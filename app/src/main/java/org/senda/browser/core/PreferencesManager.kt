@@ -36,6 +36,10 @@ class PreferencesManager(context: Context) {
         get() = prefs.getBoolean("require_biometrics", false)
         set(value) = prefs.edit().putBoolean("require_biometrics", value).apply()
 
+    var enableAntiSnooping: Boolean
+        get() = prefs.getBoolean("enable_anti_snooping", false)
+        set(value) = prefs.edit().putBoolean("enable_anti_snooping", value).apply()
+
     var showDevToolsButton: Boolean
         get() = prefs.getBoolean("show_devtools_button", true)
         set(value) = prefs.edit().putBoolean("show_devtools_button", value).apply()

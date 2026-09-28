@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -96,7 +97,7 @@ fun BrowserScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            if (activeTab != null && activeTab.url != "about:blank") {
+            if (activeTab != null) {
                 // Contenedor GeckoView para renderizado web con Gecko
                 AndroidView(
                     factory = { context ->
@@ -113,17 +114,25 @@ fun BrowserScreen(
                     },
                     modifier = Modifier.fillMaxSize()
                 )
-            } else {
-                // Pantalla Nueva Pestaña (Lienzo Zen de Senda)
-                NewTabZenView(
-                    onSearch = { query ->
-                        if (activeTab != null) {
-                            activeTab.loadUri(query)
-                        } else {
-                            onNewTab(query)
+            }
+
+            // Lienzo Zen visible solo cuando la pestaña esté vacía
+            if (activeTab == null || activeTab.url == "about:blank" || activeTab.url.isBlank()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background)
+                ) {
+                    NewTabZenView(
+                        onSearch = { query ->
+                            if (activeTab != null) {
+                                activeTab.loadUri(query)
+                            } else {
+                                onNewTab(query)
+                            }
                         }
-                    }
-                )
+                    )
+                }
             }
         }
 
@@ -232,6 +241,28 @@ fun NewTabZenView(onSearch: (String) -> Unit) {
                     tint = MaterialTheme.colorScheme.primary
                 )
             },
+            trailingIcon = {
+                if (queryText.isNotBlank()) {
+                    IconButton(onClick = { onSearch(queryText) }) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = "Ir",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            },
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                keyboardType = androidx.compose.ui.text.input.KeyboardType.Uri,
+                imeAction = androidx.compose.ui.text.input.ImeAction.Search
+            ),
+            keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                onSearch = {
+                    if (queryText.isNotBlank()) {
+                        onSearch(queryText)
+                    }
+                }
+            ),
             singleLine = true,
             shape = RoundedCornerShape(24.dp),
             colors = OutlinedTextFieldDefaults.colors(

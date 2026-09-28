@@ -22,16 +22,14 @@ import org.senda.browser.ui.theme.SendaTheme
 class MainActivity : FragmentActivity() {
 
     private lateinit var prefs: PreferencesManager
+    private var onNewIntentCallback: ((String) -> Unit)? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         prefs = PreferencesManager(this)
 
-        // Protección contra espionaje en vista multitarea (FLAG_SECURE)
-        window.setFlags(
-            WindowManager.LayoutParams.FLAG_SECURE,
-            WindowManager.LayoutParams.FLAG_SECURE
-        )
+        // Protección contra espionaje en vista multitarea (FLAG_SECURE) si el usuario la activó
+        updateAntiSnoopingFlag()
 
         // Verificar si se abrió mediante un enlace externo
         val initialUrl = intent?.dataString ?: "about:blank"
@@ -61,10 +59,22 @@ class MainActivity : FragmentActivity() {
                 }
             }
 
+            DisposableEffect(Unit) {
+                onNewIntentCallback = { url ->
+                    val newTab = BrowserTab(initialUrl = url)
+                    tabs.add(newTab)
+                    activeTabId = newTab.id
+                    currentScreen = "browser"
+                }
+                onDispose {
+                    onNewIntentCallback = null
+                }
+            }
+
             val activeTab = tabs.find { it.id == activeTabId } ?: tabs.firstOrNull()
 
-            // Manejo del botón Atrás del sistema
-            BackHandler(enabled = true) {
+            val shouldInterceptBack = currentScreen == "settings" || (activeTab?.canGoBack == true) || (tabs.size > 1)
+            BackHandler(enabled = shouldInterceptBack) {
                 if (currentScreen == "settings") {
                     currentScreen = "browser"
                 } else if (activeTab?.canGoBack == true) {
@@ -74,8 +84,6 @@ class MainActivity : FragmentActivity() {
                     activeTab.close()
                     tabs.remove(activeTab)
                     activeTabId = tabs.getOrNull((index - 1).coerceAtLeast(0))?.id ?: ""
-                } else {
-                    finish()
                 }
             }
 
@@ -90,7 +98,10 @@ class MainActivity : FragmentActivity() {
                                 SettingsScreen(
                                     prefs = prefs,
                                     onBack = { currentScreen = "browser" },
-                                    onSettingsChanged = { themeRecomposeKey++ }
+                                    onSettingsChanged = {
+                                        themeRecomposeKey++
+                                        updateAntiSnoopingFlag()
+                                    }
                                 )
                             } else {
                                 BrowserScreen(
@@ -125,7 +136,10 @@ class MainActivity : FragmentActivity() {
                                         activeTabId = fresh.id
                                     },
                                     onOpenSettings = { currentScreen = "settings" },
-                                    onSettingsChanged = { themeRecomposeKey++ }
+                                    onSettingsChanged = {
+                                        themeRecomposeKey++
+                                        updateAntiSnoopingFlag()
+                                    }
                                 )
                             }
                         }
@@ -135,9 +149,23 @@ class MainActivity : FragmentActivity() {
         }
     }
 
+    private fun updateAntiSnoopingFlag() {
+        if (prefs.enableAntiSnooping) {
+            window.setFlags(
+                WindowManager.LayoutParams.FLAG_SECURE,
+                WindowManager.LayoutParams.FLAG_SECURE
+            )
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        intent.dataString?.let { url ->
+            onNewIntentCallback?.invoke(url)
+        }
     }
 
     private fun showBiometricAuth(onResult: (Boolean) -> Unit) {

@@ -37,6 +37,7 @@ fun SettingsScreen(
     var accentHex by remember { mutableStateOf(prefs.accentColorHex) }
     var isOled by remember { mutableStateOf(prefs.isTrueOledBlack) }
     var requireBio by remember { mutableStateOf(prefs.requireBiometrics) }
+    var enableAntiSnooping by remember { mutableStateOf(prefs.enableAntiSnooping) }
     var showDevTools by remember { mutableStateOf(prefs.showDevToolsButton) }
     var showFire by remember { mutableStateOf(prefs.showFireButton) }
     var extensionInstallStatus by remember { mutableStateOf<String?>(null) }
@@ -371,6 +372,42 @@ fun SettingsScreen(
                             onCheckedChange = {
                                 requireBio = it
                                 prefs.requireBiometrics = it
+                                onSettingsChanged()
+                            }
+                        )
+                    }
+                }
+            }
+
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Anti-Espionaje Multitarea (FLAG_SECURE)",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Bloquea capturas de pantalla y oculta la vista previa en el menú de aplicaciones recientes.",
+                                fontSize = 12.sp,
+                                color = SendaColors.TextSecondary
+                            )
+                        }
+                        Switch(
+                            checked = enableAntiSnooping,
+                            onCheckedChange = {
+                                enableAntiSnooping = it
+                                prefs.enableAntiSnooping = it
                                 onSettingsChanged()
                             }
                         )
