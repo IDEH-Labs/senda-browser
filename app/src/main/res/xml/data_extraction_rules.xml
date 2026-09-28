@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup>
+        <!-- Cero subida de datos del usuario a la nube por defecto -->
+        <exclude path="." />
+    </cloud-backup>
+    <device-transfer>
+        <!-- Transferencia directa de dispositivo a dispositivo permitida si el usuario lo decide -->
+        <include path="." />
+    </device-transfer>
+</data-extraction-rules>
