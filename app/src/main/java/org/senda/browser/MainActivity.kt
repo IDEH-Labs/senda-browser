@@ -89,6 +89,8 @@ class MainActivity : FragmentActivity() {
 
             key(themeRecomposeKey) {
                 SendaTheme(
+                    themeMode = prefs.themeMode,
+                    useSystemColor = prefs.useSystemColor,
                     accentHex = prefs.accentColorHex,
                     isTrueOled = prefs.isTrueOledBlack
                 ) {

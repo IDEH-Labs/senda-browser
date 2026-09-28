@@ -1,10 +1,12 @@
 package org.senda.browser.ui.theme
 
-import androidx.compose.material3.ColorScheme
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
+import android.os.Build
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import org.senda.browser.core.AppThemeMode
 
 object SendaColors {
     val MintAccent = Color(0xFF00D2A0)
@@ -37,25 +39,58 @@ object SendaColors {
 
 @Composable
 fun SendaTheme(
+    themeMode: AppThemeMode = AppThemeMode.SYSTEM,
+    useSystemColor: Boolean = true,
     accentHex: String = "#00D2A0",
-    isTrueOled: Boolean = true,
+    isTrueOled: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val dynamicAccent = SendaColors.parseHexColor(accentHex, SendaColors.MintAccent)
-    val backgroundColor = if (isTrueOled) SendaColors.PureOledBlack else SendaColors.DarkGraphite
-    val surfaceColor = if (isTrueOled) Color(0xFF0F0F0F) else SendaColors.SurfaceDark
+    val context = LocalContext.current
+    val systemInDark = isSystemInDarkTheme()
+    val isDark = when (themeMode) {
+        AppThemeMode.SYSTEM -> systemInDark
+        AppThemeMode.LIGHT -> false
+        AppThemeMode.DARK -> true
+    }
 
-    val colorScheme: ColorScheme = darkColorScheme(
-        primary = dynamicAccent,
-        onPrimary = Color.Black,
-        background = backgroundColor,
-        onBackground = SendaColors.TextPrimary,
-        surface = surfaceColor,
-        onSurface = SendaColors.TextPrimary,
-        outline = SendaColors.BorderSubtle,
-        secondary = SendaColors.CyanGlow,
-        error = SendaColors.PanicFireRed
-    )
+    val dynamicAccent = SendaColors.parseHexColor(accentHex, SendaColors.MintAccent)
+    val supportsDynamic = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+
+    val baseColorScheme: ColorScheme = when {
+        useSystemColor && supportsDynamic && isDark -> dynamicDarkColorScheme(context)
+        useSystemColor && supportsDynamic && !isDark -> dynamicLightColorScheme(context)
+        isDark -> darkColorScheme(
+            primary = dynamicAccent,
+            onPrimary = Color.Black,
+            secondary = SendaColors.CyanGlow,
+            background = SendaColors.DarkGraphite,
+            surface = SendaColors.SurfaceDark,
+            onBackground = SendaColors.TextPrimary,
+            onSurface = SendaColors.TextPrimary,
+            outline = SendaColors.BorderSubtle,
+            error = SendaColors.PanicFireRed
+        )
+        else -> lightColorScheme(
+            primary = dynamicAccent,
+            onPrimary = Color.White,
+            secondary = SendaColors.MintAccent,
+            background = Color(0xFFF8F9FA),
+            surface = Color.White,
+            onBackground = Color(0xFF1F2328),
+            onSurface = Color(0xFF1F2328),
+            outline = Color(0xFFD0D7DE),
+            error = SendaColors.PanicFireRed
+        )
+    }
+
+    val colorScheme = if (isDark && isTrueOled) {
+        baseColorScheme.copy(
+            background = SendaColors.PureOledBlack,
+            surface = Color(0xFF0F0F0F)
+        )
+    } else {
+        baseColorScheme
+    }
 
     MaterialTheme(
         colorScheme = colorScheme,

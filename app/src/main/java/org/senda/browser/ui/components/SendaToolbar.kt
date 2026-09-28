@@ -195,7 +195,7 @@ fun SendaToolbar(
                                 Icon(
                                     imageVector = Icons.Default.Close,
                                     contentDescription = "Limpiar",
-                                    tint = SendaColors.TextSecondary,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(16.dp)
                                 )
                             }

@@ -21,9 +21,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.senda.browser.core.AppThemeMode
 import org.senda.browser.core.PreferencesManager
 import org.senda.browser.core.SendaGeckoEngine
 import org.senda.browser.core.ToolbarPosition
+import org.senda.browser.core.ZenHomeLayout
 import org.senda.browser.ui.theme.SendaColors
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -34,6 +36,9 @@ fun SettingsScreen(
     onSettingsChanged: () -> Unit
 ) {
     var toolbarPos by remember { mutableStateOf(prefs.toolbarPosition) }
+    var zenLayout by remember { mutableStateOf(prefs.zenHomeLayout) }
+    var themeMode by remember { mutableStateOf(prefs.themeMode) }
+    var useSystemColor by remember { mutableStateOf(prefs.useSystemColor) }
     var accentHex by remember { mutableStateOf(prefs.accentColorHex) }
     var isOled by remember { mutableStateOf(prefs.isTrueOledBlack) }
     var requireBio by remember { mutableStateOf(prefs.requireBiometrics) }
@@ -123,8 +128,8 @@ fun SettingsScreen(
                                     label = {
                                         Text(
                                             when (pos) {
+                                                ToolbarPosition.TOP -> "Arriba (Predeterminado)"
                                                 ToolbarPosition.BOTTOM -> "Abajo (Móvil)"
-                                                ToolbarPosition.TOP -> "Arriba"
                                                 ToolbarPosition.FLOATING -> "Flotante"
                                             }
                                         )
@@ -140,7 +145,7 @@ fun SettingsScreen(
                 }
             }
 
-            // Color de acento
+            // Diseño de la página de inicio (Nueva pestaña estilo Edge)
             item {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -148,42 +153,179 @@ fun SettingsScreen(
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = "Color de Acento del Navegador",
+                            text = "Diseño de la página de inicio (Nueva pestaña)",
                             style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        val palette = listOf(
-                            "#00D2A0" to "Menta Senda",
-                            "#4EE5B6" to "Cian",
-                            "#FFB300" to "Ámbar",
-                            "#2979FF" to "Azul Eléctrico",
-                            "#FF4081" to "Rosa",
-                            "#FFFFFF" to "Blanco Puro"
+                        Text(
+                            text = "Enfocado (mínimo), Inspirador (fondo libre), Informativo (noticias éticas) o Personalizado.",
+                            fontSize = 12.sp,
+                            color = SendaColors.TextSecondary
                         )
+                        Spacer(modifier = Modifier.height(10.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            palette.forEach { (hex, name) ->
-                                val color = SendaColors.parseHexColor(hex)
-                                val isSelected = hex.equals(accentHex, ignoreCase = true)
-                                Box(
-                                    modifier = Modifier
-                                        .size(36.dp)
-                                        .clip(CircleShape)
-                                        .background(color)
-                                        .clickable {
-                                            accentHex = hex
-                                            prefs.accentColorHex = hex
-                                            onSettingsChanged()
-                                        }
-                                        .border(
-                                            width = if (isSelected) 3.dp else 1.dp,
-                                            color = if (isSelected) Color.White else SendaColors.BorderSubtle,
-                                            shape = CircleShape
+                            ZenHomeLayout.values().forEach { layout ->
+                                val isSelected = layout == zenLayout
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = {
+                                        zenLayout = layout
+                                        prefs.zenHomeLayout = layout
+                                        onSettingsChanged()
+                                    },
+                                    label = {
+                                        Text(
+                                            when (layout) {
+                                                ZenHomeLayout.FOCUSED -> "Enfocado"
+                                                ZenHomeLayout.INSPIRATIONAL -> "Inspirador"
+                                                ZenHomeLayout.INFORMATIONAL -> "Informativo"
+                                                ZenHomeLayout.CUSTOM -> "Personalizado"
+                                            }
                                         )
+                                    },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                                    )
                                 )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Modo de tema visual (Claro / Oscuro / Sistema)
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "Modo de apariencia (Tema)",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            AppThemeMode.values().forEach { mode ->
+                                val isSelected = mode == themeMode
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = {
+                                        themeMode = mode
+                                        prefs.themeMode = mode
+                                        onSettingsChanged()
+                                    },
+                                    label = {
+                                        Text(
+                                            when (mode) {
+                                                AppThemeMode.SYSTEM -> "Sistema (Auto)"
+                                                AppThemeMode.LIGHT -> "Claro"
+                                                AppThemeMode.DARK -> "Oscuro"
+                                            }
+                                        )
+                                    },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Color del sistema (Material You)
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Color del sistema (Material You)",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Sincroniza la paleta automáticamente con el fondo y estilo de Android",
+                                fontSize = 12.sp,
+                                color = SendaColors.TextSecondary
+                            )
+                        }
+                        Switch(
+                            checked = useSystemColor,
+                            onCheckedChange = {
+                                useSystemColor = it
+                                prefs.useSystemColor = it
+                                onSettingsChanged()
+                            }
+                        )
+                    }
+                }
+            }
+
+            // Color de acento personalizado (si no usa el color del sistema)
+            if (!useSystemColor) {
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = "Color de Acento Manual",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            val palette = listOf(
+                                "#00D2A0" to "Menta Senda",
+                                "#4EE5B6" to "Cian",
+                                "#FFB300" to "Ámbar",
+                                "#2979FF" to "Azul Eléctrico",
+                                "#FF4081" to "Rosa",
+                                "#FFFFFF" to "Blanco Puro"
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                palette.forEach { (hex, _) ->
+                                    val color = SendaColors.parseHexColor(hex)
+                                    val isSelected = hex.equals(accentHex, ignoreCase = true)
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(CircleShape)
+                                            .background(color)
+                                            .clickable {
+                                                accentHex = hex
+                                                prefs.accentColorHex = hex
+                                                onSettingsChanged()
+                                            }
+                                            .border(
+                                                width = if (isSelected) 3.dp else 1.dp,
+                                                color = if (isSelected) Color.White else SendaColors.BorderSubtle,
+                                                shape = CircleShape
+                                            )
+                                    )
+                                }
                             }
                         }
                     }
@@ -210,7 +352,7 @@ fun SettingsScreen(
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "Apaga los píxeles de pantallas OLED para ahorrar batería",
+                                text = "Apaga los píxeles de pantallas OLED para ahorrar batería (en modo oscuro)",
                                 fontSize = 12.sp,
                                 color = SendaColors.TextSecondary
                             )
