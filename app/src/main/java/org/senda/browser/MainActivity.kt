@@ -27,7 +27,6 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         prefs = PreferencesManager(this)
-
         // Protección contra espionaje en vista multitarea (FLAG_SECURE) si el usuario la activó
         updateAntiSnoopingFlag()
 
@@ -149,6 +148,11 @@ class MainActivity : FragmentActivity() {
                 }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        updateAntiSnoopingFlag()
     }
 
     private fun updateAntiSnoopingFlag() {

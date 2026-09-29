@@ -94,6 +94,7 @@ fun SendaTheme(
 
     MaterialTheme(
         colorScheme = colorScheme,
+        typography = SendaTypography,
         content = content
     )
 }

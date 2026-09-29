@@ -11,7 +11,7 @@ import java.util.UUID
 
 class BrowserTab(
     val id: String = UUID.randomUUID().toString(),
-    val isPrivate: Boolean = true,
+    val isPrivate: Boolean = false,
     initialUrl: String = "about:blank"
 ) {
     val session: GeckoSession = SendaGeckoEngine.createSession(isPrivate)

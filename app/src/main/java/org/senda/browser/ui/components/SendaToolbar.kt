@@ -1,9 +1,14 @@
 package org.senda.browser.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -12,7 +17,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,6 +28,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -54,34 +59,40 @@ fun SendaToolbar(
     var isEditing by remember { mutableStateOf(false) }
     var inputUrl by remember(activeTab?.url) { mutableStateOf(activeTab?.url ?: "") }
 
+    val isHomeTab = activeTab == null || activeTab.url.isBlank() || activeTab.url == "about:blank"
+    val canGoBack = activeTab?.canGoBack == true
+
     val toolbarShape = when (position) {
         ToolbarPosition.FLOATING -> RoundedCornerShape(24.dp)
         ToolbarPosition.BOTTOM -> RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
-        ToolbarPosition.TOP -> RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp)
+        ToolbarPosition.TOP -> RoundedCornerShape(bottomStart = 18.dp, bottomEnd = 18.dp)
     }
 
-    val paddingModifier = if (position == ToolbarPosition.FLOATING) {
-        modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-    } else {
-        modifier
+    val paddingModifier = when (position) {
+        ToolbarPosition.FLOATING -> modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+        else -> modifier
     }
 
     Surface(
         modifier = paddingModifier
             .fillMaxWidth()
             .clip(toolbarShape)
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f), toolbarShape),
+            .border(
+                width = 0.8.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
+                shape = toolbarShape
+            ),
         color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 6.dp
+        tonalElevation = 3.dp
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            // Barra de progreso de carga ultra-delgada
+            // Barra de progreso de carga suave
             if (activeTab?.isLoading == true) {
                 LinearProgressIndicator(
                     progress = { (activeTab.progress / 100f).coerceIn(0f, 1f) },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(2.dp),
+                        .height(2.5.dp),
                     color = MaterialTheme.colorScheme.primary,
                     trackColor = Color.Transparent
                 )
@@ -90,30 +101,42 @@ fun SendaToolbar(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 6.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .height(52.dp)
+                    .padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                // Botón Atrás
-                IconButton(
-                    onClick = onBack,
-                    enabled = activeTab?.canGoBack == true,
-                    modifier = Modifier.size(38.dp)
+                // Botón Atrás animado: visible cuando hay historial previo
+                AnimatedVisibility(
+                    visible = canGoBack,
+                    enter = fadeIn() + expandHorizontally(),
+                    exit = fadeOut() + shrinkHorizontally()
                 ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Atrás",
-                        tint = if (activeTab?.canGoBack == true) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline
-                    )
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier.size(34.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Atrás",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(19.dp)
+                        )
+                    }
                 }
 
-                // Campo de URL / Búsqueda
+                // Píldora interactiva de URL / Búsqueda
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .height(42.dp)
+                        .height(40.dp)
                         .clip(RoundedCornerShape(20.dp))
-                        .background(MaterialTheme.colorScheme.background)
-                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), RoundedCornerShape(20.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+                        .border(
+                            width = 0.8.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
+                            shape = RoundedCornerShape(20.dp)
+                        )
                         .padding(horizontal = 10.dp),
                     contentAlignment = Alignment.CenterStart
                 ) {
@@ -121,49 +144,59 @@ fun SendaToolbar(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        // Indicador de privacidad (Escudo + contador de rastreadores)
-                        if (activeTab != null && activeTab.trackersBlocked > 0) {
+                        // Ícono de estado: Búsqueda (en inicio), Escudo (con bloqueos) o Candado (seguro)
+                        if (isHomeTab) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "Búsqueda ética",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .padding(end = 6.dp)
+                                    .size(17.dp)
+                            )
+                        } else if (activeTab != null && activeTab.trackersBlocked > 0) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
                                     .padding(end = 6.dp)
                                     .clip(CircleShape)
                                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    .padding(horizontal = 5.dp, vertical = 2.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Shield,
                                     contentDescription = "Protegido",
                                     tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(13.dp)
+                                    modifier = Modifier.size(12.dp)
                                 )
                                 Spacer(modifier = Modifier.width(3.dp))
                                 Text(
                                     text = "${activeTab.trackersBlocked}",
-                                    fontSize = 11.sp,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.primary
                                 )
                             }
                         } else {
                             Icon(
                                 imageVector = Icons.Default.Lock,
-                                contentDescription = "Seguro",
-                                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                                contentDescription = "Conexión cifrada",
+                                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
                                 modifier = Modifier
                                     .padding(end = 6.dp)
                                     .size(14.dp)
                             )
                         }
 
+                        // Campo de texto de URL o consulta
                         BasicTextField(
                             value = if (isEditing) inputUrl else displayUrl(inputUrl),
-                            onValueChange = {
-                                inputUrl = it
-                            },
+                            onValueChange = { inputUrl = it },
                             singleLine = true,
                             textStyle = TextStyle(
-                                color = MaterialTheme.colorScheme.onBackground,
-                                fontSize = 14.sp
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontSize = 13.5.sp,
+                                fontWeight = if (isHomeTab && !isEditing) FontWeight.Normal else FontWeight.Medium
                             ),
                             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                             keyboardOptions = KeyboardOptions(
@@ -182,11 +215,12 @@ fun SendaToolbar(
                                 .onFocusChanged { focusState ->
                                     isEditing = focusState.isFocused
                                     if (focusState.isFocused) {
-                                        inputUrl = activeTab?.url ?: ""
+                                        inputUrl = if (activeTab?.url == "about:blank") "" else (activeTab?.url ?: "")
                                     }
                                 }
                         )
 
+                        // Botón de limpiar texto cuando se edita
                         if (isEditing && inputUrl.isNotEmpty()) {
                             IconButton(
                                 onClick = { inputUrl = "" },
@@ -196,7 +230,7 @@ fun SendaToolbar(
                                     imageVector = Icons.Default.Close,
                                     contentDescription = "Limpiar",
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(16.dp)
+                                    modifier = Modifier.size(15.dp)
                                 )
                             }
                         }
@@ -207,13 +241,13 @@ fun SendaToolbar(
                 if (showDevToolsButton) {
                     IconButton(
                         onClick = onOpenDevTools,
-                        modifier = Modifier.size(38.dp)
+                        modifier = Modifier.size(34.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Code,
                             contentDescription = "DevTools",
                             tint = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(19.dp)
                         )
                     }
                 }
@@ -222,31 +256,36 @@ fun SendaToolbar(
                 if (showFireButton) {
                     IconButton(
                         onClick = onDissolveCurrentTab,
-                        modifier = Modifier.size(38.dp)
+                        modifier = Modifier.size(34.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.LocalFireDepartment,
                             contentDescription = "Disolver pestaña",
                             tint = SendaColors.PanicFireRed,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
 
-                // Botón contador de pestañas
+                // Botón contador de pestañas elegante
                 IconButton(
                     onClick = onOpenTabsOverview,
-                    modifier = Modifier.size(38.dp)
+                    modifier = Modifier.size(34.dp)
                 ) {
                     Box(
                         modifier = Modifier
                             .size(22.dp)
-                            .border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(5.dp)),
+                            .border(
+                                width = 1.5.dp,
+                                color = MaterialTheme.colorScheme.primary,
+                                shape = RoundedCornerShape(6.dp)
+                            ),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = "$tabsCount",
                             fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
                         )
                     }
@@ -255,12 +294,13 @@ fun SendaToolbar(
                 // Menú / Ajustes
                 IconButton(
                     onClick = onOpenSettings,
-                    modifier = Modifier.size(38.dp)
+                    modifier = Modifier.size(34.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.MoreVert,
                         contentDescription = "Ajustes",
-                        tint = MaterialTheme.colorScheme.onSurface
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
@@ -269,10 +309,10 @@ fun SendaToolbar(
 }
 
 private fun displayUrl(raw: String): String {
-    if (raw.isBlank() || raw == "about:blank") return "Escribe una dirección web o busca…"
+    if (raw.isBlank() || raw == "about:blank") return "Buscar o escribir URL…"
     return raw
         .removePrefix("https://")
         .removePrefix("http://")
         .removePrefix("www.")
-        .take(40)
+        .take(35)
 }
