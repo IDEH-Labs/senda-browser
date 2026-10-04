@@ -1,5 +1,6 @@
 package org.senda.browser.ui.components
 
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -36,33 +37,143 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.senda.browser.R
+import org.senda.browser.core.LocalSendaStrings
 import org.senda.browser.core.PreferencesManager
 import org.senda.browser.core.ZenHomeLayout
+import org.senda.browser.core.ZenShortcut
 import org.senda.browser.core.news.EthicalNewsItem
 import org.senda.browser.core.news.EthicalNewsRepository
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.ImageBitmap
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.senda.browser.core.AppThemeMode
 
-@OptIn(ExperimentalMaterial3Api::class)
+object FaviconManager {
+    private val memoryCache = android.util.LruCache<String, ImageBitmap>(60)
+
+    fun getDomain(rawUrl: String): String {
+        return try {
+            val uri = android.net.Uri.parse(if (!rawUrl.startsWith("http")) "https://$rawUrl" else rawUrl)
+            uri.host?.removePrefix("www.")?.lowercase() ?: rawUrl.lowercase()
+        } catch (_: Exception) {
+            rawUrl.lowercase()
+        }
+    }
+
+    fun getCachedFavicon(context: android.content.Context, domain: String): ImageBitmap? {
+        memoryCache.get(domain)?.let { return it }
+        val file = java.io.File(context.cacheDir, "favicons/$domain.png")
+        if (file.exists() && file.length() > 0) {
+            try {
+                val bmp = android.graphics.BitmapFactory.decodeFile(file.absolutePath)
+                if (bmp != null) {
+                    val imgBmp = bmp.asImageBitmap()
+                    memoryCache.put(domain, imgBmp)
+                    return imgBmp
+                }
+            } catch (_: Exception) {}
+        }
+        return null
+    }
+
+    suspend fun loadFavicon(context: android.content.Context, domain: String): ImageBitmap? = withContext(Dispatchers.IO) {
+        getCachedFavicon(context, domain)?.let { return@withContext it }
+        if (domain.isBlank()) return@withContext null
+
+        val urls = listOf(
+            "https://icons.duckduckgo.com/ip3/$domain.ico",
+            "https://$domain/favicon.ico"
+        )
+        for (urlStr in urls) {
+            try {
+                val conn = org.senda.browser.core.SendaNet.open(urlStr)
+                conn.connectTimeout = 3000
+                conn.readTimeout = 3000
+                conn.instanceFollowRedirects = true
+                if (conn.responseCode == 200) {
+                    conn.inputStream.use { input ->
+                        val bmp = android.graphics.BitmapFactory.decodeStream(input)
+                        if (bmp != null && bmp.width > 0 && bmp.height > 0) {
+                            val dir = java.io.File(context.cacheDir, "favicons")
+                            dir.mkdirs()
+                            val targetFile = java.io.File(dir, "$domain.png")
+                            java.io.FileOutputStream(targetFile).use { out ->
+                                bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+                            }
+                            val imgBmp = bmp.asImageBitmap()
+                            memoryCache.put(domain, imgBmp)
+                            return@withContext imgBmp
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+        null
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun NewTabZenView(
     prefs: PreferencesManager,
     onSearch: (String) -> Unit,
     onSettingsChanged: () -> Unit = {}
 ) {
+    val context = LocalContext.current
+    val strings = LocalSendaStrings.current
     var queryText by remember { mutableStateOf("") }
     var currentLayout by remember { mutableStateOf(prefs.zenHomeLayout) }
     var showWallpaper by remember { mutableStateOf(prefs.showZenWallpaper) }
     var showShortcuts by remember { mutableStateOf(prefs.showZenShortcuts) }
     var showNews by remember { mutableStateOf(prefs.showZenNewsFeed) }
     var selectedWallpaperId by remember { mutableStateOf(prefs.selectedWallpaperId) }
+    var dimPercent by remember { mutableIntStateOf(prefs.wallpaperDimPercent) }
+
+    val customWallpaperLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            try {
+                val wallDir = java.io.File(context.filesDir, "wallpapers")
+                wallDir.mkdirs()
+                val target = java.io.File(wallDir, "custom_wallpaper.jpg")
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    java.io.FileOutputStream(target).use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                prefs.customWallpaperPath = target.absolutePath
+                prefs.selectedWallpaperId = "custom_user"
+                selectedWallpaperId = "custom_user"
+                onSettingsChanged()
+            } catch (_: Exception) {}
+        }
+    }
 
     var showLayoutSelectorSheet by remember { mutableStateOf(false) }
+
+    val shortcutsList = remember { mutableStateListOf<ZenShortcut>() }
+    LaunchedEffect(Unit) {
+        shortcutsList.clear()
+        shortcutsList.addAll(prefs.getZenShortcuts())
+    }
+
+    var showAddShortcutDialog by remember { mutableStateOf(false) }
+    var editingShortcut by remember { mutableStateOf<ZenShortcut?>(null) }
 
     val newsList by produceState(initialValue = emptyList<EthicalNewsItem>()) {
         value = EthicalNewsRepository.fetchEthicalNews()
     }
 
-    val activeWallpaper = remember(selectedWallpaperId) {
-        FreeWallpapers.getById(selectedWallpaperId)
+    val activeWallpaper = remember(selectedWallpaperId, prefs.customWallpaperPath) {
+        FreeWallpapers.getById(selectedWallpaperId, prefs.customWallpaperPath)
     }
 
     val displayWallpaper = when (currentLayout) {
@@ -89,12 +200,9 @@ fun NewTabZenView(
     Box(modifier = Modifier.fillMaxSize()) {
         // Fondo artístico libre (GPL/CC0) si está activo en el modo elegido
         if (displayWallpaper) {
-            FreeWallpaperBackground(wallpaper = activeWallpaper)
-            // Capa sutil de oscurecimiento para legibilidad
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.42f))
+            FreeWallpaperBackground(
+                wallpaper = activeWallpaper,
+                dimPercent = dimPercent
             )
         } else {
             Box(
@@ -105,11 +213,13 @@ fun NewTabZenView(
         }
 
         // Contenido principal según el modo seleccionado
-        if (currentLayout == ZenHomeLayout.INFORMATIONAL || (currentLayout == ZenHomeLayout.CUSTOM && displayNewsFeed && !displayShortcuts)) {
-            // MODO INFORMATIVO: Feed continuo ético con selector en cabecera
+        if (currentLayout == ZenHomeLayout.INFORMATIONAL) {
+            // MODO INFORMATIVO: Feed continuo ético con selector en cabecera y barra de búsqueda
             InformationalLayout(
                 currentLayout = currentLayout,
                 onOpenLayoutSelector = { showLayoutSelectorSheet = true },
+                queryText = queryText,
+                onQueryChange = { queryText = it },
                 onSearch = onSearch,
                 newsList = newsList
             )
@@ -124,156 +234,434 @@ fun NewTabZenView(
                 displayShortcuts = displayShortcuts,
                 displayWallpaper = displayWallpaper,
                 activeWallpaper = activeWallpaper,
-                featuredArticle = if (currentLayout == ZenHomeLayout.INSPIRATIONAL) newsList.firstOrNull() else null
+                featuredArticle = if (currentLayout == ZenHomeLayout.INSPIRATIONAL) newsList.firstOrNull() else null,
+                displayNewsFeed = displayNewsFeed,
+                newsList = newsList,
+                shortcuts = shortcutsList,
+                onAddShortcut = { showAddShortcutDialog = true },
+                onEditShortcut = { editingShortcut = it }
+            )
+        }
+
+        // Diálogo para agregar acceso directo
+        if (showAddShortcutDialog) {
+            var newTitle by remember { mutableStateOf("") }
+            var newUrl by remember { mutableStateOf("") }
+
+            AlertDialog(
+                onDismissRequest = { showAddShortcutDialog = false },
+                title = { Text(strings.shortcut_new_title) },
+                text = {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        OutlinedTextField(
+                            value = newTitle,
+                            onValueChange = { newTitle = it },
+                            label = { Text(strings.shortcut_name_label) },
+                            placeholder = { Text(strings.shortcut_name_placeholder) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        OutlinedTextField(
+                            value = newUrl,
+                            onValueChange = { newUrl = it },
+                            label = { Text(strings.shortcut_url_label) },
+                            placeholder = { Text(strings.shortcut_url_placeholder) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            if (newTitle.isNotBlank() && newUrl.isNotBlank()) {
+                                prefs.addZenShortcut(newTitle, newUrl)
+                                shortcutsList.clear()
+                                shortcutsList.addAll(prefs.getZenShortcuts())
+                                showAddShortcutDialog = false
+                            }
+                        },
+                        enabled = newTitle.isNotBlank() && newUrl.isNotBlank()
+                    ) {
+                        Text(strings.shortcut_add)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showAddShortcutDialog = false }) {
+                        Text(strings.general_cancel)
+                    }
+                }
+            )
+        }
+
+        // Diálogo para editar o eliminar acceso directo
+        editingShortcut?.let { targetShortcut ->
+            var editTitle by remember(targetShortcut) { mutableStateOf(targetShortcut.title) }
+            var editUrl by remember(targetShortcut) { mutableStateOf(targetShortcut.url) }
+
+            AlertDialog(
+                onDismissRequest = { editingShortcut = null },
+                title = { Text(strings.shortcut_edit_title) },
+                text = {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        OutlinedTextField(
+                            value = editTitle,
+                            onValueChange = { editTitle = it },
+                            label = { Text(strings.shortcut_name_label) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        OutlinedTextField(
+                            value = editUrl,
+                            onValueChange = { editUrl = it },
+                            label = { Text(strings.shortcut_url_label) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            if (editTitle.isNotBlank() && editUrl.isNotBlank()) {
+                                prefs.updateZenShortcut(targetShortcut.id, editTitle, editUrl)
+                                shortcutsList.clear()
+                                shortcutsList.addAll(prefs.getZenShortcuts())
+                                editingShortcut = null
+                            }
+                        },
+                        enabled = editTitle.isNotBlank() && editUrl.isNotBlank()
+                    ) {
+                        Text(strings.general_save)
+                    }
+                },
+                dismissButton = {
+                    Row {
+                        TextButton(
+                            onClick = {
+                                prefs.deleteZenShortcut(targetShortcut.id)
+                                shortcutsList.clear()
+                                shortcutsList.addAll(prefs.getZenShortcuts())
+                                editingShortcut = null
+                            }
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(strings.general_delete, color = MaterialTheme.colorScheme.error)
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
+                        TextButton(onClick = { editingShortcut = null }) {
+                            Text(strings.general_cancel)
+                        }
+                    }
+                }
             )
         }
 
         // Hoja inferior para elegir diseño (Edge Preset Selector)
         if (showLayoutSelectorSheet) {
-            ModalBottomSheet(
-                onDismissRequest = { showLayoutSelectorSheet = false },
-                containerColor = MaterialTheme.colorScheme.surface,
-                dragHandle = { BottomSheetDefaults.DragHandle() }
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp)
-                        .padding(bottom = 28.dp)
+            HomeLayoutSelectorSheet(
+                prefs = prefs,
+                onDismiss = { showLayoutSelectorSheet = false },
+                onLayoutChanged = {
+                    currentLayout = prefs.zenHomeLayout
+                    showWallpaper = prefs.showZenWallpaper
+                    showShortcuts = prefs.showZenShortcuts
+                    showNews = prefs.showZenNewsFeed
+                    selectedWallpaperId = prefs.selectedWallpaperId
+                    dimPercent = prefs.wallpaperDimPercent
+                    onSettingsChanged()
+                }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HomeLayoutSelectorSheet(
+    prefs: PreferencesManager,
+    onDismiss: () -> Unit,
+    onLayoutChanged: () -> Unit = {}
+) {
+    val context = LocalContext.current
+    val strings = LocalSendaStrings.current
+    var currentLayout by remember { mutableStateOf(prefs.zenHomeLayout) }
+    var showWallpaper by remember { mutableStateOf(prefs.showZenWallpaper) }
+    var showShortcuts by remember { mutableStateOf(prefs.showZenShortcuts) }
+    var showNews by remember { mutableStateOf(prefs.showZenNewsFeed) }
+    var selectedWallpaperId by remember { mutableStateOf(prefs.selectedWallpaperId) }
+    var dimPercent by remember { mutableIntStateOf(prefs.wallpaperDimPercent) }
+
+    val customWallpaperLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            try {
+                val wallDir = java.io.File(context.filesDir, "wallpapers")
+                wallDir.mkdirs()
+                val target = java.io.File(wallDir, "custom_wallpaper.jpg")
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    java.io.FileOutputStream(target).use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                prefs.customWallpaperPath = target.absolutePath
+                prefs.selectedWallpaperId = "custom_user"
+                selectedWallpaperId = "custom_user"
+                onLayoutChanged()
+            } catch (_: Exception) {}
+        }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        dragHandle = { BottomSheetDefaults.DragHandle() }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 28.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            Text(
+                text = strings.home_design_title,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = strings.home_design_sub,
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Opciones predefinidas (Inspiradas en presets modernos)
+            LayoutOptionItem(
+                icon = Icons.Default.FilterCenterFocus,
+                title = strings.preset_focused,
+                desc = strings.preset_focused_desc,
+                isSelected = currentLayout == ZenHomeLayout.FOCUSED,
+                onClick = {
+                    currentLayout = ZenHomeLayout.FOCUSED
+                    prefs.zenHomeLayout = ZenHomeLayout.FOCUSED
+                    onLayoutChanged()
+                    onDismiss()
+                }
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            LayoutOptionItem(
+                icon = Icons.Default.AutoAwesome,
+                title = strings.preset_inspirational,
+                desc = strings.preset_inspirational_desc,
+                isSelected = currentLayout == ZenHomeLayout.INSPIRATIONAL,
+                onClick = {
+                    currentLayout = ZenHomeLayout.INSPIRATIONAL
+                    prefs.zenHomeLayout = ZenHomeLayout.INSPIRATIONAL
+                    onLayoutChanged()
+                    onDismiss()
+                }
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            LayoutOptionItem(
+                icon = Icons.Default.Newspaper,
+                title = strings.preset_informational,
+                desc = strings.preset_informational_desc,
+                isSelected = currentLayout == ZenHomeLayout.INFORMATIONAL,
+                onClick = {
+                    currentLayout = ZenHomeLayout.INFORMATIONAL
+                    prefs.zenHomeLayout = ZenHomeLayout.INFORMATIONAL
+                    onLayoutChanged()
+                    onDismiss()
+                }
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            LayoutOptionItem(
+                icon = Icons.Default.Tune,
+                title = strings.preset_custom,
+                desc = strings.preset_custom_desc,
+                isSelected = currentLayout == ZenHomeLayout.CUSTOM,
+                onClick = {
+                    currentLayout = ZenHomeLayout.CUSTOM
+                    prefs.zenHomeLayout = ZenHomeLayout.CUSTOM
+                    onLayoutChanged()
+                }
+            )
+
+            // Opciones detalladas para Personalizado
+            if (currentLayout == ZenHomeLayout.CUSTOM) {
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                CustomToggleRow(strings.home_wallpapers_art, showWallpaper) {
+                    showWallpaper = it
+                    prefs.showZenWallpaper = it
+                    onLayoutChanged()
+                }
+                CustomToggleRow(strings.zen_shortcuts, showShortcuts) {
+                    showShortcuts = it
+                    prefs.showZenShortcuts = it
+                    onLayoutChanged()
+                }
+                CustomToggleRow(strings.zen_news, showNews) {
+                    showNews = it
+                    prefs.showZenNewsFeed = it
+                    onLayoutChanged()
+                }
+            }
+
+            // Selector de fondo libre
+            if (currentLayout == ZenHomeLayout.INSPIRATIONAL || (currentLayout == ZenHomeLayout.CUSTOM && showWallpaper)) {
+                Spacer(modifier = Modifier.height(14.dp))
+                Text(
+                    text = strings.home_free_wallpapers,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(horizontal = 2.dp)
                 ) {
-                    Text(
-                        text = "Diseño de Página de Inicio",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = "Elige la armonía entre concentración, arte libre o noticias éticas.",
-                        fontSize = 13.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Opciones predefinidas (Inspiradas en presets modernos)
-                    LayoutOptionItem(
-                        icon = Icons.Default.FilterCenterFocus,
-                        title = "Enfocado",
-                        desc = "La opción más minimalista: sin fondo ni noticias, solo cuadro de búsqueda y accesos rápidos.",
-                        isSelected = currentLayout == ZenHomeLayout.FOCUSED,
-                        onClick = {
-                            currentLayout = ZenHomeLayout.FOCUSED
-                            prefs.zenHomeLayout = ZenHomeLayout.FOCUSED
-                            onSettingsChanged()
-                            showLayoutSelectorSheet = false
-                        }
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    LayoutOptionItem(
-                        icon = Icons.Default.AutoAwesome,
-                        title = "Inspirador",
-                        desc = "Fondos alusivos al Software Libre y fotografía libre profesional con noticias breves.",
-                        isSelected = currentLayout == ZenHomeLayout.INSPIRATIONAL,
-                        onClick = {
-                            currentLayout = ZenHomeLayout.INSPIRATIONAL
-                            prefs.zenHomeLayout = ZenHomeLayout.INSPIRATIONAL
-                            onSettingsChanged()
-                            showLayoutSelectorSheet = false
-                        }
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    LayoutOptionItem(
-                        icon = Icons.Default.Newspaper,
-                        title = "Informativo",
-                        desc = "Lleva las noticias éticas al centro de la pantalla con un feed continuo de EFF, FSF y MuyLinux.",
-                        isSelected = currentLayout == ZenHomeLayout.INFORMATIONAL,
-                        onClick = {
-                            currentLayout = ZenHomeLayout.INFORMATIONAL
-                            prefs.zenHomeLayout = ZenHomeLayout.INFORMATIONAL
-                            onSettingsChanged()
-                            showLayoutSelectorSheet = false
-                        }
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    LayoutOptionItem(
-                        icon = Icons.Default.Tune,
-                        title = "Personalizado",
-                        desc = "Guarda y aplica tus preferencias: activa o desactiva fondos libres, accesos y noticias a gusto.",
-                        isSelected = currentLayout == ZenHomeLayout.CUSTOM,
-                        onClick = {
-                            currentLayout = ZenHomeLayout.CUSTOM
-                            prefs.zenHomeLayout = ZenHomeLayout.CUSTOM
-                            onSettingsChanged()
-                        }
-                    )
-
-                    // Opciones detalladas para Personalizado
-                    if (currentLayout == ZenHomeLayout.CUSTOM) {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        CustomToggleRow("Fondo libre alusivo (GPL/CC0)", showWallpaper) {
-                            showWallpaper = it
-                            prefs.showZenWallpaper = it
-                            onSettingsChanged()
-                        }
-                        CustomToggleRow("Accesos directos éticos", showShortcuts) {
-                            showShortcuts = it
-                            prefs.showZenShortcuts = it
-                            onSettingsChanged()
-                        }
-                        CustomToggleRow("Feed de noticias éticas", showNews) {
-                            showNews = it
-                            prefs.showZenNewsFeed = it
-                            onSettingsChanged()
+                    // Opción de subir fondo personalizado propio
+                    item {
+                        val isCustomSelected = selectedWallpaperId == "custom_user"
+                        Surface(
+                            modifier = Modifier
+                                .width(76.dp)
+                                .height(96.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable {
+                                    try {
+                                        customWallpaperLauncher.launch("image/*")
+                                    } catch (_: Exception) {}
+                                }
+                                .border(
+                                    width = if (isCustomSelected) 2.5.dp else 0.8.dp,
+                                    color = if (isCustomSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
+                                    shape = RoundedCornerShape(10.dp)
+                                ),
+                            color = MaterialTheme.colorScheme.surfaceVariant
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(6.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.AddPhotoAlternate,
+                                    contentDescription = strings.home_custom_wallpaper,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = if (prefs.customWallpaperPath != null) strings.home_custom_label else strings.shortcut_add,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
                         }
                     }
 
-                    // Selector de fondo libre
-                    if (currentLayout == ZenHomeLayout.INSPIRATIONAL || (currentLayout == ZenHomeLayout.CUSTOM && showWallpaper)) {
-                        Spacer(modifier = Modifier.height(14.dp))
-                        Text(
-                            text = "Colección de Fondos Libres (GPL & CC0)",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    items(FreeWallpapers.items, key = { it.id }) { wallpaper ->
+                        val isSelected = wallpaper.id == selectedWallpaperId
+                        Surface(
+                            modifier = Modifier
+                                .width(76.dp)
+                                .height(96.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable {
+                                    selectedWallpaperId = wallpaper.id
+                                    prefs.selectedWallpaperId = wallpaper.id
+                                    onLayoutChanged()
+                                }
+                                .border(
+                                    width = if (isSelected) 2.5.dp else 0.8.dp,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
+                                    shape = RoundedCornerShape(10.dp)
+                                ),
+                            color = wallpaper.colors.getOrNull(1) ?: Color.DarkGray
                         ) {
-                            FreeWallpapers.items.forEach { wallpaper ->
-                                val isSelected = wallpaper.id == selectedWallpaperId
-                                Surface(
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                FreeWallpaperBackground(wallpaper = wallpaper)
+                                Box(
                                     modifier = Modifier
-                                        .weight(1f)
-                                        .height(44.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .clickable {
-                                            selectedWallpaperId = wallpaper.id
-                                            prefs.selectedWallpaperId = wallpaper.id
-                                            onSettingsChanged()
-                                        }
-                                        .border(
-                                            width = if (isSelected) 2.5.dp else 1.dp,
-                                            color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                                            shape = RoundedCornerShape(8.dp)
-                                        ),
-                                    color = wallpaper.colors.getOrNull(1) ?: Color.DarkGray
-                                ) {}
+                                        .fillMaxSize()
+                                        .background(
+                                            androidx.compose.ui.graphics.Brush.verticalGradient(
+                                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f)),
+                                                startY = 40f
+                                            )
+                                        )
+                                )
+                                Text(
+                                    text = wallpaper.name.split(":").firstOrNull() ?: wallpaper.name,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    maxLines = 2,
+                                    lineHeight = 11.sp,
+                                    modifier = Modifier
+                                        .align(Alignment.BottomStart)
+                                        .padding(5.dp)
+                                )
                             }
                         }
                     }
                 }
+
+                Spacer(modifier = Modifier.height(14.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = strings.home_dim_contrast,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "$dimPercent%",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                Slider(
+                    value = dimPercent.toFloat(),
+                    onValueChange = {
+                        dimPercent = it.toInt()
+                        prefs.wallpaperDimPercent = dimPercent
+                    },
+                    valueRange = 0f..80f,
+                    steps = 15,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
     }
@@ -289,14 +677,20 @@ fun FocusedOrInspirationalLayout(
     displayShortcuts: Boolean,
     displayWallpaper: Boolean,
     activeWallpaper: FreeWallpaper,
-    featuredArticle: EthicalNewsItem?
+    featuredArticle: EthicalNewsItem?,
+    displayNewsFeed: Boolean = false,
+    newsList: List<EthicalNewsItem> = emptyList(),
+    shortcuts: List<ZenShortcut> = emptyList(),
+    onAddShortcut: () -> Unit = {},
+    onEditShortcut: (ZenShortcut) -> Unit = {}
 ) {
+    val strings = LocalSendaStrings.current
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .imePadding()
-            .padding(horizontal = 20.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // Barra superior con selector de diseño integrado elegantemente
@@ -311,41 +705,41 @@ fun FocusedOrInspirationalLayout(
             )
         }
 
-        Spacer(modifier = Modifier.height(28.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
-        // Identidad de marca Senda
+        // Identidad de marca Senda compacta
         Image(
             painter = painterResource(id = R.drawable.ic_senda_logo),
             contentDescription = "Senda Logo",
             modifier = Modifier
-                .size(68.dp)
+                .size(46.dp)
                 .clip(CircleShape)
                 .border(
-                    width = 1.5.dp,
+                    width = 1.2.dp,
                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
                     shape = CircleShape
                 )
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(6.dp))
 
         Text(
             text = "SENDA",
-            fontSize = 24.sp,
+            fontSize = 20.sp,
             fontWeight = FontWeight.ExtraBold,
-            letterSpacing = 5.sp,
+            letterSpacing = 4.sp,
             fontFamily = FontFamily.SansSerif,
             color = if (displayWallpaper) Color.White else MaterialTheme.colorScheme.primary
         )
 
         Text(
-            text = "Navega tu propio camino · Privacidad sin concesiones",
-            fontSize = 12.5.sp,
+            text = strings.zen_tagline,
+            fontSize = 11.5.sp,
             fontWeight = FontWeight.Normal,
             color = if (displayWallpaper) Color(0xFFDCDCDC) else MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
         // Barra de búsqueda central estilizada
         OutlinedTextField(
@@ -353,8 +747,8 @@ fun FocusedOrInspirationalLayout(
             onValueChange = onQueryChange,
             placeholder = {
                 Text(
-                    "Buscar con DuckDuckGo…",
-                    color = if (displayWallpaper) Color(0xFFD8D8D8) else MaterialTheme.colorScheme.onSurfaceVariant,
+                    strings.search_or_type_url,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 13.5.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -363,9 +757,9 @@ fun FocusedOrInspirationalLayout(
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Default.Search,
-                    contentDescription = "Buscar",
+                    contentDescription = strings.general_search,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(19.dp)
                 )
             },
             trailingIcon = {
@@ -374,15 +768,15 @@ fun FocusedOrInspirationalLayout(
                         onClick = { onSearch(queryText) },
                         modifier = Modifier
                             .padding(end = 4.dp)
-                            .size(32.dp)
+                            .size(30.dp)
                             .clip(CircleShape)
                             .background(MaterialTheme.colorScheme.primary)
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                            contentDescription = "Ir",
+                            contentDescription = strings.tb_go,
                             tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(15.dp)
                         )
                     }
                 }
@@ -395,134 +789,152 @@ fun FocusedOrInspirationalLayout(
                 onSearch = { if (queryText.isNotBlank()) onSearch(queryText) }
             ),
             singleLine = true,
-            shape = RoundedCornerShape(24.dp),
+            shape = RoundedCornerShape(20.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = if (displayWallpaper) MaterialTheme.colorScheme.surface.copy(alpha = 0.92f) else MaterialTheme.colorScheme.surface,
-                unfocusedContainerColor = if (displayWallpaper) MaterialTheme.colorScheme.surface.copy(alpha = 0.85f) else MaterialTheme.colorScheme.surface,
+                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
                 focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = if (displayWallpaper) Color.White.copy(alpha = 0.25f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
+                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
             ),
-            modifier = Modifier.fillMaxWidth(0.96f)
+            modifier = Modifier.fillMaxWidth(0.98f)
         )
 
-        // Accesos directos éticos con iconografía enriquecida
+        // Accesos directos éticos en cuadrícula responsiva (4 por fila) aprovechando todo el ancho
         if (displayShortcuts) {
-            Spacer(modifier = Modifier.height(24.dp))
-            Row(
+            Spacer(modifier = Modifier.height(14.dp))
+
+            val itemsWithAdd = shortcuts.map { it to false } + listOf(null to true)
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.Top
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                QuickLinkTile(
-                    title = "DuckDuckGo",
-                    url = "https://duckduckgo.com",
-                    iconColor = Color(0xFFDE5833),
-                    monogram = "DDG",
-                    displayWallpaper = displayWallpaper,
-                    onClick = onSearch
-                )
-                QuickLinkTile(
-                    title = "Wikipedia",
-                    url = "https://es.wikipedia.org",
-                    iconColor = if (displayWallpaper) Color.White else Color(0xFF333333),
-                    monogram = "W",
-                    isSerif = true,
-                    displayWallpaper = displayWallpaper,
-                    onClick = onSearch
-                )
-                QuickLinkTile(
-                    title = "F-Droid",
-                    url = "https://f-droid.org",
-                    iconColor = Color(0xFF0288D1),
-                    iconVector = Icons.Default.Android,
-                    displayWallpaper = displayWallpaper,
-                    onClick = onSearch
-                )
-                QuickLinkTile(
-                    title = "Archive",
-                    url = "https://archive.org",
-                    iconColor = Color(0xFF546E7A),
-                    iconVector = Icons.Default.AccountBalance,
-                    displayWallpaper = displayWallpaper,
-                    onClick = onSearch
-                )
-                QuickLinkTile(
-                    title = "MuyLinux",
-                    url = "https://www.muylinux.com",
-                    iconColor = Color(0xFF00B0FF),
-                    iconVector = Icons.Default.Terminal,
-                    displayWallpaper = displayWallpaper,
-                    onClick = onSearch
-                )
+                itemsWithAdd.chunked(4).forEach { rowItems ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceAround,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        rowItems.forEach { (shortcut, isAdd) ->
+                            if (isAdd) {
+                                AddShortcutTile(
+                                    displayWallpaper = displayWallpaper,
+                                    onClick = onAddShortcut
+                                )
+                            } else if (shortcut != null) {
+                                QuickLinkTile(
+                                    title = shortcut.title,
+                                    url = shortcut.url,
+                                    iconColor = shortcut.colorHex?.let { runCatching { Color(android.graphics.Color.parseColor(it)) }.getOrNull() }
+                                        ?: if (displayWallpaper) Color.White else MaterialTheme.colorScheme.primary,
+                                    monogram = shortcut.monogram.ifBlank { shortcut.title.take(2).uppercase() },
+                                    displayWallpaper = displayWallpaper,
+                                    onClick = onSearch,
+                                    onLongClick = { onEditShortcut(shortcut) }
+                                )
+                            }
+                        }
+                        if (rowItems.size < 4) {
+                            repeat(4 - rowItems.size) {
+                                Spacer(modifier = Modifier.width(64.dp))
+                            }
+                        }
+                    }
+                }
             }
         }
 
-        // Titular ético destacado al pie (Modo Inspirador)
-        if (featuredArticle != null) {
-            Spacer(modifier = Modifier.height(28.dp))
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth(0.96f)
-                    .clip(RoundedCornerShape(16.dp))
-                    .clickable { onSearch(featuredArticle.url) },
-                colors = CardDefaults.cardColors(
-                    containerColor = if (displayWallpaper) {
-                        MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)
-                    } else {
-                        MaterialTheme.colorScheme.surface
-                    }
-                ),
-                border = BorderStroke(
-                    width = 0.8.dp,
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                ),
-                shape = RoundedCornerShape(16.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                            ) {
-                                Text(
-                                    text = "📰 ${featuredArticle.source}",
-                                    fontSize = 10.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "· ${featuredArticle.publishedDate}",
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = featuredArticle.title,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                        contentDescription = "Leer noticia",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp)
-                    )
+        // Feed completo de noticias éticas si está activo
+        if (displayNewsFeed && newsList.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(16.dp))
+
+            var selectedSource by remember { mutableStateOf("Todas") }
+            val sources = listOf("Todas", "MuyLinux", "EFF", "FSF")
+
+            val filteredNews = remember(selectedSource, newsList) {
+                if (selectedSource == "Todas") {
+                    newsList
+                } else {
+                    newsList.filter { it.source.contains(selectedSource, ignoreCase = true) }
                 }
             }
+
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = strings.zen_news,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = if (displayWallpaper) Color.White else MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = strings.zen_news_subtitle,
+                            fontSize = 11.5.sp,
+                            color = if (displayWallpaper) Color(0xFFDCDCDC) else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(sources) { source ->
+                        val isSelected = source == selectedSource
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { selectedSource = source },
+                            label = {
+                                Text(
+                                    text = when (source) {
+                                        "Todas" -> strings.zen_news_all
+                                        "MuyLinux" -> "🐧 MuyLinux"
+                                        "EFF" -> "🛡️ EFF"
+                                        "FSF" -> "🦬 FSF"
+                                        else -> source
+                                    },
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                )
+                            },
+                            // Fondo propio también sin seleccionar: transparentes se perdían sobre el fondo de pantalla
+                            colors = FilterChipDefaults.filterChipColors(
+                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
+                                labelColor = MaterialTheme.colorScheme.onSurface,
+                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                filteredNews.forEach { article ->
+                    NewsArticleCard(
+                        article = article,
+                        displayWallpaper = displayWallpaper,
+                        onClick = { onSearch(article.url) }
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                }
+            }
+        } else if (featuredArticle != null) {
+            Spacer(modifier = Modifier.height(28.dp))
+            NewsArticleCard(
+                article = featuredArticle,
+                displayWallpaper = displayWallpaper,
+                onClick = { onSearch(featuredArticle.url) }
+            )
         }
 
         // Crédito y licencia de fondo libre
@@ -549,9 +961,12 @@ fun FocusedOrInspirationalLayout(
 fun InformationalLayout(
     currentLayout: ZenHomeLayout,
     onOpenLayoutSelector: () -> Unit,
+    queryText: String,
+    onQueryChange: (String) -> Unit,
     onSearch: (String) -> Unit,
     newsList: List<EthicalNewsItem>
 ) {
+    val strings = LocalSendaStrings.current
     var selectedSource by remember { mutableStateOf("Todas") }
     val sources = listOf("Todas", "MuyLinux", "EFF", "FSF")
 
@@ -570,25 +985,29 @@ fun InformationalLayout(
         verticalArrangement = Arrangement.spacedBy(10.dp),
         contentPadding = PaddingValues(top = 14.dp, bottom = 28.dp)
     ) {
-        // Cabecera informativa con selector de modo
         item {
             Column(modifier = Modifier.fillMaxWidth()) {
+                // Cabecera con selector de diseño
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Actualidad Ética & Soberanía",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_senda_logo),
+                            contentDescription = "Senda Logo",
+                            modifier = Modifier
+                                .size(30.dp)
+                                .clip(CircleShape)
                         )
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Fuentes directas sin intermediarios algorítmicos",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text = "SENDA",
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = 2.sp,
+                            color = MaterialTheme.colorScheme.primary
                         )
                     }
 
@@ -601,7 +1020,91 @@ fun InformationalLayout(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Fila de chips de filtro por fuente ética
+                // Barra de búsqueda central en modo Informativo
+                OutlinedTextField(
+                    value = queryText,
+                    onValueChange = onQueryChange,
+                    placeholder = {
+                        Text(
+                            strings.search_or_type_url,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 13.5.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = strings.general_search,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(19.dp)
+                        )
+                    },
+                    trailingIcon = {
+                        if (queryText.isNotBlank()) {
+                            IconButton(
+                                onClick = { onSearch(queryText) },
+                                modifier = Modifier
+                                    .padding(end = 4.dp)
+                                    .size(30.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primary)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                    contentDescription = strings.tb_go,
+                                    tint = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                            }
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Uri,
+                        imeAction = ImeAction.Search
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onSearch = { if (queryText.isNotBlank()) onSearch(queryText) }
+                    ),
+                    singleLine = true,
+                    shape = RoundedCornerShape(20.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Cabecera del feed de noticias éticas
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = strings.zen_news,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = strings.zen_news_subtitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth()
@@ -614,7 +1117,7 @@ fun InformationalLayout(
                             label = {
                                 Text(
                                     text = when (source) {
-                                        "Todas" -> "Todas"
+                                        "Todas" -> strings.zen_news_all
                                         "MuyLinux" -> "🐧 MuyLinux"
                                         "EFF" -> "🛡️ EFF"
                                         "FSF" -> "🦬 FSF"
@@ -624,7 +1127,10 @@ fun InformationalLayout(
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                 )
                             },
+                            // Fondo propio también sin seleccionar: transparentes se perdían sobre el fondo de pantalla
                             colors = FilterChipDefaults.filterChipColors(
+                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
+                                labelColor = MaterialTheme.colorScheme.onSurface,
                                 selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
                                 selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
                             )
@@ -636,91 +1142,160 @@ fun InformationalLayout(
             }
         }
 
-        // Lista de artículos éticos con diseño tipo tarjeta profesional
         items(filteredNews) { article ->
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .clickable { onSearch(article.url) },
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                ),
-                border = BorderStroke(
-                    width = 0.8.dp,
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
-                ),
-                shape = RoundedCornerShape(16.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            NewsArticleCard(
+                article = article,
+                displayWallpaper = false,
+                onClick = { onSearch(article.url) }
+            )
+        }
+    }
+}
+
+@Composable
+fun NewsArticleCard(
+    article: EthicalNewsItem,
+    displayWallpaper: Boolean = false,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .clickable { onClick() },
+        colors = CardDefaults.cardColors(
+            containerColor = if (displayWallpaper) {
+                MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)
+            } else {
+                MaterialTheme.colorScheme.surface
+            }
+        ),
+        border = BorderStroke(
+            width = 0.8.dp,
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+        ),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = when (article.source) {
-                                "MuyLinux" -> Color(0xFFE65100).copy(alpha = 0.12f)
-                                "EFF" -> Color(0xFF1976D2).copy(alpha = 0.12f)
-                                "FSF" -> Color(0xFF7B1FA2).copy(alpha = 0.12f)
-                                else -> MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                            }
-                        ) {
-                            Text(
-                                text = when (article.source) {
-                                    "MuyLinux" -> "🐧 MuyLinux"
-                                    "EFF" -> "🛡️ EFF"
-                                    "FSF" -> "🦬 FSF"
-                                    else -> article.source
-                                },
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = when (article.source) {
-                                    "MuyLinux" -> Color(0xFFD84315)
-                                    "EFF" -> Color(0xFF1565C0)
-                                    "FSF" -> Color(0xFF6A1B9A)
-                                    else -> MaterialTheme.colorScheme.primary
-                                }
-                            )
-                        }
-
-                        Text(
-                            text = article.publishedDate,
-                            fontSize = 11.5.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = when (article.source) {
+                        "MuyLinux" -> Color(0xFFE65100).copy(alpha = 0.12f)
+                        "EFF" -> Color(0xFF1976D2).copy(alpha = 0.12f)
+                        "FSF" -> Color(0xFF7B1FA2).copy(alpha = 0.12f)
+                        else -> MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
                     }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
+                ) {
                     Text(
-                        text = article.title,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        lineHeight = 22.sp
+                        text = when (article.source) {
+                            "MuyLinux" -> "🐧 MuyLinux"
+                            "EFF" -> "🛡️ EFF"
+                            "FSF" -> "🦬 FSF"
+                            else -> article.source
+                        },
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = when (article.source) {
+                            "MuyLinux" -> Color(0xFFD84315)
+                            "EFF" -> Color(0xFF1565C0)
+                            "FSF" -> Color(0xFF6A1B9A)
+                            else -> MaterialTheme.colorScheme.primary
+                        }
                     )
-
-                    if (article.snippet.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = article.snippet,
-                            style = MaterialTheme.typography.bodyMedium,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            lineHeight = 18.sp
-                        )
-                    }
                 }
+
+                Text(
+                    text = article.publishedDate,
+                    fontSize = 11.5.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Text(
+                text = article.title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                lineHeight = 22.sp
+            )
+
+            if (article.snippet.isNotBlank()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = article.snippet,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 18.sp
+                )
             }
         }
     }
 }
 
+@Composable
+fun AddShortcutTile(
+    displayWallpaper: Boolean = false,
+    onClick: () -> Unit
+) {
+    val strings = LocalSendaStrings.current
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .width(64.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .clickable { onClick() }
+            .padding(vertical = 4.dp)
+    ) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = if (displayWallpaper) {
+                Color.Black.copy(alpha = 0.45f)
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+            },
+            border = BorderStroke(
+                width = 1.dp,
+                color = if (displayWallpaper) Color.White.copy(alpha = 0.35f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+            ),
+            tonalElevation = 1.dp,
+            modifier = Modifier.size(50.dp)
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = strings.shortcut_add_desc,
+                    tint = if (displayWallpaper) Color.White else MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = strings.shortcut_add,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Medium,
+            textAlign = TextAlign.Center,
+            color = if (displayWallpaper) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+            style = if (displayWallpaper) androidx.compose.material3.LocalTextStyle.current.merge(wallpaperLabelStyle) else androidx.compose.material3.LocalTextStyle.current
+        )
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun QuickLinkTile(
     title: String,
@@ -730,14 +1305,18 @@ fun QuickLinkTile(
     iconVector: ImageVector? = null,
     isSerif: Boolean = false,
     displayWallpaper: Boolean = false,
-    onClick: (String) -> Unit
+    onClick: (String) -> Unit,
+    onLongClick: (() -> Unit)? = null
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
             .width(64.dp)
             .clip(RoundedCornerShape(16.dp))
-            .clickable { onClick(url) }
+            .combinedClickable(
+                onClick = { onClick(url) },
+                onLongClick = onLongClick
+            )
             .padding(vertical = 4.dp)
     ) {
         Surface(
@@ -762,7 +1341,7 @@ fun QuickLinkTile(
                     Icon(
                         imageVector = iconVector,
                         contentDescription = title,
-                        tint = iconColor,
+                        tint = if (displayWallpaper && iconColor.luminance() < 0.2f) Color.White else iconColor,
                         modifier = Modifier.size(24.dp)
                     )
                 } else if (monogram != null) {
@@ -771,7 +1350,8 @@ fun QuickLinkTile(
                         fontSize = if (monogram.length > 1) 13.sp else 21.sp,
                         fontWeight = FontWeight.Black,
                         fontFamily = if (isSerif) FontFamily.Serif else FontFamily.SansSerif,
-                        color = iconColor
+                        // Sobre el recuadro oscuro, un color de marca muy oscuro (la «W» de Wikipedia) no se veía
+                        color = if (displayWallpaper && iconColor.luminance() < 0.2f) Color.White else iconColor
                     )
                 }
             }
@@ -786,7 +1366,9 @@ fun QuickLinkTile(
             softWrap = false,
             letterSpacing = (-0.3).sp,
             overflow = TextOverflow.Ellipsis,
-            color = if (displayWallpaper) Color.White else MaterialTheme.colorScheme.onSurface
+            color = if (displayWallpaper) Color.White else MaterialTheme.colorScheme.onSurface,
+            // Sombra sobre el fondo de pantalla: en zonas claras el nombre blanco no se leía
+            style = if (displayWallpaper) androidx.compose.material3.LocalTextStyle.current.merge(wallpaperLabelStyle) else androidx.compose.material3.LocalTextStyle.current
         )
     }
 }
@@ -797,6 +1379,7 @@ fun PresetSwitcherButton(
     onClick: () -> Unit,
     displayWallpaper: Boolean = false
 ) {
+    val strings = LocalSendaStrings.current
     Surface(
         modifier = Modifier
             .clip(RoundedCornerShape(18.dp))
@@ -819,17 +1402,17 @@ fun PresetSwitcherButton(
                     ZenHomeLayout.INFORMATIONAL -> Icons.Default.Newspaper
                     ZenHomeLayout.CUSTOM -> Icons.Default.Tune
                 },
-                contentDescription = "Diseño de Inicio",
+                contentDescription = strings.st_zen_title,
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(15.dp)
             )
             Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text = when (currentLayout) {
-                    ZenHomeLayout.FOCUSED -> "Enfocado"
-                    ZenHomeLayout.INSPIRATIONAL -> "Inspirador"
-                    ZenHomeLayout.INFORMATIONAL -> "Informativo"
-                    ZenHomeLayout.CUSTOM -> "Personalizado"
+                    ZenHomeLayout.FOCUSED -> strings.preset_focused
+                    ZenHomeLayout.INSPIRATIONAL -> strings.preset_inspirational
+                    ZenHomeLayout.INFORMATIONAL -> strings.preset_informational
+                    ZenHomeLayout.CUSTOM -> strings.preset_custom
                 },
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -854,6 +1437,7 @@ fun LayoutOptionItem(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
+    val strings = LocalSendaStrings.current
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -902,7 +1486,7 @@ fun LayoutOptionItem(
                 Spacer(modifier = Modifier.width(8.dp))
                 Icon(
                     imageVector = Icons.Default.CheckCircle,
-                    contentDescription = "Seleccionado",
+                    contentDescription = strings.general_selected,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp)
                 )
@@ -924,3 +1508,7 @@ fun CustomToggleRow(title: String, checked: Boolean, onCheckedChange: (Boolean) 
         Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
+
+private val wallpaperLabelStyle = androidx.compose.ui.text.TextStyle(
+    shadow = androidx.compose.ui.graphics.Shadow(color = Color.Black.copy(alpha = 0.8f), blurRadius = 6f)
+)

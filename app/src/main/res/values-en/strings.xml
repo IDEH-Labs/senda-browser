@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Senda</string>
+    <string name="search_hint">Search or type web address…</string>
+    <string name="dissolve_tab">Close tab</string>
+    <string name="panic_burn_all">Close all tabs</string>
+    <string name="new_tab">New tab</string>
+    <string name="tabs_open">Open tabs</string>
+    <string name="settings">Settings</string>
+    <string name="trackers_blocked">Trackers blocked</string>
+    <string name="devtools_title">Developer Console</string>
+    <string name="install_extension">Install extension (.xpi)</string>
+    <string name="biometric_prompt_title">Unlock Senda</string>
+    <string name="biometric_prompt_desc">Authenticate to access your secure sessions</string>
+    <string name="biometric_cancel">Cancel</string>
+    <string name="biometric_unlock_button">Unlock</string>
+    <string name="biometric_no_device_lock">This phone has no PIN, pattern or fingerprint: Senda\'s lock can\'t protect it until you set one up.</string>
+</resources>

@@ -4,8 +4,12 @@ import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import org.senda.browser.core.AppThemeMode
 
 object SendaColors {
@@ -43,6 +47,10 @@ fun SendaTheme(
     useSystemColor: Boolean = true,
     accentHex: String = "#00D2A0",
     isTrueOled: Boolean = false,
+    fontFamilyKey: String = "SERIF",
+    fontScalePercent: Int = 100,
+    hinting: String = "SLIGHT",
+    recomposeKey: Int = 0,
     content: @Composable () -> Unit
 ) {
     val context = LocalContext.current
@@ -92,9 +100,23 @@ fun SendaTheme(
         baseColorScheme
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = SendaTypography,
-        content = content
-    )
+    val fontFamily = remember(fontFamilyKey, recomposeKey) { resolveFontFamily(fontFamilyKey) }
+    val typography = remember(fontFamily, hinting, recomposeKey) { getSendaTypography(fontFamily, hinting) }
+
+    val currentDensity = LocalDensity.current
+    val scaleFactor = (fontScalePercent / 100f).coerceIn(0.75f, 1.8f)
+
+    CompositionLocalProvider(
+        LocalDensity provides Density(
+            density = currentDensity.density,
+            fontScale = currentDensity.fontScale * scaleFactor
+        )
+    ) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = typography,
+            content = content
+        )
+    }
 }
+

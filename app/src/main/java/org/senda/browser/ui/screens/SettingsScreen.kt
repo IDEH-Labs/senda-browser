@@ -1,31 +1,52 @@
 package org.senda.browser.ui.screens
 
+import android.app.role.RoleManager
+import android.content.Context
+import android.content.Intent
 import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.senda.browser.core.AppThemeMode
-import org.senda.browser.core.PreferencesManager
-import org.senda.browser.core.SendaGeckoEngine
-import org.senda.browser.core.ToolbarPosition
-import org.senda.browser.core.ZenHomeLayout
+import org.senda.browser.core.*
+import org.senda.browser.ui.components.CastHelper
+import org.senda.browser.ui.components.ExtensionsManagerDialog
+import org.senda.browser.ui.components.FreeWallpapers
+import org.senda.browser.ui.components.SovereignSyncDialog
+import org.senda.browser.ui.components.ToolbarCustomizationDialog
+import org.senda.browser.ui.components.SendaVaultDialog
+import org.senda.browser.ui.components.UBlockOriginDialog
+import org.senda.browser.ui.screens.settings.*
 import org.senda.browser.ui.theme.SendaColors
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -33,18 +54,18 @@ import org.senda.browser.ui.theme.SendaColors
 fun SettingsScreen(
     prefs: PreferencesManager,
     onBack: () -> Unit,
+    onOpenUrl: ((String) -> Unit)? = null,
     onSettingsChanged: () -> Unit
 ) {
-    var toolbarPos by remember { mutableStateOf(prefs.toolbarPosition) }
-    var zenLayout by remember { mutableStateOf(prefs.zenHomeLayout) }
-    var themeMode by remember { mutableStateOf(prefs.themeMode) }
-    var useSystemColor by remember { mutableStateOf(prefs.useSystemColor) }
-    var accentHex by remember { mutableStateOf(prefs.accentColorHex) }
-    var isOled by remember { mutableStateOf(prefs.isTrueOledBlack) }
-    var requireBio by remember { mutableStateOf(prefs.requireBiometrics) }
-    var enableAntiSnooping by remember { mutableStateOf(prefs.enableAntiSnooping) }
-    var showDevTools by remember { mutableStateOf(prefs.showDevToolsButton) }
-    var showFire by remember { mutableStateOf(prefs.showFireButton) }
+    val context = LocalContext.current
+    val strings = LocalSendaStrings.current
+
+    // Estados reactivos de preferencias
+    var isSearchActive by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+
+    // Diálogos activos (guardado persistente para no cerrarse en cambios de tema o configuración)
+    var activeDialog by rememberSaveable { mutableStateOf<String?>(null) }
     var extensionInstallStatus by remember { mutableStateOf<String?>(null) }
 
     // Selector de archivos para extensiones .xpi locales
@@ -55,29 +76,146 @@ fun SettingsScreen(
             SendaGeckoEngine.installExtension(
                 uri = uri,
                 onSuccess = { ext ->
-                    extensionInstallStatus = "Extensión instalada con éxito."
+                    extensionInstallStatus = strings.addon_installed_success
+                    onSettingsChanged()
                 },
                 onError = { err ->
-                    extensionInstallStatus = "Error al instalar: ${err.message}"
+                    extensionInstallStatus = "${strings.addon_install_error}: ${err.message}"
                 }
             )
         }
     }
 
+    // Comprobador y lanzador de navegador predeterminado
+    var isDefaultBrowserApp by remember {
+        mutableStateOf(checkIsDefaultBrowser(context))
+    }
+
+    val defaultBrowserLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) {
+        isDefaultBrowserApp = checkIsDefaultBrowser(context)
+    }
+
+    fun requestSetDefaultBrowser() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val roleManager = context.getSystemService(Context.ROLE_SERVICE) as? RoleManager
+            if (roleManager != null && roleManager.isRoleAvailable(RoleManager.ROLE_BROWSER)) {
+                val intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_BROWSER)
+                defaultBrowserLauncher.launch(intent)
+                return
+            }
+        }
+        try {
+            val intent = Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            try {
+                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.fromParts("package", context.packageName, null)
+                }
+                context.startActivity(intent)
+            } catch (_: Exception) {}
+        }
+    }
+
+    val allSettings = remember(prefs, strings, isDefaultBrowserApp) {
+        buildSettingsList(
+            context = context,
+            prefs = prefs,
+            strings = strings,
+            isDefaultBrowserApp = isDefaultBrowserApp,
+            onRequestSetDefaultBrowser = { requestSetDefaultBrowser() },
+            onOpenDialog = { activeDialog = it },
+            onSettingsChanged = onSettingsChanged
+        )
+    }
+
+    // Filtrado de búsqueda en tiempo real
+    val filteredSettings = remember(searchQuery, allSettings) {
+        if (searchQuery.isBlank()) {
+            allSettings
+        } else {
+            val q = searchQuery.trim().lowercase()
+            allSettings.filter {
+                it.title.lowercase().contains(q) ||
+                        it.subtitle.lowercase().contains(q) ||
+                        it.category.lowercase().contains(q)
+            }
+        }
+    }
+
+    val categories = listOf(strings.cat_nav, strings.cat_privacy, strings.cat_advanced, strings.cat_about)
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Ajustes & Soberanía Visual", color = MaterialTheme.colorScheme.onSurface) },
+                title = {
+                    if (isSearchActive) {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            placeholder = { Text(strings.search_settings, fontSize = 16.sp) },
+                            singleLine = true,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(end = 8.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color.Transparent,
+                                unfocusedBorderColor = Color.Transparent
+                            )
+                        )
+                    } else {
+                        Text(
+                            text = strings.tb_settings,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Normal,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(
+                        onClick = {
+                            if (isSearchActive) {
+                                isSearchActive = false
+                                searchQuery = ""
+                            } else {
+                                onBack()
+                            }
+                        }
+                    ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Atrás",
+                            contentDescription = strings.back,
                             tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
+                actions = {
+                    if (isSearchActive) {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = strings.general_clear,
+                                    tint = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    } else {
+                        IconButton(onClick = { isSearchActive = true }) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = strings.search_settings,
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
             )
         },
         containerColor = MaterialTheme.colorScheme.background
@@ -86,480 +224,501 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // SECCIÓN: DISEÑO Y APARIENCIA
-            item {
-                Text(
-                    text = "DISEÑADOR DE INTERFAZ",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.labelMedium
-                )
-            }
-
-            // Posición de la barra
-            item {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = "Posición de la barra de navegación",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            ToolbarPosition.values().forEach { pos ->
-                                val isSelected = pos == toolbarPos
-                                FilterChip(
-                                    selected = isSelected,
-                                    onClick = {
-                                        toolbarPos = pos
-                                        prefs.toolbarPosition = pos
-                                        onSettingsChanged()
-                                    },
-                                    label = {
-                                        Text(
-                                            when (pos) {
-                                                ToolbarPosition.TOP -> "Arriba (Predeterminado)"
-                                                ToolbarPosition.BOTTOM -> "Abajo (Móvil)"
-                                                ToolbarPosition.FLOATING -> "Flotante"
-                                            }
-                                        )
-                                    },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary
-                                    )
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Diseño de la página de inicio (Nueva pestaña estilo Edge)
-            item {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = "Diseño de la página de inicio (Nueva pestaña)",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "Enfocado (mínimo), Inspirador (fondo libre), Informativo (noticias éticas) o Personalizado.",
-                            fontSize = 12.sp,
-                            color = SendaColors.TextSecondary
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            ZenHomeLayout.values().forEach { layout ->
-                                val isSelected = layout == zenLayout
-                                FilterChip(
-                                    selected = isSelected,
-                                    onClick = {
-                                        zenLayout = layout
-                                        prefs.zenHomeLayout = layout
-                                        onSettingsChanged()
-                                    },
-                                    label = {
-                                        Text(
-                                            when (layout) {
-                                                ZenHomeLayout.FOCUSED -> "Enfocado"
-                                                ZenHomeLayout.INSPIRATIONAL -> "Inspirador"
-                                                ZenHomeLayout.INFORMATIONAL -> "Informativo"
-                                                ZenHomeLayout.CUSTOM -> "Personalizado"
-                                            }
-                                        )
-                                    },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary
-                                    )
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Modo de tema visual (Claro / Oscuro / Sistema)
-            item {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = "Modo de apariencia (Tema)",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            AppThemeMode.values().forEach { mode ->
-                                val isSelected = mode == themeMode
-                                FilterChip(
-                                    selected = isSelected,
-                                    onClick = {
-                                        themeMode = mode
-                                        prefs.themeMode = mode
-                                        onSettingsChanged()
-                                    },
-                                    label = {
-                                        Text(
-                                            when (mode) {
-                                                AppThemeMode.SYSTEM -> "Sistema (Auto)"
-                                                AppThemeMode.LIGHT -> "Claro"
-                                                AppThemeMode.DARK -> "Oscuro"
-                                            }
-                                        )
-                                    },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary
-                                    )
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Color del sistema (Material You)
-            item {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Color del sistema (Material You)",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "Sincroniza la paleta automáticamente con el fondo y estilo de Android",
-                                fontSize = 12.sp,
-                                color = SendaColors.TextSecondary
-                            )
-                        }
-                        Switch(
-                            checked = useSystemColor,
-                            onCheckedChange = {
-                                useSystemColor = it
-                                prefs.useSystemColor = it
-                                onSettingsChanged()
-                            }
-                        )
-                    }
-                }
-            }
-
-            // Color de acento personalizado (si no usa el color del sistema)
-            if (!useSystemColor) {
+            // TARJETA SUPERIOR: SINCRONIZACIÓN ÉTICA & IDENTIDAD (si no está buscando activamente)
+            if (!isSearchActive || searchQuery.isBlank()) {
                 item {
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text(
-                                text = "Color de Acento Manual",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            val palette = listOf(
-                                "#00D2A0" to "Menta Senda",
-                                "#4EE5B6" to "Cian",
-                                "#FFB300" to "Ámbar",
-                                "#2979FF" to "Azul Eléctrico",
-                                "#FF4081" to "Rosa",
-                                "#FFFFFF" to "Blanco Puro"
-                            )
+                    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                        Card(
+                            onClick = { activeDialog = "sync_ethical" },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface
+                            ),
+                            shape = RoundedCornerShape(16.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                        ) {
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(18.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                palette.forEach { (hex, _) ->
-                                    val color = SendaColors.parseHexColor(hex)
-                                    val isSelected = hex.equals(accentHex, ignoreCase = true)
-                                    Box(
-                                        modifier = Modifier
-                                            .size(36.dp)
-                                            .clip(CircleShape)
-                                            .background(color)
-                                            .clickable {
-                                                accentHex = hex
-                                                prefs.accentColorHex = hex
-                                                onSettingsChanged()
-                                            }
-                                            .border(
-                                                width = if (isSelected) 3.dp else 1.dp,
-                                                color = if (isSelected) Color.White else SendaColors.BorderSubtle,
-                                                shape = CircleShape
-                                            )
+                                Box(
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .clip(CircleShape)
+                                        .background(if (prefs.fxaIsConnected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = if (prefs.fxaIsConnected) Icons.Default.Sync else Icons.Default.AccountCircle,
+                                        contentDescription = null,
+                                        tint = if (prefs.fxaIsConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSecondaryContainer,
+                                        modifier = Modifier.size(28.dp)
                                     )
                                 }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Tema True OLED
-            item {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Negro Absoluto OLED (#000000)",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "Apaga los píxeles de pantallas OLED para ahorrar batería (en modo oscuro)",
-                                fontSize = 12.sp,
-                                color = SendaColors.TextSecondary
-                            )
-                        }
-                        Switch(
-                            checked = isOled,
-                            onCheckedChange = {
-                                isOled = it
-                                prefs.isTrueOledBlack = it
-                                onSettingsChanged()
-                            }
-                        )
-                    }
-                }
-            }
-
-            // SECCIÓN: BOTONES PERSONALIZADOS
-            item {
-                Text(
-                    text = "CONTROLES DE LA BARRA",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.labelMedium
-                )
-            }
-
-            item {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Mostrar botón DevTools (< / >)",
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Switch(
-                                checked = showDevTools,
-                                onCheckedChange = {
-                                    showDevTools = it
-                                    prefs.showDevToolsButton = it
-                                    onSettingsChanged()
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = if (prefs.fxaIsConnected) "Firefox Sync" else strings.sync_card_title,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = if (prefs.fxaIsConnected) {
+                                            "${strings.sync_card_connected}: ${prefs.fxaEmail}"
+                                        } else {
+                                            strings.sync_card_disconnected
+                                        },
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 }
-                            )
+                                Icon(
+                                    imageVector = Icons.Default.ChevronRight,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
                         }
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = SendaColors.BorderSubtle)
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                    }
+                }
+            }
+
+            // CONTENIDO DE AJUSTES (POR CATEGORÍAS O RESULTADOS DE BÚSQUEDA)
+            if (isSearchActive && searchQuery.isNotBlank()) {
+                if (filteredSettings.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(32.dp),
+                            contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "Mostrar botón Fuego / Incinerar (🔥)",
-                                color = MaterialTheme.colorScheme.onSurface
+                                text = strings.st_search_no_results.replace("%s", searchQuery),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            Switch(
-                                checked = showFire,
-                                onCheckedChange = {
-                                    showFire = it
-                                    prefs.showFireButton = it
-                                    onSettingsChanged()
-                                }
+                        }
+                    }
+                } else {
+                    items(filteredSettings, key = { it.id }) { item ->
+                        SettingRow(item = item)
+                    }
+                }
+            } else {
+                categories.forEach { category ->
+                    val categoryItems = allSettings.filter { it.category == category }
+                    if (categoryItems.isNotEmpty()) {
+                        item(key = "header_$category") {
+                            Text(
+                                text = category,
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 6.dp)
                             )
+                        }
+                        items(categoryItems, key = { it.id }) { item ->
+                            SettingRow(item = item)
                         }
                     }
                 }
             }
 
-            // SECCIÓN: EXTENSIONES & LIBERTAD DE CÓDIGO
             item {
-                Text(
-                    text = "LIBERTAD DE EXTENSIONES (.XPI)",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.labelMedium
-                )
-            }
-
-            item {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = "Instalar extensión desde archivo local",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "Instala cualquier extensión (.xpi) sin cuentas de Mozilla ni restricciones.",
-                            fontSize = 12.sp,
-                            color = SendaColors.TextSecondary
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Button(
-                            onClick = {
-                                filePickerLauncher.launch("application/x-xpinstall")
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                        ) {
-                            Icon(imageVector = Icons.Default.Extension, contentDescription = null, tint = Color.Black)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Seleccionar archivo .xpi", color = Color.Black)
-                        }
-                        if (extensionInstallStatus != null) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = extensionInstallStatus ?: "",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-                }
-            }
-
-            // SECCIÓN: SEGURIDAD FÍSICA
-            item {
-                Text(
-                    text = "BÓVEDA DE HARDWARE",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.labelMedium
-                )
-            }
-
-            item {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Bloqueo con Huella / Biometría",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "Exige autenticación biométrica obligatoria al abrir Senda",
-                                fontSize = 12.sp,
-                                color = SendaColors.TextSecondary
-                            )
-                        }
-                        Switch(
-                            checked = requireBio,
-                            onCheckedChange = {
-                                requireBio = it
-                                prefs.requireBiometrics = it
-                                onSettingsChanged()
-                            }
-                        )
-                    }
-                }
-            }
-
-            item {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Anti-Espionaje Multitarea (FLAG_SECURE)",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "Bloquea capturas de pantalla y oculta la vista previa en el menú de aplicaciones recientes.",
-                                fontSize = 12.sp,
-                                color = SendaColors.TextSecondary
-                            )
-                        }
-                        Switch(
-                            checked = enableAntiSnooping,
-                            onCheckedChange = {
-                                enableAntiSnooping = it
-                                prefs.enableAntiSnooping = it
-                                onSettingsChanged()
-                            }
-                        )
-                    }
-                }
-            }
-
-            item {
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(32.dp))
             }
         }
+    }
+
+    // ==================== DIÁLOGOS DE CONFIGURACIÓN ====================
+
+    // DIÁLOGO: MOTOR DE BÚSQUEDA
+    if (activeDialog == "search") {
+        org.senda.browser.ui.screens.settings.SettingsSearchDialog(
+            prefs = prefs,
+            strings = strings,
+            onSettingsChanged = onSettingsChanged,
+            onDismiss = { activeDialog = null }
+        )
+    }
+
+    // DIÁLOGO: GESTIÓN DE PESTAÑAS
+    if (activeDialog == "tabs") {
+        org.senda.browser.ui.screens.settings.SettingsTabsDialog(
+            prefs = prefs,
+            strings = strings,
+            onSettingsChanged = onSettingsChanged,
+            onDismiss = { activeDialog = null }
+        )
+    }
+
+    // DIÁLOGO: PÁGINA DE INICIO (ZEN)
+    if (activeDialog == "home") {
+        org.senda.browser.ui.screens.settings.SettingsHomeDialog(
+            context = context,
+            prefs = prefs,
+            strings = strings,
+            onSettingsChanged = onSettingsChanged,
+            onDismiss = { activeDialog = null }
+        )
+    }
+
+    // DIÁLOGO: APARIENCIA Y TEMA VISUAL
+    if (activeDialog == "customize") {
+        org.senda.browser.ui.screens.settings.SettingsAppearanceDialog(
+            prefs = prefs,
+            strings = strings,
+            onSettingsChanged = onSettingsChanged,
+            onDismiss = { activeDialog = null }
+        )
+    }
+
+    // DIÁLOGO: PERSONALIZAR BARRA DE HERRAMIENTAS
+    if (activeDialog == "toolbar_customization") {
+        ToolbarCustomizationDialog(
+            prefs = prefs,
+            onDismiss = { activeDialog = null },
+            onChanged = onSettingsChanged
+        )
+    }
+
+    // DIÁLOGO: BÓVEDA SOBERANA DE CONTRASEÑAS & AUDITORÍA
+    if (activeDialog == "passwords") {
+        SendaVaultDialog(
+            prefs = prefs,
+            strings = strings,
+            onDismiss = { activeDialog = null },
+            onRequireBiometricAuth = { callback ->
+                val activity = context as? androidx.fragment.app.FragmentActivity
+                if (activity != null) {
+                    val executor = androidx.core.content.ContextCompat.getMainExecutor(activity)
+                    val prompt = androidx.biometric.BiometricPrompt(
+                        activity,
+                        executor,
+                        object : androidx.biometric.BiometricPrompt.AuthenticationCallback() {
+                            override fun onAuthenticationSucceeded(result: androidx.biometric.BiometricPrompt.AuthenticationResult) {
+                                super.onAuthenticationSucceeded(result)
+                                callback(true)
+                            }
+                            override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                                super.onAuthenticationError(errorCode, errString)
+                                callback(false)
+                            }
+                            override fun onAuthenticationFailed() {
+                                super.onAuthenticationFailed()
+                            }
+                        }
+                    )
+                    // Huella o PIN/patrón del teléfono: sin huella registrada la bóveda quedaba inaccesible
+                    // La clave de la Bóveda solo se desbloquea con huella «fuerte» o PIN (Android 11+)
+                    val authenticators = (if (android.os.Build.VERSION.SDK_INT >= 30)
+                        androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
+                    else
+                        androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_WEAK) or
+                        androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
+                    if (androidx.biometric.BiometricManager.from(activity).canAuthenticate(authenticators) !=
+                        androidx.biometric.BiometricManager.BIOMETRIC_SUCCESS
+                    ) {
+                        // Sin ningún bloqueo en el teléfono no hay con qué verificar
+                        callback(true)
+                    } else {
+                        val promptInfo = androidx.biometric.BiometricPrompt.PromptInfo.Builder()
+                            .setTitle(strings.st_passwords_title)
+                            .setAllowedAuthenticators(authenticators)
+                            .build()
+                        prompt.authenticate(promptInfo)
+                    }
+                } else {
+                    callback(true)
+                }
+            }
+        )
+    }
+
+    // DIÁLOGO: AUTOCOMPLETADO
+    if (activeDialog == "autofill") {
+        SettingsAutofillDialog(
+            context = context,
+            strings = strings,
+            onDismiss = { activeDialog = null }
+        )
+    }
+
+    // DIÁLOGO: ACCESIBILIDAD VISUAL
+    if (activeDialog == "accessibility") {
+        SettingsAccessibilityDialog(
+            prefs = prefs,
+            strings = strings,
+            onOpenTypography = { activeDialog = "gnome_typography" },
+            onSettingsChanged = onSettingsChanged,
+            onDismiss = { activeDialog = null }
+        )
+    }
+
+    // DIÁLOGO: TIPOGRAFÍAS Y RENDERIZADO
+    if (activeDialog == "gnome_typography") {
+        SettingsGnomeTypographyDialog(
+            prefs = prefs,
+            strings = strings,
+            onSettingsChanged = onSettingsChanged,
+            onDismiss = { activeDialog = null }
+        )
+    }
+
+    // DIÁLOGO: IDIOMA
+    if (activeDialog == "language") {
+        SettingsLanguageDialog(
+            context = context,
+            prefs = prefs,
+            strings = strings,
+            onSettingsChanged = onSettingsChanged,
+            onDismiss = { activeDialog = null }
+        )
+    }
+
+    // DIÁLOGO: TRADUCCIONES
+    if (activeDialog == "translations") {
+        SettingsTranslationsDialog(
+            prefs = prefs,
+            strings = strings,
+            onSettingsChanged = onSettingsChanged,
+            onDismiss = { activeDialog = null }
+        )
+    }
+
+    // DIÁLOGO: MODO LECTURA Y RESÚMENES
+    if (activeDialog == "reader_mode" || activeDialog == "summaries") {
+        SettingsReaderModeDialog(
+            prefs = prefs,
+            strings = strings,
+            onSettingsChanged = onSettingsChanged,
+            onDismiss = { activeDialog = null }
+        )
+    }
+
+    // DIÁLOGO: IA LOCAL Y ASISTENCIA SOBERANA
+    if (activeDialog == "ai_controls") {
+        org.senda.browser.ui.components.SendaSovereignAiDialog(
+            prefs = prefs,
+            onDismiss = { activeDialog = null }
+        )
+    }
+
+    // DIÁLOGO: ENRUTAMIENTO TOR & PROXY SOCKS5
+    if (activeDialog == "tor_proxy") {
+        SettingsTorDialog(
+            context = context,
+            prefs = prefs,
+            strings = strings,
+            onSettingsChanged = onSettingsChanged,
+            onDismiss = { activeDialog = null }
+        )
+    }
+
+    // DIÁLOGO: NAVEGACIÓN PRIVADA
+    if (activeDialog == "private_browsing") {
+        SettingsPrivateBrowsingDialog(
+            prefs = prefs,
+            strings = strings,
+            onSettingsChanged = onSettingsChanged,
+            onDismiss = { activeDialog = null }
+        )
+    }
+
+    // DIÁLOGO: MODO SOLO HTTPS
+    if (activeDialog == "https_only") {
+        SettingsHttpsOnlyDialog(
+            prefs = prefs,
+            strings = strings,
+            onSettingsChanged = onSettingsChanged,
+            onDismiss = { activeDialog = null }
+        )
+    }
+
+    // DIÁLOGO: DNS SOBRE HTTPS (DOH)
+    if (activeDialog == "dns_over_https") {
+        SettingsDohDialog(
+            prefs = prefs,
+            strings = strings,
+            onSettingsChanged = onSettingsChanged,
+            onDismiss = { activeDialog = null }
+        )
+    }
+
+    // DIÁLOGO: PROTECCIÓN CONTRA RASTREO MEJORADA
+    if (activeDialog == "tracking_protection") {
+        SettingsTrackingProtectionDialog(
+            prefs = prefs,
+            strings = strings,
+            onSettingsChanged = onSettingsChanged,
+            onDismiss = { activeDialog = null }
+        )
+    }
+
+    // DIÁLOGO: UBLOCK ORIGIN (SOBERANÍA Y FILTROS)
+    if (activeDialog == "ublock_origin") {
+        UBlockOriginDialog(
+            onNavigate = { url ->
+                activeDialog = null
+                onOpenUrl?.invoke(url)
+            },
+            onDismiss = { activeDialog = null }
+        )
+    }
+
+    // DIÁLOGO: BÓVEDA BIOMÉTRICA & ANTI-ESPIONAJE
+    if (activeDialog == "security_vault") {
+        SettingsSecurityVaultDialog(
+            prefs = prefs,
+            strings = strings,
+            onSettingsChanged = onSettingsChanged,
+            onDismiss = { activeDialog = null }
+        )
+    }
+
+    // DIÁLOGO: CONFIGURACIÓN DEL SITIO & PERMISOS
+    if (activeDialog == "site_permissions") {
+        SettingsSitePermissionsDialog(
+            prefs = prefs,
+            strings = strings,
+            onSettingsChanged = onSettingsChanged,
+            onDismiss = { activeDialog = null }
+        )
+    }
+
+    // DIÁLOGO: RECOPILACIÓN DE DATOS & PRIVACIDAD
+    if (activeDialog == "data_collection") {
+        SettingsDataCollectionDialog(
+            strings = strings,
+            onDismiss = { activeDialog = null }
+        )
+    }
+
+    // DIÁLOGO: COMPLEMENTOS Y EXTENSIONES
+    if (activeDialog == "extensions") {
+        ExtensionsManagerDialog(
+            onDismiss = { activeDialog = null }
+        )
+    }
+
+    // DIÁLOGO: ABRIR ENLACES EN APLICACIONES
+    if (activeDialog == "open_in_apps") {
+        SettingsOpenInAppsDialog(
+            prefs = prefs,
+            strings = strings,
+            onSettingsChanged = onSettingsChanged,
+            onDismiss = { activeDialog = null }
+        )
+    }
+
+    // DIÁLOGO: AJUSTES DE DESCARGA
+    if (activeDialog == "download_settings") {
+        SettingsDownloadSettingsDialog(
+            prefs = prefs,
+            strings = strings,
+            onSettingsChanged = onSettingsChanged,
+            onDismiss = { activeDialog = null }
+        )
+    }
+
+    // DIÁLOGO: SENDA LABS (FUNCIONES EXPERIMENTALES)
+    if (activeDialog == "senda_labs") {
+        SettingsSendaLabsDialog(
+            prefs = prefs,
+            strings = strings,
+            onSettingsChanged = onSettingsChanged,
+            onDismiss = { activeDialog = null }
+        )
+    }
+
+    // DIÁLOGO: SOBRE SENDA & MANIFIESTO
+    if (activeDialog == "about_senda" || activeDialog == "ethical_manifesto" || activeDialog == "third_party_licenses") {
+        SettingsAboutDialog(
+            activeDialog = activeDialog ?: "about_senda",
+            strings = strings,
+            onDismiss = { activeDialog = null }
+        )
+    }
+
+    // DIÁLOGO: SINCRONIZACIÓN Y RESPALDO (WEBDAV & NETSCAPE HTML)
+    if (activeDialog == "sync_ethical") {
+        SovereignSyncDialog(
+            prefs = prefs,
+            onDismiss = { activeDialog = null }
+        )
+    }
+
+    // DIÁLOGO: TRANSMISIÓN Y CHROMECAST
+    if (activeDialog == "chromecast_settings") {
+        SettingsChromecastDialog(
+            context = context,
+            prefs = prefs,
+            strings = strings,
+            onSettingsChanged = onSettingsChanged,
+            onDismiss = { activeDialog = null }
+        )
+    }
+}
+
+@Composable
+private fun SettingRow(item: SettingItemData) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = item.onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+            Text(
+                text = item.title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Normal,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (item.subtitle.isNotBlank()) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = item.subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+        if (item.isToggle) {
+            Spacer(modifier = Modifier.width(8.dp))
+            Switch(
+                checked = item.isChecked,
+                onCheckedChange = { isChecked ->
+                    item.onToggleChange?.invoke(isChecked)
+                }
+            )
+        }
+    }
+}
+
+private fun checkIsDefaultBrowser(context: Context): Boolean {
+    return try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val roleManager = context.getSystemService(Context.ROLE_SERVICE) as? RoleManager
+            roleManager?.isRoleHeld(RoleManager.ROLE_BROWSER) ?: false
+        } else {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://senda.org"))
+            val resolveInfo = context.packageManager.resolveActivity(intent, 0)
+            resolveInfo?.activityInfo?.packageName == context.packageName
+        }
+    } catch (_: Exception) {
+        false
     }
 }

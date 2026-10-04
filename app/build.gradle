@@ -22,16 +22,23 @@ android {
         ndk {
             abiFilters 'arm64-v8a'
         }
+        externalNativeBuild {
+            cmake {
+                cppFlags "-O3 -flto -frtti -fexceptions"
+                arguments "-DANDROID_STL=c++_shared"
+            }
+        }
     }
 
     buildTypes {
         release {
+            signingConfig signingConfigs.debug
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
         debug {
-            debuggable false
+            debuggable true
         }
     }
 
@@ -55,6 +62,15 @@ android {
         }
         resources {
             excludes += '/META-INF/{AL2.0,LGPL2.1}'
+        }
+    }
+
+    ndkVersion "26.1.10909125"
+
+    externalNativeBuild {
+        cmake {
+            path file("src/main/cpp/CMakeLists.txt")
+            version "3.22.1"
         }
     }
 }
@@ -82,6 +98,7 @@ dependencies {
 
     // AndroidX & Kotlin
     implementation 'androidx.core:core-ktx:1.15.0'
+    implementation 'androidx.fragment:fragment-ktx:1.8.5'
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.7'
     implementation 'androidx.activity:activity-compose:1.9.3'
 
@@ -102,5 +119,13 @@ dependencies {
     // Hidden API bypass para JNI de GeckoView en Android 9-15
     implementation 'org.lsposed.hiddenapibypass:hiddenapibypass:4.3'
 
+    // Tor Nativo Embebido Soberano (Guardian Project)
+    implementation 'info.guardianproject:tor-android:0.4.8.16'
+    implementation 'info.guardianproject:jtorctl:0.4.5.7'
+    implementation 'androidx.localbroadcastmanager:localbroadcastmanager:1.1.0'
+
     debugImplementation 'androidx.compose.ui:ui-tooling'
+    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+    androidTestImplementation 'androidx.test:runner:1.6.2'
+    androidTestImplementation 'androidx.test:core:1.6.1'
 }

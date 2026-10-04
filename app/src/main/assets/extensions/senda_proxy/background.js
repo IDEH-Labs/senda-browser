@@ -1,0 +1,164 @@
+let currentConfig = null;
+
+// Ninguna petición sale hasta saber qué proxy usar: si no, al abrir Senda con Tor activado las primeras
+// páginas salían directas (con la IP real) mientras llegaba la configuración desde la app
+let markReady;
+const configReady = new Promise((resolve) => { markReady = resolve; });
+
+function proxyFor(config) {
+    if (!config || config.mode === 'OFF') {
+        return { type: 'direct' };
+    }
+
+    if (config.mode === 'TOR_ORBOT') {
+        return {
+            type: 'socks',
+            host: '127.0.0.1',
+            port: 9050,
+            proxyDNS: true
+        };
+    }
+
+    if (config.mode === 'CUSTOM_SOCKS5') {
+        const host = config.host || '127.0.0.1';
+        const port = parseInt(config.port, 10) || 9050;
+        return {
+            type: 'socks',
+            host: host,
+            port: port,
+            proxyDNS: config.proxyDNS !== false
+        };
+    }
+
+    if (config.mode === 'CUSTOM_HTTP') {
+        const host = config.host || '127.0.0.1';
+        const port = parseInt(config.port, 10) || 8080;
+        return {
+            type: 'http',
+            host: host,
+            port: port
+        };
+    }
+
+    return { type: 'direct' };
+}
+
+function handleProxyRequest(requestInfo) {
+    if (currentConfig) {
+        return proxyFor(currentConfig);
+    }
+    return configReady.then(() => proxyFor(currentConfig));
+}
+
+// 1. Registrar el listener activo de proxy para todas las URLs
+try {
+    if (browser.proxy && browser.proxy.onRequest) {
+        browser.proxy.onRequest.addListener(handleProxyRequest, { urls: ['<all_urls>'] });
+        console.log('Senda Proxy: onRequest listener activo');
+    }
+} catch (e) {
+    console.error('Senda Proxy: Error en onRequest listener:', e);
+}
+
+// WebRTC puede revelar la IP real aunque la web vaya por Tor o un proxy: con proxy activo solo se permite
+// WebRTC a través del proxy
+function applyWebRtcPolicy(config) {
+    try {
+        const setting = browser.privacy && browser.privacy.network && browser.privacy.network.webRTCIPHandlingPolicy;
+        if (!setting) return;
+        if (config && config.mode !== 'OFF') {
+            setting.set({ value: 'proxy_only' }).catch(() => {});
+        } else {
+            setting.clear({}).catch(() => {});
+        }
+    } catch (e) {
+        console.warn('Senda Proxy: WebRTC policy warning:', e);
+    }
+}
+
+function applyProxy(config) {
+    if (!config) return;
+    currentConfig = config;
+    markReady();
+    applyWebRtcPolicy(config);
+
+    // 2. Configuración global vía browser.proxy.settings
+    try {
+        if (browser.proxy && browser.proxy.settings) {
+            if (config.mode === 'OFF') {
+                browser.proxy.settings.set({ value: { proxyType: 'none' } }).catch(() => {});
+            } else if (config.mode === 'TOR_ORBOT') {
+                browser.proxy.settings.set({
+                    value: {
+                        proxyType: 'manual',
+                        socks: '127.0.0.1:9050',
+                        socksVersion: 5,
+                        proxyDNS: true
+                    }
+                }).catch(() => {});
+            } else if (config.mode === 'CUSTOM_SOCKS5') {
+                const host = config.host || '127.0.0.1';
+                const port = parseInt(config.port, 10) || 9050;
+                browser.proxy.settings.set({
+                    value: {
+                        proxyType: 'manual',
+                        socks: host + ':' + port,
+                        socksVersion: 5,
+                        proxyDNS: config.proxyDNS !== false
+                    }
+                }).catch(() => {});
+            } else if (config.mode === 'CUSTOM_HTTP') {
+                const host = config.host || '127.0.0.1';
+                const port = parseInt(config.port, 10) || 8080;
+                browser.proxy.settings.set({
+                    value: {
+                        proxyType: 'manual',
+                        http: host + ':' + port,
+                        ssl: host + ':' + port
+                    }
+                }).catch(() => {});
+            }
+        }
+    } catch (e) {
+        console.warn('Senda Proxy: proxy.settings.set warning:', e);
+    }
+}
+
+function rememberAndApply(msg) {
+    if (msg && msg.type === 'SET_PROXY') {
+        applyProxy(msg);
+        browser.storage.local.set({ currentProxy: msg });
+    }
+}
+
+// 3. Conexión de puerto nativo continuo
+try {
+    const port = browser.runtime.connectNative('senda_proxy');
+    port.onMessage.addListener(rememberAndApply);
+} catch (e) {
+    console.warn('Senda Proxy: connectNative error', e);
+}
+
+// 4. Última configuración guardada: disponible al instante al arrancar
+browser.storage.local.get('currentProxy').then((res) => {
+    if (res && res.currentProxy && !currentConfig) {
+        applyProxy(res.currentProxy);
+    }
+}).catch(() => {});
+
+// 5. Consulta a la app: la fuente de verdad
+try {
+    browser.runtime.sendNativeMessage('senda_proxy', { action: 'GET_INITIAL_PROXY' })
+        .then(rememberAndApply)
+        .catch((err) => console.log('Senda Proxy: sendNativeMessage err', err));
+} catch (e) {
+    console.warn('Senda Proxy: sendNativeMessage error', e);
+}
+
+// Si la app no responde (no debería pasar), no bloquear la navegación para siempre: sin configuración
+// conocida se navega directo, igual que con el proxy apagado
+setTimeout(() => {
+    if (!currentConfig) {
+        applyProxy({ type: 'SET_PROXY', mode: 'OFF' });
+    }
+}, 8000);
