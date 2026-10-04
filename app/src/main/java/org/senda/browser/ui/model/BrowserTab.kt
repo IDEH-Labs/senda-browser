@@ -154,6 +154,7 @@ class BrowserTab(
                 // Cerrar el aviso sin elegir equivale a no conceder nada
                 is SendaPrompt.DateTime -> if (!p.prompt.isComplete) p.result.complete(p.prompt.dismiss())
                 is SendaPrompt.Permission -> p.onDecision(false)
+                is SendaPrompt.OpenInApp -> p.onDecision(false)
                 is SendaPrompt.ContextMenu -> {}
             }
         } catch (_: Exception) {}
@@ -195,9 +196,8 @@ class BrowserTab(
             ?.takeIf { it.startsWith("https://") || it.startsWith("http://") }
         intent.addCategory(Intent.CATEGORY_BROWSABLE)
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        // «Nunca» en «Abrir enlaces en apps»: solo se respetan los esquemas estándar (llamar, correo, mapa)
-        val appsAllowed = standard || prefs?.openLinksInApps != "NEVER"
-        val launched = appsAllowed && try {
+        val mode = prefs?.openLinksInApps ?: "ASK"
+        fun launch(): Boolean = try {
             context.startActivity(intent)
             true
         } catch (_: android.content.ActivityNotFoundException) {
@@ -205,7 +205,32 @@ class BrowserTab(
         } catch (_: SecurityException) {
             false
         }
-        if (!launched && fallback != null) loadUri(fallback)
+        // «Nunca» en «Abrir enlaces en apps»: solo se respetan los esquemas estándar (llamar, correo, mapa)
+        if (!standard && mode == "NEVER") {
+            if (fallback != null) loadUri(fallback)
+            return
+        }
+        if (!standard && mode == "ASK") {
+            val target = try {
+                context.packageManager.resolveActivity(intent, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY)
+            } catch (_: Exception) { null }
+            // Sin app que lo abra no hay nada que preguntar
+            if (target == null) {
+                if (fallback != null) loadUri(fallback)
+                return
+            }
+            // Si resuelve al selector del sistema, no hay una app concreta que nombrar
+            val label = target.activityInfo?.packageName
+                ?.takeIf { it != "android" }
+                ?.let { target.loadLabel(context.packageManager)?.toString() }
+            // Una sola decisión: el diálogo decide y luego se descarta (que vuelve a avisar con «no»)
+            val decided = java.util.concurrent.atomic.AtomicBoolean(false)
+            activePrompt = SendaPrompt.OpenInApp(label) { open ->
+                if (decided.compareAndSet(false, true) && !(open && launch()) && fallback != null) loadUri(fallback)
+            }
+            return
+        }
+        if (!launch() && fallback != null) loadUri(fallback)
     }
 
     /**

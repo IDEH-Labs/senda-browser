@@ -739,6 +739,13 @@ interface SendaStringPack {
     val devtools_none: String
     val devtools_injected_success: String
     val devtools_inject_error: String
+    val dl_cancelled: String
+    val open_in_app_title: String
+    val open_in_app_title_generic: String
+    val open_in_app_body: String
+    val open_in_app_open: String
+    val open_in_app_stay: String
+    val tb_suggestion_fill: String
 }
 
 object SendaStringsDe : SendaStringPack {
@@ -963,7 +970,7 @@ object SendaStringsDe : SendaStringPack {
     override val dlg_search_custom_url = "Benutzerdefinierte Such-URL"
     override val dlg_search_custom_url_hint = "Suchadresse (verwende %s für die Suchanfrage)"
     override val dlg_search_suggestions = "Suchvorschläge"
-    override val dlg_search_suggestions_sub = "Vorschläge während der Eingabe anzeigen"
+    override val dlg_search_suggestions_sub = "Aus Lesezeichen und Verlauf; Ihre Eingabe verlässt das Telefon nicht"
     override val dlg_biometrics_desc = "Aktivieren Sie die biometrische Sperre, um Ihre Tabs und Sitzungen beim App-Wechsel zu schützen."
     override val dlg_clear_data_desc = "Wählen Sie die Daten aus, die Sie sofort von Ihrem Gerät entfernen möchten:"
     override val dlg_doh_desc = "Verschlüsselt Ihre DNS-Anfragen via DoH, damit weder Netzwerk noch Provider sehen können, welche Websites Sie aufrufen."
@@ -1033,7 +1040,7 @@ object SendaStringsDe : SendaStringPack {
     override val dlg_passwords_info = "Senda speichert deine Passwörter in einem lokalen, mit AES-256-GCM verschlüsselten Tresor; der Schlüssel liegt im Android-Keystore. Vorerst ist es ein manueller Manager: Formulare werden nicht ausgefüllt."
     override val dlg_passwords_bullets = "• Keine Passwörter werden in die Cloud oder an zentrale Server gesendet.\n• Verschlüsselt mit freien AES-256-GCM-Algorithmen.\n• Automatisches Ausfüllen kann per Biometrie gesperrt werden."
     override val dlg_autofill_desc = "Senda speichert noch keine Formulare oder Adressen. Du kannst deinen Android-Passwortmanager oder Autofill-Dienst (Bitwarden, KeePassDX…) nutzen, den Senda in Seitenfeldern unterstützt."
-    override val dlg_accessibility_typography_note = "Skalierung, Websynchronisierung, Schriftarten und Rendering (Hinting/Antialiasing) werden gemeinsam im Typografie-Menü verwaltet."
+    override val dlg_accessibility_typography_note = "Skalierung, Websynchronisierung und Schriftarten werden gemeinsam im Typografie-Menü verwaltet."
     override val dlg_senda_labs_desc = "Inspektions- und Anpassungswerkzeuge für fortgeschrittene Nutzer und Entwickler:"
     override val dlg_senda_labs_css = "Benutzerdefiniertes CSS"
     override val dlg_senda_labs_css_hint = "/* Globale CSS-Stile injizieren */"
@@ -1339,6 +1346,13 @@ object SendaStringsDe : SendaStringPack {
     override val devtools_none = "keiner"
     override val devtools_injected_success = "Code erfolgreich ausgeführt."
     override val devtools_inject_error = "Fehler beim Ausführen des Codes:"
+    override val dl_cancelled = "Download abgebrochen: %s"
+    override val open_in_app_title = "In %s öffnen?"
+    override val open_in_app_title_generic = "In einer anderen App öffnen?"
+    override val open_in_app_body = "Dieser Link möchte Senda verlassen und in einer installierten App geöffnet werden."
+    override val open_in_app_open = "Öffnen"
+    override val open_in_app_stay = "In Senda bleiben"
+    override val tb_suggestion_fill = "Diese Adresse bearbeiten"
 }
 
 object SendaStringsEn : SendaStringPack {
@@ -1563,7 +1577,7 @@ object SendaStringsEn : SendaStringPack {
     override val dlg_search_custom_url = "Custom search URL"
     override val dlg_search_custom_url_hint = "Search address (use %s for query)"
     override val dlg_search_suggestions = "Search suggestions"
-    override val dlg_search_suggestions_sub = "Show suggestions while typing"
+    override val dlg_search_suggestions_sub = "From your bookmarks and history; what you type never leaves the phone"
     override val dlg_biometrics_desc = "Enable biometric lock to protect your tabs and active sessions when switching apps."
     override val dlg_clear_data_desc = "Select the data you wish to delete immediately from your device:"
     override val dlg_doh_desc = "Encrypt your domain lookups using DoH so no one on your local network or ISP can see which websites you connect to."
@@ -1633,7 +1647,7 @@ object SendaStringsEn : SendaStringPack {
     override val dlg_passwords_info = "Senda keeps your passwords in a local vault encrypted with AES-256-GCM, with the key protected by the Android Keystore. For now it is a manual manager: it does not fill page forms."
     override val dlg_passwords_bullets = "• No passwords are sent to cloud or central servers.\n• Encrypted with open AES-256-GCM algorithms.\n• You can protect autofill with biometric authentication."
     override val dlg_autofill_desc = "Senda does not save forms or addresses yet. You can use your Android password manager or autofill service (Bitwarden, KeePassDX…), which Senda supports in page fields."
-    override val dlg_accessibility_typography_note = "Scale factor, web sync, fonts, and rendering (hinting/antialiasing) are managed together in the typography panel."
+    override val dlg_accessibility_typography_note = "Scale factor, web sync and fonts are managed together in the typography panel."
     override val dlg_senda_labs_desc = "Inspection and visual styling tools for advanced users and engineers:"
     override val dlg_senda_labs_css = "User Custom CSS"
     override val dlg_senda_labs_css_hint = "/* Inject global CSS styles */"
@@ -1939,6 +1953,13 @@ object SendaStringsEn : SendaStringPack {
     override val devtools_none = "none"
     override val devtools_injected_success = "Code injected successfully."
     override val devtools_inject_error = "Error injecting code:"
+    override val dl_cancelled = "Download cancelled: %s"
+    override val open_in_app_title = "Open in %s?"
+    override val open_in_app_title_generic = "Open in another app?"
+    override val open_in_app_body = "This link wants to leave Senda and open in an installed app."
+    override val open_in_app_open = "Open"
+    override val open_in_app_stay = "Stay in Senda"
+    override val tb_suggestion_fill = "Edit this address"
 }
 
 object SendaStringsEs : SendaStringPack {
@@ -2163,7 +2184,7 @@ object SendaStringsEs : SendaStringPack {
     override val dlg_search_custom_url = "URL de búsqueda personalizada"
     override val dlg_search_custom_url_hint = "Dirección de búsqueda (usa %s para la consulta)"
     override val dlg_search_suggestions = "Sugerencias de búsqueda"
-    override val dlg_search_suggestions_sub = "Mostrar sugerencias mientras escribes"
+    override val dlg_search_suggestions_sub = "Desde tus favoritos e historial; lo que escribes no sale del teléfono"
     override val dlg_biometrics_desc = "Activa el bloqueo biométrico para proteger tus pestañas y sesiones al cambiar de aplicación."
     override val dlg_clear_data_desc = "Selecciona qué datos deseas eliminar inmediatamente de tu dispositivo:"
     override val dlg_doh_desc = "Cifra tus peticiones de nombres de dominio mediante DoH para que nadie en tu red local o ISP pueda ver los sitios a los que te conectas."
@@ -2233,7 +2254,7 @@ object SendaStringsEs : SendaStringPack {
     override val dlg_passwords_info = "Senda guarda tus contraseñas en una bóveda local cifrada con AES-256-GCM, con la clave protegida por el Keystore de Android. Por ahora es un gestor manual: no rellena los formularios de las páginas."
     override val dlg_passwords_bullets = "• Ninguna contraseña es enviada a la nube ni a servidores centrales.\n• Cifrado con algoritmos libres AES-256-GCM.\n• Puedes bloquear el autocompletado exigiendo tu huella biométrica."
     override val dlg_autofill_desc = "Senda aún no guarda formularios ni direcciones. Puedes usar tu gestor de contraseñas o servicio de autocompletado de Android (Bitwarden, KeePassDX…), que Senda admite en los campos de las páginas."
-    override val dlg_accessibility_typography_note = "El factor de escala, sincronización web, fuentes y el renderizado (hinting/antialiasing) se gestionan de forma unificada en el panel de tipografías."
+    override val dlg_accessibility_typography_note = "El factor de escala, la sincronización web y las fuentes se gestionan de forma unificada en el panel de tipografías."
     override val dlg_senda_labs_desc = "Herramientas de inspección y hackeo visual para usuarios avanzados e ingenieros:"
     override val dlg_senda_labs_css = "CSS Personalizado de Usuario"
     override val dlg_senda_labs_css_hint = "/* Inyectar estilos CSS globales */"
@@ -2539,6 +2560,13 @@ object SendaStringsEs : SendaStringPack {
     override val devtools_none = "ninguna"
     override val devtools_injected_success = "Código inyectado con éxito."
     override val devtools_inject_error = "Error al inyectar código:"
+    override val dl_cancelled = "Descarga cancelada: %s"
+    override val open_in_app_title = "¿Abrir en %s?"
+    override val open_in_app_title_generic = "¿Abrir en otra app?"
+    override val open_in_app_body = "Este enlace quiere salir de Senda y abrirse en una aplicación instalada."
+    override val open_in_app_open = "Abrir"
+    override val open_in_app_stay = "Quedarme en Senda"
+    override val tb_suggestion_fill = "Editar esta dirección"
 }
 
 object SendaStringsFr : SendaStringPack {
@@ -2763,7 +2791,7 @@ object SendaStringsFr : SendaStringPack {
     override val dlg_search_custom_url = "URL de recherche personnalisée"
     override val dlg_search_custom_url_hint = "Adresse de recherche (utilisez %s pour la requête)"
     override val dlg_search_suggestions = "Suggestions de recherche"
-    override val dlg_search_suggestions_sub = "Afficher les suggestions pendant la saisie"
+    override val dlg_search_suggestions_sub = "Depuis vos favoris et votre historique ; ce que vous tapez ne quitte pas le téléphone"
     override val dlg_biometrics_desc = "Activez le verrouillage biométrique pour protéger vos onglets lors du basculement d'application."
     override val dlg_clear_data_desc = "Sélectionnez les données à supprimer immédiatement de votre appareil :"
     override val dlg_doh_desc = "Chiffrez vos requêtes DNS via DoH afin que votre réseau ou FAI ne puisse voir les sites que vous consultez."
@@ -2833,7 +2861,7 @@ object SendaStringsFr : SendaStringPack {
     override val dlg_passwords_info = "Senda conserve vos mots de passe dans un coffre local chiffré en AES-256-GCM, dont la clé est protégée par le Keystore Android. Pour l’instant, c’est un gestionnaire manuel : il ne remplit pas les formulaires."
     override val dlg_passwords_bullets = "• Aucun mot de passe n'est envoyé vers le cloud ou des serveurs centraux.\n• Chiffrement ouvert AES-256-GCM.\n• Verrouillage possible de la saisie automatique par biométrie."
     override val dlg_autofill_desc = "Senda n’enregistre pas encore les formulaires ni les adresses. Vous pouvez utiliser votre gestionnaire de mots de passe ou service de saisie automatique Android (Bitwarden, KeePassDX…), pris en charge dans les champs des pages."
-    override val dlg_accessibility_typography_note = "L'échelle, la synchronisation web, les polices et le rendu (hinting/anticrénelage) sont configurés dans le panneau de typographie."
+    override val dlg_accessibility_typography_note = "L'échelle, la synchronisation web et les polices sont configurées dans le panneau de typographie."
     override val dlg_senda_labs_desc = "Outils d'inspection et de personnalisation visuelle pour utilisateurs avancés et ingénieurs :"
     override val dlg_senda_labs_css = "CSS personnalisé de l'utilisateur"
     override val dlg_senda_labs_css_hint = "/* Injecter des styles CSS globaux */"
@@ -3139,6 +3167,13 @@ object SendaStringsFr : SendaStringPack {
     override val devtools_none = "aucun"
     override val devtools_injected_success = "Code injecté avec succès."
     override val devtools_inject_error = "Erreur lors de l'injection du code :"
+    override val dl_cancelled = "Téléchargement annulé : %s"
+    override val open_in_app_title = "Ouvrir dans %s ?"
+    override val open_in_app_title_generic = "Ouvrir dans une autre application ?"
+    override val open_in_app_body = "Ce lien veut quitter Senda et s'ouvrir dans une application installée."
+    override val open_in_app_open = "Ouvrir"
+    override val open_in_app_stay = "Rester dans Senda"
+    override val tb_suggestion_fill = "Modifier cette adresse"
 }
 
 object SendaStringsPt : SendaStringPack {
@@ -3363,7 +3398,7 @@ object SendaStringsPt : SendaStringPack {
     override val dlg_search_custom_url = "URL de busca personalizada"
     override val dlg_search_custom_url_hint = "Endereço de pesquisa (use %s para a consulta)"
     override val dlg_search_suggestions = "Sugestões de pesquisa"
-    override val dlg_search_suggestions_sub = "Mostrar sugestões enquanto você digita"
+    override val dlg_search_suggestions_sub = "Dos seus favoritos e histórico; o que você digita não sai do celular"
     override val dlg_biometrics_desc = "Ative o bloqueio biométrico para proteger suas abas e sessões ao alternar de aplicativo."
     override val dlg_clear_data_desc = "Selecione quais dados você deseja excluir imediatamente do seu dispositivo:"
     override val dlg_doh_desc = "Criptografe suas consultas DNS usando DoH para que ninguém em sua rede ou provedor veja quais sites você acessa."
@@ -3433,7 +3468,7 @@ object SendaStringsPt : SendaStringPack {
     override val dlg_passwords_info = "O Senda guarda suas senhas em um cofre local criptografado com AES-256-GCM, com a chave protegida pelo Keystore do Android. Por enquanto é um gerenciador manual: não preenche formulários."
     override val dlg_passwords_bullets = "• Nenhuma senha é enviada para a nuvem ou servidores centrais.\n• Criptografado com algoritmos livres AES-256-GCM.\n• Você pode proteger o preenchimento automático com biometria."
     override val dlg_autofill_desc = "O Senda ainda não salva formulários nem endereços. Você pode usar seu gerenciador de senhas ou serviço de preenchimento automático do Android (Bitwarden, KeePassDX…), compatível com os campos das páginas."
-    override val dlg_accessibility_typography_note = "Fator de escala, sincronização web, fontes e renderização (hinting/antialiasing) são ajustados no painel de tipografia."
+    override val dlg_accessibility_typography_note = "Fator de escala, sincronização web e fontes são ajustados no painel de tipografia."
     override val dlg_senda_labs_desc = "Ferramentas de inspeção e personalização visual para usuários avançados e engenheiros:"
     override val dlg_senda_labs_css = "CSS personalizado do usuário"
     override val dlg_senda_labs_css_hint = "/* Injetar estilos CSS globais */"
@@ -3739,6 +3774,13 @@ object SendaStringsPt : SendaStringPack {
     override val devtools_none = "nenhuma"
     override val devtools_injected_success = "Código injetado com sucesso."
     override val devtools_inject_error = "Erro ao injetar código:"
+    override val dl_cancelled = "Download cancelado: %s"
+    override val open_in_app_title = "Abrir no %s?"
+    override val open_in_app_title_generic = "Abrir em outro app?"
+    override val open_in_app_body = "Este link quer sair do Senda e abrir em um aplicativo instalado."
+    override val open_in_app_open = "Abrir"
+    override val open_in_app_stay = "Ficar no Senda"
+    override val tb_suggestion_fill = "Editar este endereço"
 }
 
 object SendaStringsIt : SendaStringPack {
@@ -3963,7 +4005,7 @@ object SendaStringsIt : SendaStringPack {
     override val dlg_search_custom_url = "URL di ricerca personalizzato"
     override val dlg_search_custom_url_hint = "Indirizzo di ricerca (usa %s per la query)"
     override val dlg_search_suggestions = "Suggerimenti di ricerca"
-    override val dlg_search_suggestions_sub = "Mostra suggerimenti durante la digitazione"
+    override val dlg_search_suggestions_sub = "Dai tuoi preferiti e dalla cronologia; ciò che scrivi non lascia il telefono"
     override val dlg_biometrics_desc = "Attiva il blocco biometrico per proteggere le tue schede e sessioni quando cambi applicazione."
     override val dlg_clear_data_desc = "Seleziona quali dati desideri rimuovere immediatamente dal dispositivo:"
     override val dlg_doh_desc = "Cifra le tue query DNS con DoH in modo che nessuno sulla tua rete o ISP possa vedere quali siti visiti."
@@ -4033,7 +4075,7 @@ object SendaStringsIt : SendaStringPack {
     override val dlg_passwords_info = "Senda conserva le password in una cassaforte locale cifrata con AES-256-GCM, con la chiave protetta dal Keystore di Android. Per ora è un gestore manuale: non compila i moduli."
     override val dlg_passwords_bullets = "• Nessuna password viene inviata al cloud o a server esterni.\n• Cifratura con algoritmi aperti AES-256-GCM.\n• Puoi proteggere il riempimento automatico con l'autenticazione biometrica."
     override val dlg_autofill_desc = "Senda non salva ancora moduli o indirizzi. Puoi usare il gestore password o servizio di compilazione automatica di Android (Bitwarden, KeePassDX…), supportato nei campi delle pagine."
-    override val dlg_accessibility_typography_note = "Fattore di scala, sincronizzazione web, caratteri e rendering (hinting/antialiasing) sono gestiti insieme nel pannello tipografia."
+    override val dlg_accessibility_typography_note = "Fattore di scala, sincronizzazione web e caratteri sono gestiti insieme nel pannello tipografia."
     override val dlg_senda_labs_desc = "Strumenti di ispezione e personalizzazione visiva per utenti avanzati e sviluppatori:"
     override val dlg_senda_labs_css = "CSS personalizzato dell'utente"
     override val dlg_senda_labs_css_hint = "/* Inietta stili CSS globali */"
@@ -4339,6 +4381,13 @@ object SendaStringsIt : SendaStringPack {
     override val devtools_none = "nessuna"
     override val devtools_injected_success = "Codice iniettato con successo."
     override val devtools_inject_error = "Errore durante l'iniezione del codice:"
+    override val dl_cancelled = "Download annullato: %s"
+    override val open_in_app_title = "Aprire in %s?"
+    override val open_in_app_title_generic = "Aprire in un'altra app?"
+    override val open_in_app_body = "Questo link vuole uscire da Senda e aprirsi in un'app installata."
+    override val open_in_app_open = "Apri"
+    override val open_in_app_stay = "Resta in Senda"
+    override val tb_suggestion_fill = "Modifica questo indirizzo"
 }
 
 object SendaStringsJa : SendaStringPack {
@@ -4563,7 +4612,7 @@ object SendaStringsJa : SendaStringPack {
     override val dlg_search_custom_url = "カスタム検索 URL"
     override val dlg_search_custom_url_hint = "検索アドレス (クエリ部分に %s を使用)"
     override val dlg_search_suggestions = "検索サジェスト"
-    override val dlg_search_suggestions_sub = "入力中に関連する検索候補を表示"
+    override val dlg_search_suggestions_sub = "ブックマークと履歴から表示。入力内容は端末の外に送信されません"
     override val dlg_biometrics_desc = "アプリ切替時に開いているタブやセッションを保護するため、生体認証ロックを有効化します。"
     override val dlg_clear_data_desc = "端末から直ちに消去したいデータ項目を選択してください："
     override val dlg_doh_desc = "DNS over HTTPS (DoH) は DNS クエリを暗号化し、ISP や公衆 Wi-Fi による閲覧履歴の盗聴を防ぎます。"
@@ -4633,7 +4682,7 @@ object SendaStringsJa : SendaStringPack {
     override val dlg_passwords_info = "Senda はパスワードを AES-256-GCM で暗号化したローカル保管庫に保存し、鍵は Android Keystore で保護されます。現在は手動管理のみで、フォームへの自動入力は行いません。"
     override val dlg_passwords_bullets = "• パスワードがクラウドや外部サーバーに送信されることは決してありません。\n• オープンスタンダードの AES-256-GCM で強固に暗号化。\n• 生体認証によって自動入力を安全に保護できます。"
     override val dlg_autofill_desc = "Senda はまだフォームや住所を保存しません。Android のパスワードマネージャーや自動入力サービス（Bitwarden、KeePassDX など）をページの入力欄で利用できます。"
-    override val dlg_accessibility_typography_note = "拡大縮小率、ウェブ同期、フォント、レンダリング補正 (ヒンティング/アンチエイリアス) はタイポグラフィパネルで一括管理されます。"
+    override val dlg_accessibility_typography_note = "拡大率、ウェブ同期、フォントはタイポグラフィパネルでまとめて設定します。"
     override val dlg_senda_labs_desc = "パワーユーザーや開発者のための視覚的カスタマイズ・検証ツール:"
     override val dlg_senda_labs_css = "カスタムユーザー CSS"
     override val dlg_senda_labs_css_hint = "/* グローバル CSS スタイルを挿入 */"
@@ -4939,6 +4988,13 @@ object SendaStringsJa : SendaStringPack {
     override val devtools_none = "なし"
     override val devtools_injected_success = "コードが正常に注入されました。"
     override val devtools_inject_error = "コードの注入エラー:"
+    override val dl_cancelled = "ダウンロードをキャンセルしました: %s"
+    override val open_in_app_title = "%s で開きますか？"
+    override val open_in_app_title_generic = "別のアプリで開きますか？"
+    override val open_in_app_body = "このリンクは Senda を離れ、インストール済みのアプリで開こうとしています。"
+    override val open_in_app_open = "開く"
+    override val open_in_app_stay = "Senda に留まる"
+    override val tb_suggestion_fill = "このアドレスを編集"
 }
 
 object SendaStringsZh : SendaStringPack {
@@ -5163,7 +5219,7 @@ object SendaStringsZh : SendaStringPack {
     override val dlg_search_custom_url = "自定义搜索引擎网址"
     override val dlg_search_custom_url_hint = "搜索接口地址 (用 %s 代替关键词)"
     override val dlg_search_suggestions = "实时搜索词建议"
-    override val dlg_search_suggestions_sub = "在地址栏键入时智能展示候选搜索词"
+    override val dlg_search_suggestions_sub = "来自你的书签和历史记录；输入内容不会离开手机"
     override val dlg_biometrics_desc = "启用生物识别锁定，在切换应用时保护您的活动标签页与会话信息不被窥视。"
     override val dlg_clear_data_desc = "选择您希望立即从设备中彻底清除的数据："
     override val dlg_doh_desc = "DNS over HTTPS (DoH) 通过加密方式发送 DNS 查询，防止运营商或公共 Wi-Fi 偷窥您的访问历史。"
@@ -5233,7 +5289,7 @@ object SendaStringsZh : SendaStringPack {
     override val dlg_passwords_info = "Senda 将密码保存在使用 AES-256-GCM 加密的本地保险库中，密钥受 Android Keystore 保护。目前为手动管理，不会自动填写网页表单。"
     override val dlg_passwords_bullets = "• 绝不向云端或任何外部中央服务器上传密码。\n• 采用经过同行严格审查的开放标准 AES-256-GCM 算法加密。\n• 可绑定生物识别验证防护密码自动填充。"
     override val dlg_autofill_desc = "Senda 目前不保存表单或地址。你可以使用 Android 的密码管理器或自动填充服务（Bitwarden、KeePassDX 等），Senda 在网页字段中支持它们。"
-    override val dlg_accessibility_typography_note = "排版缩放比例、网页同步、系统字体与渲染效果 (微调/抗锯齿) 均在字体排版面板中集中管理。"
+    override val dlg_accessibility_typography_note = "缩放比例、网页同步和字体在排版面板中统一管理。"
     override val dlg_senda_labs_desc = "为高级极客与工程人员提供的样式注入与代码审查工具："
     override val dlg_senda_labs_css = "自定义用户 CSS 样式"
     override val dlg_senda_labs_css_hint = "/* 在此注入全局网页 CSS 样式表 */"
@@ -5539,6 +5595,13 @@ object SendaStringsZh : SendaStringPack {
     override val devtools_none = "无"
     override val devtools_injected_success = "代码已成功注入执行。"
     override val devtools_inject_error = "注入代码时发生错误:"
+    override val dl_cancelled = "下载已取消：%s"
+    override val open_in_app_title = "在 %s 中打开？"
+    override val open_in_app_title_generic = "在其他应用中打开？"
+    override val open_in_app_body = "此链接想要离开 Senda，并在已安装的应用中打开。"
+    override val open_in_app_open = "打开"
+    override val open_in_app_stay = "留在 Senda"
+    override val tb_suggestion_fill = "编辑此地址"
 }
 
 object SendaStrings {

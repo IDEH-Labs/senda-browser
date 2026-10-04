@@ -65,6 +65,30 @@ class MainActivity : FragmentActivity() {
         androidPermissionLauncher.launch(missing.toTypedArray())
     }
 
+    // «Preguntar dónde guardar»: una petición del selector de archivos a la vez; las demás esperan su turno
+    private class SaveRequest(val fileName: String, val mime: String, val onResult: (android.net.Uri?) -> Unit)
+    private val pendingSaves = ArrayDeque<SaveRequest>()
+    private val saveLocationLauncher: androidx.activity.result.ActivityResultLauncher<SaveRequest> = registerForActivityResult(
+        object : androidx.activity.result.contract.ActivityResultContract<SaveRequest, android.net.Uri?>() {
+            override fun createIntent(context: android.content.Context, input: SaveRequest) =
+                Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                    type = input.mime.takeIf { '*' !in it } ?: "application/octet-stream"
+                    putExtra(Intent.EXTRA_TITLE, input.fileName)
+                }
+            override fun parseResult(resultCode: Int, intent: Intent?) =
+                intent?.data.takeIf { resultCode == RESULT_OK }
+        }
+    ) { uri ->
+        pendingSaves.removeFirstOrNull()?.onResult?.invoke(uri)
+        pendingSaves.firstOrNull()?.let { saveLocationLauncher.launch(it) }
+    }
+
+    private fun askSaveLocation(fileName: String, mime: String, onResult: (android.net.Uri?) -> Unit) {
+        pendingSaves.addLast(SaveRequest(fileName, mime, onResult))
+        if (pendingSaves.size == 1) saveLocationLauncher.launch(pendingSaves.first())
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         prefs = PreferencesManager(this)
@@ -155,9 +179,11 @@ class MainActivity : FragmentActivity() {
                 BrowserTab.androidPermissionRequester = { permissions, onResult ->
                     requestAndroidPermissions(permissions, onResult)
                 }
+                org.senda.browser.core.SendaDownloadManager.locationPicker = ::askSaveLocation
                 onDispose {
                     BrowserTab.tabOpener = null
                     BrowserTab.androidPermissionRequester = null
+                    org.senda.browser.core.SendaDownloadManager.locationPicker = null
                     onNewIntentCallback = null
                 }
             }

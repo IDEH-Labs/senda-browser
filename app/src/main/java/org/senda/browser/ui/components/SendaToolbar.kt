@@ -552,6 +552,73 @@ fun SendaToolbar(
                             }
                         }
                     }
+
+                    // Sugerencias mientras se escribe: solo de favoritos e historial guardados en el teléfono,
+                    // nunca se envía lo tecleado a un buscador
+                    if (prefs?.searchSuggestionsEnabled == true) {
+                        val sources = remember(effectiveIsEditing) {
+                            prefs.getBookmarks().map { Triple(it.title, it.url, true) } +
+                                prefs.getHistory().sortedByDescending { it.timestamp }.map { Triple(it.title, it.url, false) }
+                        }
+                        val query = textFieldValue.text.trim()
+                        val suggestions = remember(query, sources) {
+                            if (query.length < 2) emptyList()
+                            else sources.asSequence()
+                                .filter { (title, url, _) -> url.contains(query, ignoreCase = true) || title.contains(query, ignoreCase = true) }
+                                .distinctBy { it.second.trimEnd('/') }
+                                .take(6)
+                                .toList()
+                        }
+                        suggestions.forEach { (title, url, isBookmark) ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        focusManager.clearFocus()
+                                        keyboardController?.hide()
+                                        setEditing(false)
+                                        onNavigate(url)
+                                    }
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = if (isBookmark) Icons.Default.Star else Icons.Default.History,
+                                    contentDescription = if (isBookmark) strings.tb_bookmarks else strings.tb_history,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = title.ifBlank { url },
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = url.removePrefix("https://").removePrefix("http://").removePrefix("www."),
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                // Llevar la dirección al campo para seguir editándola
+                                IconButton(
+                                    onClick = { textFieldValue = TextFieldValue(url, TextRange(url.length)) },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.NorthWest,
+                                        contentDescription = strings.tb_suggestion_fill,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
                 } else {
                     // Barra de Navegación estilo GNOME Web (Epiphany Adwaita HeaderBar)
                     Row(
