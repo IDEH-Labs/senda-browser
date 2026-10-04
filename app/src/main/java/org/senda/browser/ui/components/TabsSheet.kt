@@ -1,5 +1,8 @@
 package org.senda.browser.ui.components
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -7,158 +10,390 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.senda.browser.core.LocalSendaStrings
+import org.senda.browser.core.PreferencesManager
+import org.senda.browser.core.ZenHomeLayout
 import org.senda.browser.ui.model.BrowserTab
 import org.senda.browser.ui.theme.SendaColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TabsSheet(
+fun TabsOverview(
     tabs: List<BrowserTab>,
     activeTabId: String,
+    tabsViewMode: String = "GRID",
+    prefs: PreferencesManager? = null,
     onSelectTab: (BrowserTab) -> Unit,
     onCloseTab: (BrowserTab) -> Unit,
     onNewTab: () -> Unit,
+    onNewPrivateTab: () -> Unit = {},
     onCloseAll: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onSettingsChanged: () -> Unit = {}
 ) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surface,
-        dragHandle = { BottomSheetDefaults.DragHandle() }
+    BackHandler(onBack = onDismiss)
+    val strings = LocalSendaStrings.current
+
+    var showConfirmCloseAllDialog by remember { mutableStateOf(false) }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = strings.tb_tabs,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(MaterialTheme.colorScheme.primaryContainer)
+                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "${tabs.size}",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = strings.back,
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                },
+                actions = {
+                    // Botón + exactamente como en el ejemplo: limpio, elegante y bien posicionado
+                    IconButton(onClick = onNewTab) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = strings.tb_new_tab,
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+
+                    // Menú de opciones (tres puntos verticales ⋮): Pestaña privada y Cerrar todas las pestañas
+                    var showMoreMenu by remember { mutableStateOf(false) }
+                    Box {
+                        IconButton(onClick = { showMoreMenu = true }) {
+                            Icon(
+                                imageVector = Icons.Default.MoreVert,
+                                contentDescription = "Más opciones",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        DropdownMenu(
+                            expanded = showMoreMenu,
+                            onDismissRequest = { showMoreMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("${strings.tb_new_tab} (${strings.tabs_private})") },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Security,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                },
+                                onClick = {
+                                    showMoreMenu = false
+                                    onNewPrivateTab()
+                                }
+                            )
+
+                            if (tabs.isNotEmpty()) {
+                                HorizontalDivider()
+                                DropdownMenuItem(
+                                    text = { Text(strings.tabs_close_all, color = MaterialTheme.colorScheme.error) },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.DeleteSweep,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.error
+                                        )
+                                    },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        showConfirmCloseAllDialog = true
+                                    }
+                                )
+                            }
+                        }
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { padding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
+            if (tabs.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Tab,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.size(64.dp)
+                        )
+                        Text(
+                            text = strings.tabs_empty,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Button(
+                            onClick = onNewTab,
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                        ) {
+                            Icon(imageVector = Icons.Default.Add, contentDescription = null, tint = Color.Black)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(strings.tb_new_tab, color = Color.Black)
+                        }
+                    }
+                }
+            } else {
+                val isGrid = tabsViewMode != "LIST"
+                val columns = if (isGrid) GridCells.Fixed(2) else GridCells.Fixed(1)
+                val gridState = rememberLazyGridState()
+
+                // Desplazar suavemente a la nueva pestaña creada para apreciar la animación
+                LaunchedEffect(tabs.size) {
+                    if (tabs.isNotEmpty()) {
+                        gridState.animateScrollToItem(tabs.size - 1)
+                    }
+                }
+
+                LazyVerticalGrid(
+                    state = gridState,
+                    columns = columns,
+                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    items(tabs, key = { it.id }) { tab ->
+                        val isSelected = tab.id == activeTabId
+                        TabCardItem(
+                            modifier = Modifier.animateItem(),
+                            tab = tab,
+                            isSelected = isSelected,
+                            isGrid = isGrid,
+                            onSelect = { onSelectTab(tab) },
+                            onClose = { onCloseTab(tab) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    if (showConfirmCloseAllDialog) {
+        AlertDialog(
+            onDismissRequest = { showConfirmCloseAllDialog = false },
+            title = { Text(strings.tabs_close_all) },
+            text = { Text(strings.dlg_tabs_close_all_confirm_text) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showConfirmCloseAllDialog = false
+                        onCloseAll()
+                    }
+                ) {
+                    Text(strings.tabs_close_all, color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConfirmCloseAllDialog = false }) {
+                    Text(strings.general_cancel)
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun TabCardItem(
+    modifier: Modifier = Modifier,
+    tab: BrowserTab,
+    isSelected: Boolean,
+    isGrid: Boolean = true,
+    onSelect: () -> Unit,
+    onClose: () -> Unit
+) {
+    val strings = LocalSendaStrings.current
+    val cardHeight = if (isGrid) 136.dp else 72.dp
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(cardHeight)
+            .shadow(
+                elevation = if (isSelected) 5.dp else 1.5.dp,
+                shape = RoundedCornerShape(14.dp),
+                ambientColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.25f) else Color.Black.copy(alpha = 0.12f)
+            )
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(onClick = onSelect)
+            .border(
+                width = if (isSelected) 2.dp else 0.8.dp,
+                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
+                shape = RoundedCornerShape(14.dp)
+            ),
+        colors = CardDefaults.cardColors(
+            // Opaco: con transparencia la sombra de la tarjeta se veía como un recuadro gris encima del título
+            containerColor = if (isSelected) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface
+        ),
+        shape = RoundedCornerShape(14.dp)
     ) {
         Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.75f)
-                .padding(16.dp)
+                .fillMaxSize()
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
+            // Cabecera de la tarjeta: Título + Botón Cerrar
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = if (tab.isPrivate) Icons.Default.Security else if (tab.url == "about:blank" || tab.url.isBlank()) Icons.Default.Home else Icons.Default.Language,
+                        contentDescription = null,
+                        tint = if (tab.isPrivate) MaterialTheme.colorScheme.secondary else if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (tab.url == "about:blank" || tab.url.isBlank()) strings.tabs_new else tab.title.ifBlank { strings.tb_tabs },
+                        maxLines = if (isGrid) 2 else 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        lineHeight = 16.sp
+                    )
+                }
+                // Zona táctil de 36 dp (antes 24 dp, difícil de acertar con el dedo)
+                IconButton(
+                    onClick = onClose,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = strings.general_close,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
+
+            // Pie de la tarjeta: URL y Badge de Activa / Reposo / Privada
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Pestañas (${tabs.size})",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.primary
+                    text = if (tab.url == "about:blank" || tab.url.isBlank()) "senda://zen" else tab.url.removePrefix("https://").removePrefix("http://"),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    fontSize = 10.5.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
                 )
-
-                Row {
-                    TextButton(onClick = onCloseAll) {
-                        Icon(
-                            imageVector = Icons.Default.DeleteSweep,
-                            contentDescription = "Cerrar todas",
-                            tint = SendaColors.PanicFireRed
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Cerrar todas", color = SendaColors.PanicFireRed, fontSize = 13.sp)
-                    }
-
-                    IconButton(
-                        onClick = onNewTab,
+                if (tab.isPrivate) {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(MaterialTheme.colorScheme.primary)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f))
+                            .padding(horizontal = 4.dp, vertical = 1.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Nueva pestaña",
-                            tint = MaterialTheme.colorScheme.onPrimary
+                        Text(
+                            text = strings.tabs_private,
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.secondary
                         )
                     }
                 }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                items(tabs) { tab ->
-                    val isSelected = tab.id == activeTabId
-                    Card(
+                if (tab.isCrashed) {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .height(130.dp)
-                            .clickable {
-                                onSelectTab(tab)
-                                onDismiss()
-                            }
-                            .border(
-                                width = if (isSelected) 2.dp else 1.dp,
-                                color = if (isSelected) MaterialTheme.colorScheme.primary else SendaColors.BorderSubtle,
-                                shape = RoundedCornerShape(12.dp)
-                            ),
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (isSelected) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.background
-                        ),
-                        shape = RoundedCornerShape(12.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .padding(horizontal = 4.dp, vertical = 1.dp)
                     ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(10.dp),
-                            verticalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.Top
-                            ) {
-                                Text(
-                                    text = tab.title.ifBlank { "Pestaña" },
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                    fontSize = 13.sp,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                IconButton(
-                                    onClick = { onCloseTab(tab) },
-                                    modifier = Modifier.size(24.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = "Cerrar",
-                                        tint = SendaColors.TextSecondary,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                            }
-
-                            Column {
-                                if (tab.trackersBlocked > 0) {
-                                    Text(
-                                        text = "🛡️ ${tab.trackersBlocked} bloqueados",
-                                        fontSize = 10.sp,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                                Text(
-                                    text = tab.url.removePrefix("https://").removePrefix("http://"),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    fontSize = 11.sp,
-                                    color = SendaColors.TextSecondary
-                                )
-                            }
-                        }
+                        Text(
+                            text = strings.general_disabled,
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else if (isSelected) {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(MaterialTheme.colorScheme.primary)
+                            .padding(horizontal = 5.dp, vertical = 1.dp)
+                    ) {
+                        Text(
+                            text = strings.general_active,
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
                     }
                 }
             }

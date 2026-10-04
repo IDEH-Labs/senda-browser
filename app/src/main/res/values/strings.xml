@@ -13,4 +13,6 @@
     <string name="biometric_prompt_title">Desbloquear Senda</string>
     <string name="biometric_prompt_desc">Autentícate para acceder a tus sesiones seguras</string>
     <string name="biometric_cancel">Cancelar</string>
+    <string name="biometric_unlock_button">Desbloquear</string>
+    <string name="biometric_no_device_lock">Este teléfono no tiene PIN, patrón ni huella: el bloqueo de Senda no puede protegerlo hasta que configures uno.</string>
 </resources>

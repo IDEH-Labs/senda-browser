@@ -16,3 +16,18 @@ Senda respeta el trabajo de la comunidad de software libre y reconoce la autorí
 - **Licencia:** MIT License
 - **Sitio:** https://github.com/arkenfox/user.js
 - Plantilla de configuración de seguridad y privacidad para Gecko.
+
+### uBlock Origin (Raymond Hill)
+- **Licencia:** GNU General Public License v3 (GPLv3)
+- **Sitio:** https://github.com/gorhill/uBlock
+- Se incluye su paquete `.xpi` firmado sin modificaciones (`assets/extensions/ublock.xpi`).
+
+### Tor, tor-android y jtorctl (The Tor Project / Guardian Project)
+- **Licencia:** BSD 3-Clause
+- **Sitio:** https://gitlab.torproject.org/tpo/core/tor | https://github.com/guardianproject/tor-android
+- Demonio Tor embebido y su controlador para el enrutamiento por la red Tor.
+
+### llama.cpp y ggml (Georgi Gerganov y colaboradores)
+- **Licencia:** MIT License
+- **Sitio:** https://github.com/ggml-org/llama.cpp
+- Motor de inferencia local para los modelos GGUF de Senda AI.

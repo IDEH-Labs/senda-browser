@@ -24,11 +24,11 @@ object EthicalNewsRepository {
 
     private val fallbackNews = listOf(
         EthicalNewsItem(
-            title = "Soberanía digital: cómo proteger tu huella y datos en Android",
+            title = "Privacidad digital: cómo proteger tu huella y datos en Android",
             url = "https://www.eff.org",
             source = "EFF",
             publishedDate = "Hoy",
-            snippet = "Las herramientas éticas y de código abierto devuelven el control a los usuarios frente a la vigilancia corporativa."
+            snippet = "Herramientas de código abierto que devuelven el control y la privacidad a los usuarios."
         ),
         EthicalNewsItem(
             title = "El Manifiesto de Software Libre y las 4 Libertades Esenciales",
@@ -100,12 +100,10 @@ object EthicalNewsRepository {
         var stream: InputStream? = null
 
         try {
-            val url = URL(feedUrl)
-            connection = url.openConnection() as HttpURLConnection
+            connection = org.senda.browser.core.SendaNet.open(feedUrl)
             connection.connectTimeout = 4000
             connection.readTimeout = 4000
             connection.instanceFollowRedirects = true
-            connection.setRequestProperty("User-Agent", "SendaBrowser/0.1 (Android; Privacy Conscious)")
 
             if (connection.responseCode in 200..299) {
                 stream = connection.inputStream

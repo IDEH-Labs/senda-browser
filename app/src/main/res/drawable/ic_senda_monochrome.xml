@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Senda S-Curve Path Monochrome for Material You Android 13+ Themed Icons -->
+    <path
+        android:pathData="M66,34 C66,26 58,22 48,22 C36,22 30,28 30,38 C30,50 42,54 54,58 C68,62 76,68 76,78 C76,90 64,96 50,96 C36,96 28,88 28,78"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="10"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

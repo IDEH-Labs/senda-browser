@@ -33,8 +33,9 @@ fun DevToolsSheet(
     activeTab: BrowserTab?,
     onDismiss: () -> Unit
 ) {
+    val strings = org.senda.browser.core.LocalSendaStrings.current
     var jsCode by remember { mutableStateOf("") }
-    val consoleLogs = remember { mutableStateListOf("Senda DevTools v0.1 inicializada.", "Pestaña activa: ${activeTab?.url ?: "ninguna"}") }
+    val consoleLogs = remember { mutableStateListOf(strings.devtools_init_log, "${strings.devtools_active_tab_prefix} ${activeTab?.url ?: strings.devtools_none}") }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -53,14 +54,14 @@ fun DevToolsSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Consola Web & Inspector Móvil",
+                    text = strings.devtools_header,
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary
                 )
                 IconButton(onClick = onDismiss) {
                     Icon(
                         imageVector = Icons.Default.Close,
-                        contentDescription = "Cerrar",
+                        contentDescription = strings.general_close,
                         tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
@@ -75,13 +76,13 @@ fun DevToolsSheet(
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text(
-                        text = "URL: ${activeTab?.url}",
+                        text = "${strings.devtools_url_prefix} ${activeTab?.url}",
                         fontSize = 12.sp,
                         fontFamily = FontFamily.Monospace,
                         color = SendaColors.TextSecondary
                     )
                     Text(
-                        text = "Rastreadores interceptados: ${activeTab?.trackersBlocked ?: 0}",
+                        text = "${strings.devtools_trackers_prefix} ${activeTab?.trackersBlocked ?: 0}",
                         fontSize = 12.sp,
                         fontFamily = FontFamily.Monospace,
                         color = MaterialTheme.colorScheme.primary
@@ -139,7 +140,7 @@ fun DevToolsSheet(
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                         keyboardActions = KeyboardActions(onSend = {
                             if (jsCode.isNotBlank() && activeTab != null) {
-                                executeJs(activeTab, jsCode, consoleLogs)
+                                executeJs(activeTab, jsCode, consoleLogs, strings)
                                 jsCode = ""
                             }
                         }),
@@ -147,7 +148,7 @@ fun DevToolsSheet(
                     )
                     if (jsCode.isEmpty()) {
                         Text(
-                            text = "ej. document.title o alert(1)",
+                            text = strings.devtools_js_placeholder,
                             fontSize = 12.sp,
                             color = SendaColors.TextSecondary,
                             fontFamily = FontFamily.Monospace
@@ -160,7 +161,7 @@ fun DevToolsSheet(
                 IconButton(
                     onClick = {
                         if (jsCode.isNotBlank() && activeTab != null) {
-                            executeJs(activeTab, jsCode, consoleLogs)
+                            executeJs(activeTab, jsCode, consoleLogs, strings)
                             jsCode = ""
                         }
                     },
@@ -171,7 +172,7 @@ fun DevToolsSheet(
                 ) {
                     Icon(
                         imageVector = Icons.Default.PlayArrow,
-                        contentDescription = "Ejecutar",
+                        contentDescription = strings.devtools_run,
                         tint = Color.Black
                     )
                 }
@@ -180,14 +181,14 @@ fun DevToolsSheet(
     }
 }
 
-private fun executeJs(tab: BrowserTab, code: String, logs: MutableList<String>) {
+private fun executeJs(tab: BrowserTab, code: String, logs: MutableList<String>, strings: org.senda.browser.core.SendaStringPack) {
     try {
         logs.add(code)
         // Inyección directa de JavaScript en la pestaña activa
         tab.session.loadUri("javascript:(function(){ try { let r = eval(${escapeForJs(code)}); console.log(r); } catch(e){ console.error(e); } })();")
-        logs.add("Código inyectado con éxito.")
+        logs.add(strings.devtools_injected_success)
     } catch (e: Exception) {
-        logs.add("Error al inyectar: ${e.message}")
+        logs.add("${strings.devtools_inject_error} ${e.message}")
     }
 }
 
