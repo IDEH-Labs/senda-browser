@@ -117,8 +117,6 @@ fun SettingsGnomeTypographyDialog(
 ) {
     var selectedFont by rememberSaveable { mutableStateOf(prefs.uiFontFamily) }
     var fontScale by rememberSaveable { mutableIntStateOf(prefs.uiFontScalePercent) }
-    var selectedHinting by rememberSaveable { mutableStateOf(prefs.fontHinting) }
-    var selectedAntialiasing by rememberSaveable { mutableStateOf(prefs.fontAntialiasing) }
     var syncWeb by rememberSaveable { mutableStateOf(prefs.syncWebFontScale) }
 
     val previewFontFamily = remember(selectedFont) { resolveFontFamily(selectedFont) }
@@ -168,13 +166,7 @@ fun SettingsGnomeTypographyDialog(
                                 color = MaterialTheme.colorScheme.primary
                             )
                             Text(
-                                // Nombre traducido del suavizado, no la clave interna («full»)
-                                text = "$fontScale% • " + when (selectedHinting.uppercase()) {
-                                    "NONE" -> strings.dlg_hinting_none
-                                    "SLIGHT" -> strings.dlg_hinting_slight
-                                    "MEDIUM" -> strings.dlg_hinting_medium
-                                    else -> strings.dlg_hinting_full
-                                },
+                                text = "$fontScale%",
                                 fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -343,95 +335,6 @@ fun SettingsGnomeTypographyDialog(
                             onSettingsChanged()
                         }
                     )
-                }
-
-                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
-
-                // 4. Optimización de Contornos (Hinting)
-                Text(
-                    text = strings.dlg_hinting_title,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = strings.dlg_hinting_sub,
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                val hintingOptions = listOf(
-                    "NONE" to strings.dlg_hinting_none,
-                    "SLIGHT" to strings.dlg_hinting_slight,
-                    "MEDIUM" to strings.dlg_hinting_medium,
-                    "FULL" to strings.dlg_hinting_full
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    hintingOptions.forEach { (hKey, hLabel) ->
-                        FilterChip(
-                            modifier = Modifier.weight(1f),
-                            selected = selectedHinting.equals(hKey, ignoreCase = true),
-                            onClick = {
-                                selectedHinting = hKey
-                                prefs.fontHinting = hKey
-                                onSettingsChanged()
-                            },
-                            label = {
-                                Text(
-                                    text = hLabel,
-                                    fontSize = 11.sp,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        )
-                    }
-                }
-
-                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
-
-                // 5. Suavizado (Antialiasing)
-                Text(
-                    text = strings.dlg_aa_title,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = strings.dlg_aa_sub,
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                val aaOptions = listOf(
-                    "SUBPIXEL" to strings.dlg_aa_subpixel,
-                    "GRAYSCALE" to strings.dlg_aa_grayscale,
-                    "NONE" to strings.dlg_hinting_none
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    aaOptions.forEach { (aaKey, aaLabel) ->
-                        FilterChip(
-                            modifier = Modifier.weight(1f),
-                            selected = selectedAntialiasing.equals(aaKey, ignoreCase = true),
-                            onClick = {
-                                selectedAntialiasing = aaKey
-                                prefs.fontAntialiasing = aaKey
-                                onSettingsChanged()
-                            },
-                            label = {
-                                Text(
-                                    text = aaLabel,
-                                    fontSize = 11.sp,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        )
-                    }
                 }
             }
         },

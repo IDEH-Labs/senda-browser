@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -89,12 +90,37 @@ fun SendaPromptHost(
                 onDismiss = onDismiss
             )
         }
+        is SendaPrompt.OpenInApp -> {
+            OpenInAppDialog(request = prompt, onDismiss = onDismiss)
+        }
         is SendaPrompt.ContextMenu -> {
             if (tab != null) {
                 ContextMenuSheet(element = prompt.element, tab = tab, onDismiss = onDismiss)
             }
         }
     }
+}
+
+@Composable
+private fun OpenInAppDialog(request: SendaPrompt.OpenInApp, onDismiss: () -> Unit) {
+    val strings = LocalSendaStrings.current
+    fun decide(open: Boolean) {
+        request.onDecision(open)
+        onDismiss()
+    }
+    AlertDialog(
+        onDismissRequest = { decide(false) },
+        icon = { Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null) },
+        title = {
+            Text(
+                text = request.appName?.let { strings.open_in_app_title.format(it) } ?: strings.open_in_app_title_generic,
+                style = MaterialTheme.typography.titleMedium
+            )
+        },
+        text = { Text(strings.open_in_app_body, style = MaterialTheme.typography.bodyMedium) },
+        confirmButton = { TextButton(onClick = { decide(true) }) { Text(strings.open_in_app_open) } },
+        dismissButton = { TextButton(onClick = { decide(false) }) { Text(strings.open_in_app_stay) } }
+    )
 }
 
 @Composable

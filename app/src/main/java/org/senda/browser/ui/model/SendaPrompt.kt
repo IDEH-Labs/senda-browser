@@ -57,6 +57,12 @@ sealed interface SendaPrompt {
         val onDecision: (Boolean) -> Unit
     ) : SendaPrompt
 
+    /** «Abrir enlaces en apps» en «Preguntar»: [appName] es null si Android mostraría su selector. */
+    data class OpenInApp(
+        val appName: String?,
+        val onDecision: (Boolean) -> Unit
+    ) : SendaPrompt
+
     /** Pulsación larga sobre un enlace, una imagen o un video. */
     data class ContextMenu(
         val element: GeckoSession.ContentDelegate.ContextElement

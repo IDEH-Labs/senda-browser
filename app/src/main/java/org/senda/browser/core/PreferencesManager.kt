@@ -281,7 +281,8 @@ class PreferencesManager(context: Context) {
         set(value) = prefs.edit().putString("search_engine_url", value).apply()
 
     var searchSuggestionsEnabled: Boolean
-        get() = prefs.getBoolean("search_suggestions_enabled", false)
+        // Sugerencias locales (favoritos e historial): no salen del teléfono, por eso vienen activadas
+        get() = prefs.getBoolean("search_suggestions_enabled", true)
         set(value) = prefs.edit().putBoolean("search_suggestions_enabled", value).apply()
 
     // --- PESTAÑAS ---

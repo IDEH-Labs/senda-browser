@@ -115,9 +115,9 @@ fun SettingsSearchDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-                        Text(text = strings.search_engine_sub, style = MaterialTheme.typography.bodyMedium)
+                        Text(text = strings.dlg_search_suggestions, style = MaterialTheme.typography.bodyMedium)
                         Text(
-                            text = strings.dlg_search_engine_desc,
+                            text = strings.dlg_search_suggestions_sub,
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

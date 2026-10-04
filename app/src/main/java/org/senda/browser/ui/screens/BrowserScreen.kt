@@ -42,6 +42,7 @@ import org.senda.browser.ui.components.DownloadsManagerDialog
 import org.senda.browser.ui.components.HistoryManagerDialog
 import org.senda.browser.ui.components.NewTabZenView
 import org.senda.browser.ui.components.SendaAssistantSheet
+import org.senda.browser.ui.components.BookmarksBar
 import org.senda.browser.ui.components.SendaPromptHost
 import org.senda.browser.ui.components.SendaToolbar
 import org.senda.browser.ui.components.SovereignSyncDialog
@@ -110,6 +111,7 @@ fun BrowserScreen(
     val showDevTools = prefs.showDevToolsButton
     val showCast = prefs.showCastButton
     val isFullWidth = prefs.toolbarFullWidth
+    val showBookmarksBar = prefs.showBookmarksBar
     // Pantalla completa inmersiva solo cuando el usuario la activa en la pestaña
     val isFullScreen = activeTab?.isFullScreen == true
 
@@ -164,6 +166,7 @@ fun BrowserScreen(
             },
             contentWindowInsets = if (isFullScreen || showTabsSheet) WindowInsets(0, 0, 0, 0) else ScaffoldDefaults.contentWindowInsets,
             topBar = {
+                Column {
                 if (!isFullScreen && !showTabsSheet && toolbarPos == ToolbarPosition.TOP) {
                     SendaToolbar(
                         activeTab = activeTab,
@@ -207,6 +210,18 @@ fun BrowserScreen(
                         onCloseCurrentTab = { if (activeTab != null) onCloseTab(activeTab) },
                         onCloseAllTabs = onCloseAllTabs
                     )
+                }
+                // Barra de favoritos: bajo la barra superior, o arriba del todo si la barra va abajo
+                if (showBookmarksBar && !isFullScreen && !showTabsSheet && !isAddressBarEditing) {
+                    BookmarksBar(
+                        prefs = prefs,
+                        currentUrl = activeTab?.url.orEmpty(),
+                        currentTitle = activeTab?.title.orEmpty(),
+                        onNavigate = { url -> activeTab?.loadUri(url) ?: onNewTab(url) },
+                        onOpenManager = { showBookmarksDialog = true },
+                        modifier = if (toolbarPos == ToolbarPosition.TOP) Modifier else Modifier.statusBarsPadding()
+                    )
+                }
                 }
             }
         ) { padding ->

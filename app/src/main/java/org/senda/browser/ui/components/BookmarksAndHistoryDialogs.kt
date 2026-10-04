@@ -53,7 +53,8 @@ fun BookmarksBar(
     modifier: Modifier = Modifier
 ) {
     val strings = org.senda.browser.core.LocalSendaStrings.current
-    var bookmarks by remember { mutableStateOf(prefs.getBookmarks()) }
+    // Se relee al navegar, por si se editaron favoritos desde el gestor u otra pestaña
+    var bookmarks by remember(currentUrl) { mutableStateOf(prefs.getBookmarks()) }
     var editingBookmark by remember { mutableStateOf<BookmarkItem?>(null) }
     val isCurrentBookmarked = remember(currentUrl, bookmarks) {
         prefs.isBookmarked(currentUrl)

@@ -31,6 +31,13 @@ object SendaDownloadManager {
     private val ioExecutor = Executors.newSingleThreadExecutor { r -> Thread(r, "senda-download") }
     private val mainHandler = Handler(Looper.getMainLooper())
 
+    /**
+     * Selector de ubicación del sistema (lo registra MainActivity). Recibe nombre sugerido y tipo MIME y
+     * devuelve la Uri elegida, o null si el usuario canceló. Sin él se guarda directamente en Descargas.
+     */
+    @Volatile
+    var locationPicker: ((fileName: String, mime: String, onResult: (Uri?) -> Unit) -> Unit)? = null
+
     /** Guarda la respuesta que Gecko no puede mostrar (onExternalResponse). */
     fun saveResponse(context: Context, prefs: PreferencesManager, response: WebResponse, isPrivate: Boolean) {
         val mime = response.headers["Content-Type"]?.substringBefore(";")?.trim()?.ifBlank { null }
@@ -100,45 +107,88 @@ object SendaDownloadManager {
                     status = "DOWNLOADING", mimeType = mime)
             )
         }
-        toast(context) { it.dl_started.format(fileName) }
-        ioExecutor.execute {
-            var target: Uri? = null
-            try {
-                val (uri, finalName) = createTarget(context, fileName, mime)
-                target = uri
-                var written = 0L
-                body.use { input ->
-                    context.contentResolver.openOutputStream(uri)!!.use { output ->
-                        val buffer = ByteArray(64 * 1024)
-                        while (true) {
-                            val read = input.read(buffer)
-                            if (read < 0) break
-                            output.write(buffer, 0, read)
-                            written += read
-                        }
+        val picker = locationPicker
+        if (prefs.askDownloadLocation && picker != null) {
+            // «Preguntar dónde guardar»: el usuario elige carpeta y nombre; si cancela, no se guarda nada
+            mainHandler.post {
+                picker(fileName, mime) { uri ->
+                    if (uri == null) {
+                        runCatching { body.close() }
+                        if (!isPrivate) prefs.deleteDownload(id)
+                        toast(context) { it.dl_cancelled.format(fileName) }
+                    } else {
+                        toast(context) { it.dl_started.format(fileName) }
+                        ioExecutor.execute { write(context, prefs, body, id, uri, fileName, mime, url, isPrivate, ownsTarget = false) }
                     }
                 }
-                finishTarget(context, uri)
-                // Android puede renombrar al publicar (« (1)» si ya existía): registrar el nombre real
-                val savedName = displayName(context, uri) ?: finalName
-                if (!isPrivate) {
-                    prefs.updateDownload(
-                        DownloadItem(id = id, fileName = savedName, url = url, filePath = uri.toString(),
-                            totalBytes = written, downloadedBytes = written, status = "COMPLETED", mimeType = mime)
-                    )
-                }
-                toast(context) { it.dl_completed.format(savedName) }
-            } catch (e: Exception) {
-                android.util.Log.w("SendaDownload", "Descarga fallida de $fileName: ${e.message}")
-                target?.let { runCatching { context.contentResolver.delete(it, null, null) } }
-                if (!isPrivate) {
-                    prefs.updateDownload(
-                        DownloadItem(id = id, fileName = fileName, url = url, status = "FAILED", mimeType = mime)
-                    )
-                }
-                toast(context) { it.dl_failed.format(fileName) }
             }
+            return
         }
+        toast(context) { it.dl_started.format(fileName) }
+        ioExecutor.execute {
+            val (uri, finalName) = try {
+                createTarget(context, fileName, mime)
+            } catch (e: Exception) {
+                android.util.Log.w("SendaDownload", "No se pudo crear $fileName: ${e.message}")
+                runCatching { body.close() }
+                markFailed(context, prefs, id, fileName, url, mime, isPrivate)
+                return@execute
+            }
+            write(context, prefs, body, id, uri, finalName, mime, url, isPrivate, ownsTarget = true)
+        }
+    }
+
+    /**
+     * Copia [body] en [uri]. Si falla y el archivo lo creó Senda ([ownsTarget]) se borra; uno elegido por el
+     * usuario se deja, porque el proveedor de documentos puede haber sobrescrito un archivo que ya existía.
+     */
+    private fun write(
+        context: Context,
+        prefs: PreferencesManager,
+        body: InputStream,
+        id: String,
+        uri: Uri,
+        fileName: String,
+        mime: String,
+        url: String,
+        isPrivate: Boolean,
+        ownsTarget: Boolean
+    ) {
+        try {
+            var written = 0L
+            body.use { input ->
+                context.contentResolver.openOutputStream(uri, "wt")!!.use { output ->
+                    val buffer = ByteArray(64 * 1024)
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read < 0) break
+                        output.write(buffer, 0, read)
+                        written += read
+                    }
+                }
+            }
+            finishTarget(context, uri)
+            // Android puede renombrar al publicar (« (1)» si ya existía): registrar el nombre real
+            val savedName = displayName(context, uri) ?: fileName
+            if (!isPrivate) {
+                prefs.updateDownload(
+                    DownloadItem(id = id, fileName = savedName, url = url, filePath = uri.toString(),
+                        totalBytes = written, downloadedBytes = written, status = "COMPLETED", mimeType = mime)
+                )
+            }
+            toast(context) { it.dl_completed.format(savedName) }
+        } catch (e: Exception) {
+            android.util.Log.w("SendaDownload", "Descarga fallida de $fileName: ${e.message}")
+            if (ownsTarget) runCatching { context.contentResolver.delete(uri, null, null) }
+            markFailed(context, prefs, id, fileName, url, mime, isPrivate)
+        }
+    }
+
+    private fun markFailed(context: Context, prefs: PreferencesManager, id: String, fileName: String, url: String, mime: String, isPrivate: Boolean) {
+        if (!isPrivate) {
+            prefs.updateDownload(DownloadItem(id = id, fileName = fileName, url = url, status = "FAILED", mimeType = mime))
+        }
+        toast(context) { it.dl_failed.format(fileName) }
     }
 
     /** Crea el archivo en Descargas y devuelve su Uri y el nombre definitivo (Android añade « (1)» si ya existe). */
