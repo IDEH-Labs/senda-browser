@@ -65,7 +65,26 @@ class BrowserTab(
         private set
     var isReaderMode by mutableStateOf(false)
     var originalArticleUrl by mutableStateOf<String?>(null)
-    var activePrompt by mutableStateOf<SendaPrompt?>(null)
+    private var shownPrompt by mutableStateOf<SendaPrompt?>(null)
+    private val queuedPrompts = ArrayDeque<SendaPrompt>()
+
+    /**
+     * Diálogo de la página a la vista. Si llega otro mientras hay uno abierto, espera su turno: antes lo
+     * reemplazaba sin resolverlo (una segunda descarga perdía la primera, un aviso de script lento dejaba la
+     * página esperando para siempre). Al ponerlo a null se muestra el siguiente. El menú de pulsación larga
+     * no se encola: si hay otro diálogo se ignora, para que no aparezca después fuera de contexto.
+     * Siempre en el hilo principal (los delegados de Gecko y los post al Looper principal lo son).
+     */
+    var activePrompt: SendaPrompt?
+        get() = shownPrompt
+        set(value) {
+            when {
+                value == null -> shownPrompt = queuedPrompts.removeFirstOrNull()
+                shownPrompt == null -> shownPrompt = value
+                value is SendaPrompt.ContextMenu -> if (shownPrompt is SendaPrompt.ContextMenu) shownPrompt = value
+                else -> queuedPrompts.addLast(value)
+            }
+        }
     var isCrashed by mutableStateOf(false)
 
     // Reproducción multimedia informada por la API nativa de GeckoView (sin scripts en la página):
@@ -884,6 +903,7 @@ class BrowserTab(
                         // pidiendo la huella, ese flujo sigue y deja el relleno pendiente
                         android.os.Handler(android.os.Looper.getMainLooper()).post {
                             if ((activePrompt as? SendaPrompt.LoginSelect)?.request === request) activePrompt = null
+                            else queuedPrompts.removeAll { it is SendaPrompt.LoginSelect && it.request === request }
                         }
                     }
                 })
@@ -1682,7 +1702,8 @@ class BrowserTab(
     }
 
     fun close() {
-        dismissActivePrompt()
+        // Resolver también los que esperaban turno: un GeckoResult sin completar deja a Gecko esperando
+        while (activePrompt != null) dismissActivePrompt()
         thumbnail = null
         try {
             session.setActive(false)

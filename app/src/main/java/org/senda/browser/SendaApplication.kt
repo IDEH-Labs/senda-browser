@@ -55,7 +55,11 @@ class SendaApplication : Application() {
         // Inicializar subsistema de transmisión DLNA y Cast V2
         org.senda.browser.core.cast.SendaUnifiedCast.initialize(this)
         // Restos de descargas de modelos interrumpidas (pueden ocupar cientos de MB)
-        Thread { org.senda.browser.core.ai.SendaModelManager.cleanupInterruptedDownloads(this) }.start()
+        Thread {
+            org.senda.browser.core.ai.SendaModelManager.cleanupInterruptedDownloads(this)
+            // Copias de archivos subidos a páginas en la sesión anterior
+            org.senda.browser.core.SendaWebUploads.cleanup(this)
+        }.start()
         // Inicializar motor neuronal nativo en chip (llama.cpp ARM64 NEON)
         org.senda.browser.core.ai.llama.SendaLlamaBridge.initialize(this)
         // Inicializar gestor de Tor integrado
