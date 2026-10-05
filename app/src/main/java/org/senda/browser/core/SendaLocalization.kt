@@ -356,6 +356,10 @@ interface SendaStringPack {
     val st_licenses_title: String
     val st_licenses_sub: String
     val summary_tabs_manual: String
+    val as_group_accounts_title: String
+    val as_group_accounts_sub: String
+    val as_group_api_title: String
+    val as_group_api_sub: String
     val as_web_title: String
     val as_web_note: String
     val as_web_copy_page: String
@@ -1135,6 +1139,10 @@ object SendaStringsDe : SendaStringPack {
     override val st_licenses_title = "Open-Source-Lizenzen"
     override val st_licenses_sub = "GeckoView, Mozilla, AndroidX, Kotlin und freie Software"
     override val summary_tabs_manual = "Manuell schließen"
+    override val as_group_accounts_title = "Mit deinem Konto (Abo)"
+    override val as_group_accounts_sub = "Nutze dein vorhandenes Konto. ChatGPT funktioniert in Senda; die anderen öffnen sich auf ihrer offiziellen Website."
+    override val as_group_api_title = "Mit API-Schlüssel (fortgeschritten)"
+    override val as_group_api_sub = "Du zahlst direkt beim Anbieter nach Nutzung oder verwendest deinen eigenen Server."
     override val as_web_title = "Auf der offiziellen Website nutzen"
     override val as_web_note = "Du meldest dich auf der Seite des jeweiligen Dienstes an (Google, GitHub, Microsoft …). Senda sieht deine Zugangsdaten nie."
     override val as_web_copy_page = "Diese Seite beim Öffnen kopieren"
@@ -1913,6 +1921,10 @@ object SendaStringsEn : SendaStringPack {
     override val st_licenses_title = "Open Source Licenses"
     override val st_licenses_sub = "GeckoView, Mozilla, AndroidX, Kotlin and free software"
     override val summary_tabs_manual = "Close manually"
+    override val as_group_accounts_title = "With your account (subscription)"
+    override val as_group_accounts_sub = "Use the account you already have. ChatGPT works inside Senda; the others open on their official website."
+    override val as_group_api_title = "With an API key (advanced)"
+    override val as_group_api_sub = "You pay per use directly to the provider, or use your own server."
     override val as_web_title = "Use on its official website"
     override val as_web_note = "You sign in on each service's own page (Google, GitHub, Microsoft…). Senda never sees your credentials."
     override val as_web_copy_page = "Copy this page when opening"
@@ -2691,6 +2703,10 @@ object SendaStringsEs : SendaStringPack {
     override val st_licenses_title = "Licencias de código abierto"
     override val st_licenses_sub = "GeckoView, Mozilla, AndroidX, Kotlin y software libre"
     override val summary_tabs_manual = "Cerrar manualmente"
+    override val as_group_accounts_title = "Con tu cuenta (suscripción)"
+    override val as_group_accounts_sub = "Usa la cuenta que ya tienes. ChatGPT funciona dentro de Senda; las demás se abren en su web oficial."
+    override val as_group_api_title = "Con clave de API (avanzado)"
+    override val as_group_api_sub = "Pagas por uso directamente al proveedor, o usas tu propio servidor."
     override val as_web_title = "Usar en su web oficial"
     override val as_web_note = "Inicias sesión en la página de cada servicio (Google, GitHub, Microsoft…). Senda no ve tus credenciales."
     override val as_web_copy_page = "Copiar esta página al abrir"
@@ -3469,6 +3485,10 @@ object SendaStringsFr : SendaStringPack {
     override val st_licenses_title = "Licences Open Source"
     override val st_licenses_sub = "GeckoView, Mozilla, AndroidX, Kotlin et logiciels libres"
     override val summary_tabs_manual = "Fermer manuellement"
+    override val as_group_accounts_title = "Avec votre compte (abonnement)"
+    override val as_group_accounts_sub = "Utilisez le compte que vous avez déjà. ChatGPT fonctionne dans Senda ; les autres s'ouvrent sur leur site officiel."
+    override val as_group_api_title = "Avec une clé d'API (avancé)"
+    override val as_group_api_sub = "Vous payez à l'usage directement au fournisseur, ou utilisez votre propre serveur."
     override val as_web_title = "Utiliser sur son site officiel"
     override val as_web_note = "Vous vous connectez sur la page de chaque service (Google, GitHub, Microsoft…). Senda ne voit jamais vos identifiants."
     override val as_web_copy_page = "Copier cette page à l'ouverture"
@@ -4247,6 +4267,10 @@ object SendaStringsPt : SendaStringPack {
     override val st_licenses_title = "Licenças de código aberto"
     override val st_licenses_sub = "GeckoView, Mozilla, AndroidX, Kotlin e software livre"
     override val summary_tabs_manual = "Fechar manualmente"
+    override val as_group_accounts_title = "Com a sua conta (subscrição)"
+    override val as_group_accounts_sub = "Use a conta que já tem. O ChatGPT funciona dentro do Senda; os outros abrem no site oficial."
+    override val as_group_api_title = "Com chave de API (avançado)"
+    override val as_group_api_sub = "Paga por utilização diretamente ao fornecedor, ou usa o seu próprio servidor."
     override val as_web_title = "Usar no site oficial"
     override val as_web_note = "Inicia sessão na página de cada serviço (Google, GitHub, Microsoft…). O Senda nunca vê as suas credenciais."
     override val as_web_copy_page = "Copiar esta página ao abrir"
@@ -5025,6 +5049,10 @@ object SendaStringsIt : SendaStringPack {
     override val st_licenses_title = "Licenze Open Source"
     override val st_licenses_sub = "GeckoView, Mozilla, AndroidX, Kotlin e software libero"
     override val summary_tabs_manual = "Chiudi manualmente"
+    override val as_group_accounts_title = "Con il tuo account (abbonamento)"
+    override val as_group_accounts_sub = "Usa l'account che hai già. ChatGPT funziona dentro Senda; gli altri si aprono sul loro sito ufficiale."
+    override val as_group_api_title = "Con chiave API (avanzato)"
+    override val as_group_api_sub = "Paghi a consumo direttamente al fornitore, oppure usi il tuo server."
     override val as_web_title = "Usa sul sito ufficiale"
     override val as_web_note = "Accedi dalla pagina di ciascun servizio (Google, GitHub, Microsoft…). Senda non vede mai le tue credenziali."
     override val as_web_copy_page = "Copia questa pagina all'apertura"
@@ -5803,6 +5831,10 @@ object SendaStringsJa : SendaStringPack {
     override val st_licenses_title = "オープンソースライセンス"
     override val st_licenses_sub = "GeckoView、Mozilla、AndroidX、Kotlin および自由ソフトウェア"
     override val summary_tabs_manual = "手動で閉じる"
+    override val as_group_accounts_title = "アカウントで使う(サブスクリプション)"
+    override val as_group_accounts_sub = "お持ちのアカウントを使います。ChatGPTはSendaの中で動作し、その他は公式サイトで開きます。"
+    override val as_group_api_title = "APIキーで使う(上級者向け)"
+    override val as_group_api_sub = "プロバイダーに使用量に応じて直接支払うか、自前のサーバーを使います。"
     override val as_web_title = "公式サイトで使う"
     override val as_web_note = "各サービスのページ(Google、GitHub、Microsoftなど)でサインインします。Sendaが認証情報を見ることはありません。"
     override val as_web_copy_page = "開くときにこのページをコピー"
@@ -6581,6 +6613,10 @@ object SendaStringsZh : SendaStringPack {
     override val st_licenses_title = "开源软件许可证"
     override val st_licenses_sub = "GeckoView、Mozilla、AndroidX、Kotlin 及其他自由开源组件"
     override val summary_tabs_manual = "手动关闭"
+    override val as_group_accounts_title = "使用你的账户(订阅)"
+    override val as_group_accounts_sub = "使用你已有的账户。ChatGPT 可在 Senda 内使用；其他服务会在其官方网站打开。"
+    override val as_group_api_title = "使用 API 密钥(高级)"
+    override val as_group_api_sub = "按使用量直接向服务商付费，或使用你自己的服务器。"
     override val as_web_title = "在官方网站使用"
     override val as_web_note = "在各服务自己的页面登录(Google、GitHub、Microsoft 等)。Senda 不会看到你的登录凭据。"
     override val as_web_copy_page = "打开时复制此网页"

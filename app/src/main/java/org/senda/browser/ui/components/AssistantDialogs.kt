@@ -210,7 +210,9 @@ fun SendaAssistantSettingsDialog(
                 Text(strings.as_settings_intro, fontSize = 13.sp)
                 Spacer(Modifier.height(12.dp))
                 Text(strings.as_provider, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                RemoteAiProvider.entries.forEach { p ->
+                // Dos tipos de usuario: quien ya paga una suscripción (cuenta) y quien usa claves o su servidor (API)
+                @Composable
+                fun ProviderRow(p: RemoteAiProvider) {
                     Row(
                         modifier = Modifier.fillMaxWidth().selectable(selected = p == provider, onClick = {
                             provider = p; status = null
@@ -221,6 +223,15 @@ fun SendaAssistantSettingsDialog(
                         Text(if (p.isOwnServer) strings.as_own_server else p.displayName, fontSize = 14.sp)
                     }
                 }
+                Spacer(Modifier.height(4.dp))
+                Text(strings.as_group_accounts_title, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
+                Text(strings.as_group_accounts_sub, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                ProviderRow(RemoteAiProvider.CHATGPT_PLAN)
+                OfficialSiteChips(prefs, null) { onLeaveForSignIn() }
+                Spacer(Modifier.height(10.dp))
+                Text(strings.as_group_api_title, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
+                Text(strings.as_group_api_sub, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                RemoteAiProvider.entries.filter { it != RemoteAiProvider.CHATGPT_PLAN }.forEach { ProviderRow(it) }
                 Spacer(Modifier.height(8.dp))
                 if (provider.isOwnServer) {
                     OutlinedTextField(
@@ -536,6 +547,17 @@ private fun AssistantWebShortcuts(prefs: PreferencesManager, activeTab: BrowserT
             Text(strings.as_web_copy_page, fontSize = 12.sp)
         }
     }
+    OfficialSiteChips(prefs, activeTab, copyPage && hasPage, onOpened)
+}
+
+/** Botones de las webs oficiales (sin ChatGPT cuando ya se ofrece con el plan, para no repetirlo dos veces). */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun OfficialSiteChips(prefs: PreferencesManager, activeTab: BrowserTab?, copyPage: Boolean = false, onOpened: () -> Unit) {
+    val context = LocalContext.current
+    val strings = LocalSendaStrings.current
+    val scope = rememberCoroutineScope()
+    val hasPage = activeTab != null && activeTab.url.isNotBlank() && activeTab.url != "about:blank"
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OFFICIAL_AI_SITES.forEach { (name, url) ->
             AssistChip(
