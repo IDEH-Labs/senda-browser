@@ -136,7 +136,7 @@ configurations.all {
 
 dependencies {
     // GeckoView - Motor web libre de Mozilla
-    implementation 'org.mozilla.geckoview:geckoview:156.0.20260921121718'
+    implementation 'org.mozilla.geckoview:geckoview:157.0.20260924084938'
 
     // AndroidX & Kotlin
     implementation 'androidx.core:core-ktx:1.15.0'
