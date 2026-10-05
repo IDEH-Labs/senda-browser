@@ -37,20 +37,6 @@ android {
         ndk {
             abiFilters 'arm64-v8a'
         }
-        externalNativeBuild {
-            cmake {
-                cppFlags "-O3 -flto -frtti -fexceptions"
-                // Estática: solo libsenda-llama usa libc++, y la copia compartida del NDK 26 venía alineada a 4 KB
-                arguments "-DANDROID_STL=c++_static"
-                // Compilación de prueba con Vulkan: -PsendaVulkan -PsendaVulkanHeaders=… -PsendaSpirvPrefix=… -PsendaGlslc=…
-                if (project.hasProperty('sendaVulkan')) {
-                    arguments "-DSENDA_VULKAN=ON",
-                        "-DSENDA_VULKAN_HEADERS=${project.property('sendaVulkanHeaders')}",
-                        "-DSENDA_SPIRV_PREFIX=${project.property('sendaSpirvPrefix')}",
-                        "-DSENDA_GLSLC=${project.property('sendaGlslc')}"
-                }
-            }
-        }
     }
 
     signingConfigs {
@@ -99,8 +85,6 @@ android {
     packaging {
         jniLibs {
             useLegacyPackaging = true
-            // Solo sirve para enlazar libggml-opencl: en el APK taparía el OpenCL del fabricante
-            excludes += ['**/libOpenCL.so']
         }
         resources {
             excludes += '/META-INF/{AL2.0,LGPL2.1}'
@@ -109,12 +93,6 @@ android {
 
     ndkVersion "26.1.10909125"
 
-    externalNativeBuild {
-        cmake {
-            path file("src/main/cpp/CMakeLists.txt")
-            version "3.22.1"
-        }
-    }
 }
 
 configurations.all {

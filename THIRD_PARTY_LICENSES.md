@@ -27,7 +27,3 @@ Senda respeta el trabajo de la comunidad de software libre y reconoce la autorí
 - **Sitio:** https://gitlab.torproject.org/tpo/core/tor | https://github.com/guardianproject/tor-android
 - Demonio Tor embebido y su controlador para el enrutamiento por la red Tor.
 
-### llama.cpp y ggml (Georgi Gerganov y colaboradores)
-- **Licencia:** MIT License
-- **Sitio:** https://github.com/ggml-org/llama.cpp
-- Motor de inferencia local para los modelos GGUF de Senda AI.

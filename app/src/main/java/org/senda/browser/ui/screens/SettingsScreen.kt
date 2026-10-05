@@ -461,14 +461,6 @@ fun SettingsScreen(
         )
     }
 
-    // DIÁLOGO: IA LOCAL Y ASISTENCIA SOBERANA
-    if (activeDialog == "ai_controls") {
-        org.senda.browser.ui.components.SendaSovereignAiDialog(
-            prefs = prefs,
-            onDismiss = { activeDialog = null }
-        )
-    }
-
     // DIÁLOGO: ENRUTAMIENTO TOR & PROXY SOCKS5
     if (activeDialog == "tor_proxy") {
         SettingsTorDialog(
