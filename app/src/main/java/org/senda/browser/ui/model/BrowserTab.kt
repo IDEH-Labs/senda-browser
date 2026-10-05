@@ -463,6 +463,14 @@ class BrowserTab(
                 session: GeckoSession,
                 request: GeckoSession.NavigationDelegate.LoadRequest
             ): GeckoResult<org.mozilla.geckoview.AllowOrDeny>? {
+                // Vuelta del inicio de sesión con ChatGPT: se entrega dentro de Senda sin cargarla. Por la red, el
+                // modo solo HTTPS bloquea http://127.0.0.1 y la página mostraba «conexión no segura»
+                if (org.senda.browser.core.assistant.ChatGptPlanAuth.deliverCallback(request.uri)) {
+                    // Página en blanco: volver atrás recargaba la página de OpenAI de la misma autorización justo
+                    // antes del canje y el código quedaba invalidado (invalid_grant, 2026-10-05)
+                    android.os.Handler(android.os.Looper.getMainLooper()).post { session.loadUri("about:blank") }
+                    return GeckoResult.fromValue(org.mozilla.geckoview.AllowOrDeny.DENY)
+                }
                 val scheme = request.uri.substringBefore(':', "").lowercase()
                 if (scheme in GECKO_SCHEMES) return null
                 // Solo tras un toque del usuario: una web no puede lanzar apps por su cuenta
@@ -583,12 +591,19 @@ class BrowserTab(
             }
         }
 
+        // App instalada como depurable (compilación de desarrollo): sin BuildConfig en este módulo
+        val applicationDebuggable = (org.senda.browser.SendaApplication.instance.applicationInfo.flags and
+            android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
         session.contentBlockingDelegate = object : ContentBlocking.Delegate {
             override fun onContentBlocked(
                 session: GeckoSession,
                 event: ContentBlocking.BlockEvent
             ) {
                 trackersBlocked++
+                // Solo en compilaciones de desarrollo: la versión de usuarios no registra las direcciones visitadas
+                if (applicationDebuggable) {
+                    android.util.Log.d("SendaBlocked", "${event.uri} categorías=${event.antiTrackingCategory} cookies=${event.cookieBehaviorCategory} safe=${event.safeBrowsingCategory}")
+                }
             }
         }
 

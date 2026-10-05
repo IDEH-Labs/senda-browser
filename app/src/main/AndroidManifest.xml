@@ -28,6 +28,16 @@
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"
         tools:ignore="ProtectedPermissions" />
 
+    <!-- Solo los navegadores (apps que abren enlaces https): para ofrecer otro navegador al iniciar sesión con
+         ChatGPT. Desde Android 11 las demás apps no son visibles sin declararlo -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" />
+        </intent>
+    </queries>
+
     <application
         android:name=".SendaApplication"
         android:allowBackup="false"

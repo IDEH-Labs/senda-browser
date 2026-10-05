@@ -65,6 +65,27 @@ fun openInBrowser(context: Context, url: String) {
     } catch (_: android.content.ActivityNotFoundException) {}
 }
 
+/**
+ * Inicio de sesión de OpenAI en otro navegador del teléfono (RFC 8252: navegador externo). En Senda, el bloqueo
+ * estricto de rastreadores y uBlock cortan peticiones que necesita la página de OpenAI y el botón no responde
+ * (probado el 2026-10-05); no se rebajan las protecciones de Senda para todos los sitios por esto. La vuelta llega
+ * igual a Senda por 127.0.0.1. Sin otro navegador instalado, se abre en Senda.
+ */
+fun openSignInBrowser(context: Context, url: String) {
+    val uri = android.net.Uri.parse(url)
+    val view = android.content.Intent(android.content.Intent.ACTION_VIEW, uri)
+    val others = context.packageManager.queryIntentActivities(view, android.content.pm.PackageManager.MATCH_ALL)
+        .filter { it.activityInfo.packageName != context.packageName }
+    if (others.isEmpty()) { openInBrowser(context, url); return }
+    val own = context.packageManager.queryIntentActivities(view, android.content.pm.PackageManager.MATCH_ALL)
+        .filter { it.activityInfo.packageName == context.packageName }
+        .map { android.content.ComponentName(it.activityInfo.packageName, it.activityInfo.name) }
+    val chooser = android.content.Intent.createChooser(view, null)
+        .putExtra(android.content.Intent.EXTRA_EXCLUDE_COMPONENTS, own.toTypedArray())
+        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+    try { context.startActivity(chooser) } catch (_: android.content.ActivityNotFoundException) { openInBrowser(context, url) }
+}
+
 /** Aviso obligatorio de OpenAI al usar el plan de ChatGPT por primera vez, con su logo. */
 @Composable
 fun ChatGptWelcomeDialog(onDismiss: () -> Unit) {
@@ -109,7 +130,13 @@ private fun ChatGptLogo(sizeDp: Int) {
 
 /** Configuración del asistente: proveedor, clave cifrada, prueba de conexión, modelo y aviso de privacidad. */
 @Composable
-fun SendaAssistantSettingsDialog(prefs: PreferencesManager, onDismiss: () -> Unit) {
+fun SendaAssistantSettingsDialog(
+    prefs: PreferencesManager,
+    onDismiss: () -> Unit,
+    // Al iniciar sesión con ChatGPT se abre la página de OpenAI en una pestaña: hay que quitar de encima lo que la
+    // tape (este cuadro y, si viene del chat, la hoja del asistente). Al volver, el cuadro retoma el resultado
+    onLeaveForSignIn: () -> Unit = onDismiss
+) {
     val context = LocalContext.current
     val strings = LocalSendaStrings.current
     val scope = rememberCoroutineScope()
@@ -218,7 +245,8 @@ fun SendaAssistantSettingsDialog(prefs: PreferencesManager, onDismiss: () -> Uni
                         Button(
                             enabled = !loading && signIn !is org.senda.browser.core.assistant.ChatGptPlanAuth.SignInState.Waiting,
                             onClick = {
-                                org.senda.browser.core.assistant.ChatGptPlanAuth.startSignIn(context, prefs) { url -> openInBrowser(context, url) }
+                                org.senda.browser.core.assistant.ChatGptPlanAuth.startSignIn(context, prefs) { url -> openSignInBrowser(context, url) }
+                                onLeaveForSignIn()
                             },
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -366,10 +394,15 @@ fun SendaAssistantSheet(prefs: PreferencesManager, activeTab: BrowserTab?, onDis
     }
 
     if (showSettings) {
-        SendaAssistantSettingsDialog(prefs) {
-            showSettings = false
-            configured = SendaAssistant.isConfigured(prefs)
-        }
+        SendaAssistantSettingsDialog(
+            prefs,
+            onDismiss = {
+                showSettings = false
+                configured = SendaAssistant.isConfigured(prefs)
+            },
+            // La página de OpenAI queda a la vista: se cierran el cuadro y la hoja del asistente
+            onLeaveForSignIn = { showSettings = false; busy?.cancel(); onDismiss() }
+        )
     }
 
     ModalBottomSheet(onDismissRequest = { busy?.cancel(); onDismiss() }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
