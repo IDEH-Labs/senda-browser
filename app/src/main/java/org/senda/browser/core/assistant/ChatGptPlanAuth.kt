@@ -71,15 +71,26 @@ object ChatGptPlanAuth {
      */
     fun startSignIn(context: Context, prefs: PreferencesManager, openUrl: (String) -> Unit) {
         if (_signInState.value == SignInState.Waiting) return
+        injectedCallback = null
         _signInState.value = SignInState.Waiting
         signInJob = appScope.launch {
             _signInState.value = try {
-                SignInState.Done(signIn(context.applicationContext, prefs, openUrl).email)
+                SignInState.Done(signIn(context.applicationContext, prefs, openUrl).email).also { done ->
+                    // El usuario está en la pestaña de OpenAI, no en Ajustes: confirmarle que ya puede volver
+                    val strings = org.senda.browser.core.SendaStrings.get(prefs.appLanguage, context)
+                    kotlinx.coroutines.withContext(Dispatchers.Main) {
+                        android.widget.Toast.makeText(context.applicationContext,
+                            strings.as_chatgpt_signed_in.format(done.email ?: "ChatGPT"), android.widget.Toast.LENGTH_LONG).show()
+                    }
+                }
             } catch (e: AuthException) {
+                // Solo el código del error (nunca tokens ni el código de autorización)
+                android.util.Log.w("SendaChatGpt", "Inicio de sesión fallido: ${e.code}")
                 SignInState.Failed(e.code)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 SignInState.Idle
             } catch (e: RemoteAiException) {
+                android.util.Log.w("SendaChatGpt", "Inicio de sesión fallido: ${e.kind} ${e.message}")
                 SignInState.Failed(e.kind.name.lowercase())
             } catch (e: Exception) {
                 SignInState.Failed(e.javaClass.simpleName)
@@ -104,7 +115,8 @@ object ChatGptPlanAuth {
      * 127.0.0.1. [openUrl] abre la URL; la función vuelve cuando la sesión queda guardada.
      */
     suspend fun signIn(context: Context, prefs: PreferencesManager, openUrl: (String) -> Unit): Session {
-        val verifier = randomUrlSafe(64)
+        // 32 bytes en base64url (43 caracteres) para verificador, state y nonce: igual que el kit oficial de OpenAI
+        val verifier = randomUrlSafe(32)
         val challenge = b64url(MessageDigest.getInstance("SHA-256").digest(verifier.toByteArray()))
         val state = randomUrlSafe(32)
         val nonce = randomUrlSafe(32)
@@ -140,6 +152,12 @@ object ChatGptPlanAuth {
                 callback["error"]?.let { throw AuthException(it) }
                 val code = callback["code"] ?: throw AuthException("no_code")
                 val clientId = callback["client_id"] ?: params.getValue("client_id")
+                if (clientId == "dynamic_agent_client" || !Regex("^[a-zA-Z0-9_-]{1,200}$").matches(clientId)) throw AuthException("registration_incomplete")
+                // Como el kit oficial: guardar el cliente emitido antes del canje, para que un nuevo intento no
+                // registre otra app si el código caduca o falla
+                prefs.assistantChatGptClientId = clientId
+                android.util.Log.i("SendaChatGpt", "Canje: cliente=${clientId.take(12)}… verificador=${verifier.length} car., " +
+                    "reto coincide=${b64url(MessageDigest.getInstance("SHA-256").digest(verifier.toByteArray())) == challenge}, parámetros de vuelta=${callback.keys}")
                 val tokens = postForm(TOKEN, mapOf(
                     "grant_type" to "authorization_code", "code" to code, "client_id" to clientId,
                     "code_verifier" to verifier, "redirect_uri" to REDIRECT, "resource" to RESOURCE
@@ -194,11 +212,30 @@ object ChatGptPlanAuth {
         }
     }
 
+    /** Vuelta entregada por la propia Senda (ver deliverCallback) mientras se espera. */
+    @Volatile private var injectedCallback: Map<String, String>? = null
+
+    /**
+     * Si [url] es la vuelta del inicio de sesión en curso, la entrega y devuelve true (la pestaña no debe cargarla).
+     * Cuando el inicio de sesión ocurre en la propia Senda, el modo solo HTTPS impide cargar http://127.0.0.1.
+     */
+    fun deliverCallback(url: String): Boolean {
+        if (_signInState.value != SignInState.Waiting || !url.startsWith(REDIRECT)) return false
+        injectedCallback = parseQuery(url.substringAfter('?', ""))
+        android.util.Log.i("SendaChatGpt", "Vuelta de OpenAI recibida dentro de Senda")
+        return true
+    }
+
+    private fun parseQuery(q: String): Map<String, String> = q.split('&').filter { it.contains('=') }.associate {
+        URLDecoder.decode(it.substringBefore('='), "UTF-8") to URLDecoder.decode(it.substringAfter('='), "UTF-8")
+    }
+
     /** Espera una sola petición GET /auth/callback?… y responde una página sencilla. */
     private suspend fun awaitCallback(server: ServerSocket, deadline: Long): Map<String, String> {
         while (true) {
             kotlinx.coroutines.currentCoroutineContext().ensureActive()
             if (System.currentTimeMillis() > deadline) throw AuthException("timeout")
+            injectedCallback?.let { injectedCallback = null; return it }
             val accepted = try { server.accept() } catch (_: java.net.SocketTimeoutException) { continue }
             accepted.use { socket ->
                 socket.soTimeout = 10_000
@@ -217,11 +254,7 @@ object ChatGptPlanAuth {
                     write(bytes)
                     flush()
                 }
-                if (ok) {
-                    return target.substringAfter('?', "").split('&').filter { it.contains('=') }.associate {
-                        URLDecoder.decode(it.substringBefore('='), "UTF-8") to URLDecoder.decode(it.substringAfter('='), "UTF-8")
-                    }
-                }
+                if (ok) return parseQuery(target.substringAfter('?', ""))
             }
         }
     }
@@ -238,7 +271,10 @@ object ChatGptPlanAuth {
             val code = conn.responseCode
             val text = (if (code in 200..299) conn.inputStream else conn.errorStream)?.bufferedReader()?.use { it.readText() }.orEmpty()
             if (code !in 200..299) {
-                val err = runCatching { JSONObject(text).optString("error") }.getOrNull().orEmpty()
+                val json = runCatching { JSONObject(text) }.getOrNull()
+                val err = json?.optString("error").orEmpty()
+                // La descripción de OpenAI explica el rechazo; no contiene el código ni los tokens
+                android.util.Log.w("SendaChatGpt", "HTTP $code en ${url.substringAfterLast('/')}: $err — ${json?.optString("error_description")?.take(300)} (campos: ${fields.keys})")
                 throw AuthException(err.ifBlank { "http_$code" })
             }
             return if (text.isBlank()) JSONObject() else JSONObject(text)
