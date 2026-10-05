@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Healing
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -455,6 +456,10 @@ fun BrowserScreen(
             )
         }
 
+        // Subir archivos a una página (<input type="file">). Antes no había selector: el aviso se quedaba sin
+        // resolver y ninguna página podía recibir un archivo
+        SendaFilePromptHandler(activeTab)
+
         // Anfitrión de diálogos interactivos web (Desplegables / Select, Alertas, Confirmaciones)
         if (activeTab?.activePrompt != null && activeTab.activePrompt !is SendaPrompt.File) {
             SendaPromptHost(
@@ -549,6 +554,64 @@ private fun TabCrashedView(
                     Text(strings.crash_sheet_restore, fontWeight = FontWeight.Bold)
                 }
             }
+        }
+    }
+}
+
+
+/** Abre el selector de documentos de Android para el aviso de archivo de la pestaña y le entrega lo elegido. */
+@Composable
+private fun SendaFilePromptHandler(tab: BrowserTab?) {
+    val context = LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val filePrompt = tab?.activePrompt as? SendaPrompt.File
+    // Evita abrir el selector dos veces para el mismo aviso (p. ej. al girar la pantalla)
+    var launchedFor by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(0) }
+
+    fun deliver(uris: List<android.net.Uri>) {
+        val t = tab ?: return
+        val p = t.activePrompt as? SendaPrompt.File ?: return
+        scope.launch {
+            val copies = org.senda.browser.core.SendaWebUploads.copyToCache(context, uris)
+            if (!p.prompt.isComplete) {
+                p.result.complete(
+                    when {
+                        copies.isEmpty() -> p.prompt.dismiss()
+                        p.prompt.type == org.mozilla.geckoview.GeckoSession.PromptDelegate.FilePrompt.Type.MULTIPLE ->
+                            p.prompt.confirm(context, copies.toTypedArray())
+                        else -> p.prompt.confirm(context, copies.first())
+                    }
+                )
+            }
+            if (t.activePrompt === p) t.dismissActivePrompt()
+        }
+    }
+
+    val pickOne = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri -> deliver(listOfNotNull(uri)) }
+    val pickMany = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris -> deliver(uris) }
+
+    LaunchedEffect(filePrompt) {
+        val p = filePrompt ?: return@LaunchedEffect
+        val t = tab ?: return@LaunchedEffect
+        val id = System.identityHashCode(p)
+        if (launchedFor == id) return@LaunchedEffect
+        launchedFor = id
+        // Gecko da tipos MIME («image/*») y a veces extensiones («.pdf»): el selector solo entiende MIME
+        val mimes = p.prompt.mimeTypes?.filter { it.contains('/') }?.distinct()?.takeIf { it.isNotEmpty() }
+            ?.toTypedArray() ?: arrayOf("*/*")
+        try {
+            when (p.prompt.type) {
+                org.mozilla.geckoview.GeckoSession.PromptDelegate.FilePrompt.Type.MULTIPLE -> pickMany.launch(mimes)
+                org.mozilla.geckoview.GeckoSession.PromptDelegate.FilePrompt.Type.SINGLE -> pickOne.launch(mimes)
+                // Carpetas: GeckoView no tiene cómo recibirlas desde el selector de documentos
+                else -> t.dismissActivePrompt()
+            }
+        } catch (e: android.content.ActivityNotFoundException) {
+            t.dismissActivePrompt()
         }
     }
 }
