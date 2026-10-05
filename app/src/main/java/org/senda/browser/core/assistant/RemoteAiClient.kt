@@ -30,7 +30,7 @@ data class ChatTurn(val role: Role, val text: String) {
 
 /** Fallo explicable al usuario. El mensaje nunca contiene la clave. */
 class RemoteAiException(val kind: Kind, detail: String = "") : Exception(detail) {
-    enum class Kind { NOT_CONFIGURED, INSECURE_URL, AUTH, RATE_LIMIT, NETWORK, REFUSED, BAD_RESPONSE }
+    enum class Kind { NOT_CONFIGURED, INSECURE_URL, AUTH, RATE_LIMIT, NETWORK, REFUSED, BAD_RESPONSE, USAGE_LIMIT, NOT_ELIGIBLE }
 }
 
 interface RemoteAiClient {
@@ -50,6 +50,8 @@ object RemoteAiClients {
                 if (apiKey.isBlank()) throw RemoteAiException(RemoteAiException.Kind.NOT_CONFIGURED)
                 ClaudeClient(apiKey)
             }
+            // Sin clave: usa la sesión de «Sign in with ChatGPT» (SendaAssistant.client)
+            RemoteAiProvider.Style.CHATGPT_PLAN -> throw RemoteAiException(RemoteAiException.Kind.NOT_CONFIGURED)
             RemoteAiProvider.Style.OPENAI_COMPATIBLE -> {
                 val base = (provider.baseUrl ?: serverUrl).trim().trimEnd('/')
                 if (base.isBlank()) throw RemoteAiException(RemoteAiException.Kind.NOT_CONFIGURED)
@@ -226,5 +228,118 @@ private class ClaudeClient(apiKey: String) : RemoteAiClient {
     companion object {
         /** Modelos que aceptan fallbacks «default» en la API de Anthropic (guía oficial, 2026-09). */
         private val SERVER_FALLBACK_MODELS = setOf("claude-opus-5-5", "claude-fable-5-1", "claude-opus-5", "claude-sonnet-5-5")
+    }
+}
+
+/**
+ * El plan de ChatGPT del usuario («Sign in with ChatGPT»): /v1/models y /v1/responses con store=false y stream=true,
+ * como exige la guía oficial (developers.openai.com/siwc/token-sharing-open-source/models-and-inference).
+ */
+class ChatGptPlanClient(private val prefs: org.senda.browser.core.PreferencesManager) : RemoteAiClient {
+
+    override suspend fun listModels(): List<String> = withContext(Dispatchers.IO) {
+        val conn = open("$BASE/models", ChatGptPlanAuth.accessToken(prefs)).apply { requestMethod = "GET" }
+        try {
+            val body = readOrThrow(conn)
+            val models = JSONObject(body).optJSONArray("models") ?: JSONArray()
+            (0 until models.length()).mapNotNull { models.optJSONObject(it) }
+                .filter { it.optString("visibility") == "list" }
+                .mapNotNull { it.optString("slug").ifBlank { null } }
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    override suspend fun chat(model: String, system: String, turns: List<ChatTurn>, onDelta: (String) -> Unit): String =
+        withContext(Dispatchers.IO) {
+            val input = JSONArray().put(JSONObject().put("role", "developer").put("content", system))
+            turns.forEach { t -> input.put(JSONObject().put("role", if (t.role == ChatTurn.Role.USER) "user" else "assistant").put("content", t.text)) }
+            val payload = JSONObject().put("model", model).put("input", input).put("store", false).put("stream", true).toString()
+            // «usage_unavailable» (503) es temporal: reintento acotado antes de empezar a mostrar texto
+            var attempt = 0
+            while (true) {
+                try {
+                    return@withContext stream(payload, onDelta)
+                } catch (e: RemoteAiException) {
+                    if (e.message == "subscription_sharing_usage_unavailable" && attempt < 2) {
+                        attempt++
+                        kotlinx.coroutines.delay(2_000L * attempt)
+                        continue
+                    }
+                    throw e
+                }
+            }
+            @Suppress("UNREACHABLE_CODE") ""
+        }
+
+    private suspend fun stream(payload: String, onDelta: (String) -> Unit): String {
+        val conn = open("$BASE/responses", ChatGptPlanAuth.accessToken(prefs)).apply {
+            requestMethod = "POST"; doOutput = true
+            setRequestProperty("Content-Type", "application/json")
+            setRequestProperty("Accept", "text/event-stream")
+        }
+        try {
+            conn.outputStream.use { it.write(payload.toByteArray()) }
+            if (conn.responseCode !in 200..299) readOrThrow(conn)
+            val out = StringBuilder()
+            var completed = false
+            conn.inputStream.bufferedReader().useLines { lines ->
+                for (line in lines) {
+                    currentCoroutineContext().ensureActive()
+                    if (!line.startsWith("data:")) continue
+                    val data = line.removePrefix("data:").trim()
+                    if (data.isEmpty() || data == "[DONE]") continue
+                    val ev = JSONObject(data)
+                    when (ev.optString("type")) {
+                        "response.output_text.delta" -> { out.append(ev.optString("delta")); onDelta(out.toString()) }
+                        "response.completed" -> { completed = true; break }
+                        "response.failed" -> throw planError(ev.optJSONObject("response")?.optJSONObject("error")?.optString("code").orEmpty(), 0)
+                        "response.incomplete" -> throw RemoteAiException(RemoteAiException.Kind.BAD_RESPONSE, "incomplete")
+                    }
+                }
+            }
+            // La guía exige response.completed para dar la respuesta por buena
+            if (!completed) throw RemoteAiException(RemoteAiException.Kind.BAD_RESPONSE, "incomplete")
+            return out.toString()
+        } catch (e: IOException) {
+            throw RemoteAiException(RemoteAiException.Kind.NETWORK, e.javaClass.simpleName)
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    private fun open(url: String, token: String): HttpURLConnection = SendaNet.open(url).apply {
+        connectTimeout = 20_000
+        readTimeout = 120_000
+        setRequestProperty("Authorization", "Bearer $token")
+    }
+
+    private fun readOrThrow(conn: HttpURLConnection): String {
+        val code = try { conn.responseCode } catch (e: IOException) {
+            throw RemoteAiException(RemoteAiException.Kind.NETWORK, e.javaClass.simpleName)
+        }
+        if (code in 200..299) return conn.inputStream.bufferedReader().use { it.readText() }
+        val err = try { conn.errorStream?.bufferedReader()?.use { it.readText() } } catch (_: IOException) { null }.orEmpty()
+        val errCode = runCatching { JSONObject(err).optJSONObject("error")?.optString("code") }.getOrNull().orEmpty()
+        throw planError(errCode, code)
+    }
+
+    /** Códigos de la guía «Errors and recovery» y la acción que piden. */
+    private fun planError(code: String, http: Int): RemoteAiException = when (code) {
+        "subscription_sharing_usage_limit_exceeded" -> RemoteAiException(RemoteAiException.Kind.USAGE_LIMIT, code)
+        "subscription_sharing_user_not_eligible" -> RemoteAiException(RemoteAiException.Kind.NOT_ELIGIBLE, code)
+        "subscription_sharing_invalid_user" -> RemoteAiException(RemoteAiException.Kind.AUTH, code)
+        "subscription_sharing_usage_unavailable" -> RemoteAiException(RemoteAiException.Kind.RATE_LIMIT, code)
+        else -> when (http) {
+            401, 403 -> RemoteAiException(RemoteAiException.Kind.AUTH, "HTTP $http $code")
+            429 -> RemoteAiException(RemoteAiException.Kind.RATE_LIMIT, "HTTP 429 $code")
+            else -> RemoteAiException(RemoteAiException.Kind.BAD_RESPONSE, "HTTP $http $code".trim())
+        }
+    }
+
+    companion object {
+        private const val BASE = "https://api.openai.com/v1"
+        /** Página de OpenAI donde el usuario ve y ajusta lo que esta app puede usar de su plan. */
+        const val MANAGE_USAGE_URL = "https://chatgpt.com/settings/usage"
     }
 }

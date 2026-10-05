@@ -272,6 +272,17 @@ object SendaGeckoEngine {
             { list ->
                 updateFromExtensionList(list)
 
+                // uBlock y el proxy/Tor de Senda deben estar siempre activos (la app no deja desactivarlos). El
+                // 2026-10-05 aparecieron desactivados en un teléfono tras reinstalar (userDisabled en el perfil,
+                // causa sin determinar): sin uBlock no hay bloqueo de rastreadores. Se reactivan y se registra por qué
+                list?.filter { it.id in EMBEDDED_EXTENSION_IDS && !it.metaData.enabled }?.forEach { ext ->
+                    android.util.Log.w("Senda", "Extensión integrada desactivada (${ext.id}, disabledFlags=${ext.metaData.disabledFlags}): se reactiva")
+                    controller.enable(ext, org.mozilla.geckoview.WebExtensionController.EnableSource.USER).accept(
+                        { refreshExtensions() },
+                        { e -> android.util.Log.e("Senda", "No se pudo reactivar ${ext.id}: ${e?.message}") }
+                    )
+                }
+
                 // 1. uBlock Origin
                 val hasUBlock = list?.any { it.id == "uBlock0@raymondhill.net" } == true
                 if (!hasUBlock) {

@@ -16,6 +16,8 @@ enum class RemoteAiProvider(
     /** Modelo sugerido si el listado del proveedor falla; el usuario puede elegir otro de la lista. */
     val suggestedModel: String?
 ) {
+    /** El plan Plus/Pro del usuario con «Sign in with ChatGPT» (sin clave de API). */
+    CHATGPT_PLAN("chatgpt_plan", "ChatGPT (Plus / Pro)", "https://api.openai.com/v1", Style.CHATGPT_PLAN, null, null),
     ANTHROPIC("anthropic", "Anthropic (Claude)", "https://api.anthropic.com", Style.ANTHROPIC,
         "https://console.anthropic.com/settings/keys", "claude-opus-5-5"),
     OPENAI("openai", "OpenAI", "https://api.openai.com/v1", Style.OPENAI_COMPATIBLE,
@@ -28,7 +30,7 @@ enum class RemoteAiProvider(
         "https://console.mistral.ai/api-keys", null),
     OWN_SERVER("own", "", null, Style.OPENAI_COMPATIBLE, null, null);
 
-    enum class Style { ANTHROPIC, OPENAI_COMPATIBLE }
+    enum class Style { ANTHROPIC, OPENAI_COMPATIBLE, CHATGPT_PLAN }
 
     val isOwnServer: Boolean get() = this == OWN_SERVER
 

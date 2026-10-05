@@ -564,6 +564,20 @@ class PreferencesManager(context: Context) {
         get() = prefs.getString("assistant_server_url", "") ?: ""
         set(value) = prefs.edit().putString("assistant_server_url", value.trim().trimEnd('/')).apply()
 
+    /** «Sign in with ChatGPT»: identificador estable de esta instalación (ext_agent_host_id) y cliente emitido. */
+    var assistantChatGptHostId: String
+        get() = prefs.getString("assistant_chatgpt_host_id", "") ?: ""
+        set(value) = prefs.edit().putString("assistant_chatgpt_host_id", value).apply()
+
+    var assistantChatGptClientId: String
+        get() = prefs.getString("assistant_chatgpt_client_id", "") ?: ""
+        set(value) = prefs.edit().putString("assistant_chatgpt_client_id", value).apply()
+
+    /** Ya vio el aviso de bienvenida obligatorio de OpenAI («Eligible usage in this app uses your ChatGPT plan»). */
+    var assistantChatGptWelcomeSeen: Boolean
+        get() = prefs.getBoolean("assistant_chatgpt_welcome_seen", false)
+        set(value) = prefs.edit().putBoolean("assistant_chatgpt_welcome_seen", value).apply()
+
     /** Confirmó el aviso de que el texto y las páginas que envíe salen hacia el proveedor. */
     var assistantPrivacyAccepted: Boolean
         get() = prefs.getBoolean("assistant_privacy_accepted", false)

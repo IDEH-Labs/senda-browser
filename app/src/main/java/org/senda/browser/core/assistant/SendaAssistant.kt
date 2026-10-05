@@ -17,8 +17,11 @@ object SendaAssistant {
     /** Configuración completa (proveedor y modelo) y aviso de privacidad aceptado. */
     fun isConfigured(prefs: PreferencesManager): Boolean {
         val p = RemoteAiProvider.byId(prefs.assistantProvider) ?: return false
-        return prefs.assistantModel.isNotBlank() && prefs.assistantPrivacyAccepted &&
-            (if (p.isOwnServer) prefs.assistantServerUrl.isNotBlank() else prefs.getAssistantKey(p.id).isNotBlank())
+        return prefs.assistantModel.isNotBlank() && prefs.assistantPrivacyAccepted && when {
+            p.style == RemoteAiProvider.Style.CHATGPT_PLAN -> ChatGptPlanAuth.isSignedIn(prefs)
+            p.isOwnServer -> prefs.assistantServerUrl.isNotBlank()
+            else -> prefs.getAssistantKey(p.id).isNotBlank()
+        }
     }
 
     /** Adónde viajan los datos: el dominio del proveedor o la dirección del servidor propio. */
@@ -30,6 +33,7 @@ object SendaAssistant {
 
     fun client(prefs: PreferencesManager): RemoteAiClient {
         val p = RemoteAiProvider.byId(prefs.assistantProvider) ?: throw RemoteAiException(RemoteAiException.Kind.NOT_CONFIGURED)
+        if (p.style == RemoteAiProvider.Style.CHATGPT_PLAN) return ChatGptPlanClient(prefs)
         return RemoteAiClients.create(p, prefs.getAssistantKey(p.id), prefs.assistantServerUrl)
     }
 
