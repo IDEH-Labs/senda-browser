@@ -33,6 +33,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -46,6 +47,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.senda.browser.core.LocalSendaStrings
 import org.senda.browser.core.PreferencesManager
+import kotlin.math.roundToInt
 import org.senda.browser.core.ai.*
 import org.senda.browser.ui.model.BrowserTab
 import java.io.File
@@ -104,12 +106,12 @@ fun SendaSovereignAiDialog(
                 Spacer(modifier = Modifier.width(10.dp))
                 Column {
                     Text(
-                        text = "Senda IA Soberana",
+                        text = strings.ai_title,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "100% Privado • Sin Rastreo Externo",
+                        text = strings.ai_subtitle,
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -131,12 +133,12 @@ fun SendaSovereignAiDialog(
                     Tab(
                         selected = selectedTab == 0,
                         onClick = { selectedTab = 0 },
-                        text = { Text("Modo Offline", fontSize = 12.sp, fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal) }
+                        text = { Text(strings.ai_tab_device, fontSize = 12.sp, fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal) }
                     )
                     Tab(
                         selected = selectedTab == 1,
                         onClick = { selectedTab = 1 },
-                        text = { Text("Ollama / Red LAN", fontSize = 12.sp, fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal) }
+                        text = { Text(strings.ai_tab_lan, fontSize = 12.sp, fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal) }
                     )
                 }
 
@@ -166,7 +168,7 @@ fun SendaSovereignAiDialog(
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
-                                        text = "Diagnóstico en Vivo de Hardware",
+                                        text = strings.ai_hw_title,
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.primary
@@ -178,7 +180,7 @@ fun SendaSovereignAiDialog(
                                         color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
                                     ) {
                                         Text(
-                                            text = "ACTUALIZADO",
+                                            text = strings.ai_hw_updated,
                                             fontSize = 9.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.primary,
@@ -191,19 +193,28 @@ fun SendaSovereignAiDialog(
                             Spacer(modifier = Modifier.height(8.dp))
 
                             Text(
-                                text = "• RAM Total: ${String.format("%.1f", profile.totalRamGb)} GB (${String.format("%.1f", profile.availableRamGb)} GB libres)",
+                                text = strings.ai_hw_ram.format(String.format("%.1f", profile.totalRamGb), String.format("%.1f", profile.availableRamGb)),
                                 fontSize = 11.sp
                             )
                             Text(
-                                text = "• CPU: ${profile.cpuCores} núcleos (${profile.performanceThreadsOptimal} hilos asignados)",
+                                text = strings.ai_hw_cpu.format(profile.cpuCores, profile.performanceThreadsOptimal),
                                 fontSize = 11.sp
                             )
                             Text(
-                                text = "• Acelerador Gráfico: ${if (profile.hasVulkanSupport) "Vulkan 1.x Activo" else "CPU ARM NEON"}",
+                                text = strings.ai_hw_accel.format(if (profile.hasVulkanSupport) strings.ai_hw_vulkan else strings.ai_hw_neon),
                                 fontSize = 11.sp
                             )
                             Text(
-                                text = "• Estado Térmico: ${profile.thermalStatusLabel}",
+                                text = strings.ai_hw_thermal.format(
+                                    when (profile.thermalStatusLabel) {
+                                        "NONE" -> strings.ai_thermal_none
+                                        "LIGHT" -> strings.ai_thermal_light
+                                        "MODERATE" -> strings.ai_thermal_moderate
+                                        "SEVERE" -> strings.ai_thermal_severe
+                                        "CRITICAL", "EMERGENCY", "SHUTDOWN" -> strings.ai_thermal_critical
+                                        else -> strings.ai_thermal_unknown
+                                    }
+                                ),
                                 fontSize = 11.sp,
                                 color = if (profile.isThermalThrottled) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -232,7 +243,7 @@ fun SendaSovereignAiDialog(
                                         color = MaterialTheme.colorScheme.onPrimary
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Analizando memoria y procesador...", fontSize = 11.sp)
+                                    Text(strings.ai_hw_measuring, fontSize = 11.sp)
                                 } else {
                                     Icon(
                                         imageVector = Icons.Default.Speed,
@@ -241,7 +252,7 @@ fun SendaSovereignAiDialog(
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = if (diagnosticExecuted) "Volver a Medir Hardware" else "Ejecutar Diagnóstico de Hardware",
+                                        text = if (diagnosticExecuted) strings.ai_hw_remeasure else strings.ai_hw_run,
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold
                                     )
@@ -268,7 +279,7 @@ fun SendaSovereignAiDialog(
                                         )
                                         Spacer(modifier = Modifier.width(5.dp))
                                         Text(
-                                            text = "IA Ideal Determinada: ${recommendedModel.name}",
+                                            text = strings.ai_recommended.format(recommendedModel.name),
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.primary
@@ -276,7 +287,7 @@ fun SendaSovereignAiDialog(
                                     }
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Text(
-                                        text = "Tope seguro: ${profile.maxRecommendedContextTokens} tokens • Presupuesto verificado para evitar cierres OOM.",
+                                        text = strings.ai_context_cap.format(profile.maxRecommendedContextTokens),
                                         fontSize = 10.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -291,7 +302,7 @@ fun SendaSovereignAiDialog(
                                             shape = RoundedCornerShape(6.dp),
                                             contentPadding = PaddingValues(vertical = 4.dp, horizontal = 8.dp)
                                         ) {
-                                            Text("Activar ${recommendedModel.name} como Predeterminado", fontSize = 11.sp)
+                                            Text(strings.ai_activate_default.format(recommendedModel.name), fontSize = 11.sp)
                                         }
                                     }
                                 }
@@ -299,10 +310,15 @@ fun SendaSovereignAiDialog(
                         }
                     }
 
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // ACELERACIÓN MEDIDA EN ESTE TELÉFONO (CPU / GPU)
+                    SendaAccelerationCard(prefs = prefs)
+
                     Spacer(modifier = Modifier.height(14.dp))
 
                     Text(
-                        text = "Catálogo de Modelos Soberanos (GGUF)",
+                        text = strings.ai_catalog_title,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -324,7 +340,7 @@ fun SendaSovereignAiDialog(
                                     if (isReady) {
                                         val modelFile = SendaModelManager.getModelFile(context, model)
                                         scope.launch {
-                                            org.senda.browser.core.ai.llama.SendaLlamaBridge.loadModel(modelFile)
+                                            org.senda.browser.core.ai.SendaAiCalibrator.loadConfigured(context, prefs, model, modelFile)
                                         }
                                     }
                                 },
@@ -359,7 +375,7 @@ fun SendaSovereignAiDialog(
                                                     color = MaterialTheme.colorScheme.primary
                                                 ) {
                                                     Text(
-                                                        text = "ACTIVO",
+                                                        text = strings.ai_badge_active,
                                                         fontSize = 9.sp,
                                                         fontWeight = FontWeight.Bold,
                                                         color = MaterialTheme.colorScheme.onPrimary,
@@ -374,7 +390,7 @@ fun SendaSovereignAiDialog(
                                                     color = MaterialTheme.colorScheme.secondary
                                                 ) {
                                                     Text(
-                                                        text = "IDEAL",
+                                                        text = strings.ai_badge_recommended,
                                                         fontSize = 9.sp,
                                                         fontWeight = FontWeight.Bold,
                                                         color = MaterialTheme.colorScheme.onSecondary,
@@ -384,7 +400,7 @@ fun SendaSovereignAiDialog(
                                             }
                                         }
                                         Text(
-                                            text = "${model.subtitle} • RAM: ~${model.ramRequiredMb} MB",
+                                            text = strings.ai_model_ram.format(model.subtitle, model.ramRequiredMb),
                                             fontSize = 10.sp,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -406,13 +422,13 @@ fun SendaSovereignAiDialog(
                                                     downloadStates = downloadStates.toMutableMap().apply {
                                                         put(model.id, ModelDownloadState.Idle)
                                                     }
-                                                    Toast.makeText(context, "${model.name} eliminado de la memoria", Toast.LENGTH_SHORT).show()
+                                                    Toast.makeText(context, strings.ai_model_deleted.format(model.name), Toast.LENGTH_SHORT).show()
                                                 },
                                                 modifier = Modifier.size(28.dp)
                                             ) {
                                                 Icon(
                                                     imageVector = Icons.Default.DeleteOutline,
-                                                    contentDescription = "Eliminar y liberar espacio",
+                                                    contentDescription = strings.ai_model_delete_cd,
                                                     tint = MaterialTheme.colorScheme.error,
                                                     modifier = Modifier.size(18.dp)
                                                 )
@@ -441,9 +457,9 @@ fun SendaSovereignAiDialog(
                                                                 prefs.selectedLocalAiModel = model.id
                                                                 val modelFile = SendaModelManager.getModelFile(context, model)
                                                                 scope.launch {
-                                                                    org.senda.browser.core.ai.llama.SendaLlamaBridge.loadModel(modelFile)
+                                                                    org.senda.browser.core.ai.SendaAiCalibrator.loadConfigured(context, prefs, model, modelFile)
                                                                 }
-                                                                Toast.makeText(context, "¡${model.name} instalado y activo en chip!", Toast.LENGTH_SHORT).show()
+                                                                Toast.makeText(context, strings.ai_model_installed.format(model.name), Toast.LENGTH_SHORT).show()
                                                             } else if (newState is ModelDownloadState.Error) {
                                                                 activeDownloadingModelId = null
                                                                 Toast.makeText(context, newState.message, Toast.LENGTH_LONG).show()
@@ -452,14 +468,15 @@ fun SendaSovereignAiDialog(
                                                     }
                                                 }
                                             },
-                                            enabled = activeDownloadingModelId == null,
+                                            // Sin 8 GB de RAM o sin dotprod el modelo cerraría otras apps o tardaría minutos
+                                            enabled = activeDownloadingModelId == null && profile.meetsLocalModelRequirements,
                                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                                             shape = RoundedCornerShape(8.dp),
                                             modifier = Modifier.height(30.dp)
                                         ) {
                                             Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(14.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
-                                            Text("Bajar", fontSize = 11.sp)
+                                            Text(strings.ai_download, fontSize = 11.sp)
                                         }
                                     }
                                 }
@@ -470,6 +487,14 @@ fun SendaSovereignAiDialog(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(top = 4.dp)
                                 )
+                                if (!profile.meetsLocalModelRequirements && !isReady) {
+                                    Text(
+                                        text = strings.ai_requirements_unmet,
+                                        fontSize = 10.5.sp,
+                                        color = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.padding(top = 4.dp)
+                                    )
+                                }
 
                                 if (state is ModelDownloadState.Downloading) {
                                     Spacer(modifier = Modifier.height(6.dp))
@@ -491,7 +516,7 @@ fun SendaSovereignAiDialog(
                                             fontSize = 9.sp,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
-                                        Text(text = "Descarga atómica directa", fontSize = 9.sp, color = MaterialTheme.colorScheme.primary)
+                                        Text(text = strings.ai_download_source, fontSize = 9.sp, color = MaterialTheme.colorScheme.primary)
                                     }
                                 }
                             }
@@ -515,7 +540,7 @@ fun SendaSovereignAiDialog(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Garantía Senda: Ningún texto, prompt o artículo analizado saldrá jamás de este teléfono. Funciona en Modo Avión.",
+                                text = strings.ai_privacy_note,
                                 fontSize = 10.5.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -525,14 +550,14 @@ fun SendaSovereignAiDialog(
                 } else {
                     // TAB 1: CONEXIÓN OLLAMA / LOCAL HOST EN RED
                     Text(
-                        text = "Servidor Propio Ollama (Red Local / LAN)",
+                        text = strings.ai_ollama_title,
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.primary
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Si ejecutas Ollama en tu computadora de casa (ej. con Llama 70B o DeepSeek R1), Senda puede conectarse directamente sin intermediarios.",
+                        text = strings.ai_ollama_desc,
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -545,7 +570,7 @@ fun SendaSovereignAiDialog(
                     OutlinedTextField(
                         value = ollamaUrl,
                         onValueChange = { ollamaUrl = it },
-                        label = { Text("URL Servidor Ollama") },
+                        label = { Text(strings.ai_ollama_url) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(10.dp)
@@ -556,7 +581,7 @@ fun SendaSovereignAiDialog(
                     OutlinedTextField(
                         value = ollamaModel,
                         onValueChange = { ollamaModel = it },
-                        label = { Text("Nombre del Modelo en Ollama") },
+                        label = { Text(strings.ai_ollama_model) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(10.dp)
@@ -569,14 +594,14 @@ fun SendaSovereignAiDialog(
                             prefs.aiOllamaUrl = ollamaUrl
                             prefs.aiOllamaModel = ollamaModel
                             prefs.aiBackendMode = "OLLAMA"
-                            Toast.makeText(context, "Configuración vinculada y guardada en Senda", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, strings.ai_ollama_saved, Toast.LENGTH_SHORT).show()
                         },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(10.dp)
                     ) {
                         Icon(Icons.Default.Lan, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Vincular Red LAN Privada", fontSize = 12.sp)
+                        Text(strings.ai_ollama_link, fontSize = 12.sp)
                     }
                 }
             }
@@ -611,7 +636,7 @@ object SendaDocumentExporter {
             putExtra(Intent.EXTRA_TEXT, content)
             type = "text/plain"
         }
-        val shareIntent = Intent.createChooser(sendIntent, "Exportar con Senda AI")
+        val shareIntent = Intent.createChooser(sendIntent, title)
         context.startActivity(shareIntent)
     }
 
@@ -679,8 +704,13 @@ fun SendaAssistantSheet(
 
     var inputText by remember { mutableStateOf("") }
     var isGenerating by remember { mutableStateOf(false) }
+    // Respuesta del modelo local mientras se escribe
+    var partialText by remember { mutableStateOf("") }
+    val calibrationStep by org.senda.browser.core.ai.SendaAiCalibrator.progress.collectAsState()
 
+    val strings = LocalSendaStrings.current
     val hasActivePage = activeTab != null && activeTab.url.isNotBlank() && activeTab.url != "about:blank"
+    var webLookup by remember { mutableStateOf(prefs.aiWebLookup) }
     var includePageContext by remember { mutableStateOf(hasActivePage) }
 
     // Scroll al final al agregar mensajes
@@ -701,6 +731,7 @@ fun SendaAssistantSheet(
             )
         )
         inputText = ""
+        partialText = ""
         isGenerating = true
 
         scope.launch {
@@ -708,7 +739,8 @@ fun SendaAssistantSheet(
                 val selectedModel = SendaAiModels.getById(prefs.selectedLocalAiModel)
                 val modelFile = SendaModelManager.getModelFile(context, selectedModel)
                 if (modelFile.exists() && modelFile.length() > 0) {
-                    org.senda.browser.core.ai.llama.SendaLlamaBridge.loadModel(modelFile)
+                    // La primera vez, si el teléfono tiene GPU, mide CPU y GPU antes de responder (~2-3 min en un Snapdragon 695)
+                    org.senda.browser.core.ai.SendaAiCalibrator.loadConfigured(context, prefs, selectedModel, modelFile)
                 }
             }
 
@@ -722,7 +754,9 @@ fun SendaAssistantSheet(
                 includePageContext = includePageContext,
                 ollamaUrl = prefs.aiOllamaUrl,
                 ollamaModel = prefs.aiOllamaModel,
-                backendMode = prefs.aiBackendMode
+                backendMode = prefs.aiBackendMode,
+                allowWebLookup = webLookup,
+                onPartial = { text -> scope.launch(Dispatchers.Main) { if (isGenerating) partialText = text } }
             )
 
             messages.add(
@@ -738,7 +772,13 @@ fun SendaAssistantSheet(
                 )
             )
             isGenerating = false
+            partialText = ""
         }
+    }
+
+    // Seguir el texto mientras se escribe
+    LaunchedEffect(partialText.length / 80) {
+        if (isGenerating && partialText.isNotEmpty()) listState.animateScrollToItem(messages.size)
     }
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -801,7 +841,7 @@ fun SendaAssistantSheet(
                                 shape = RoundedCornerShape(4.dp)
                             ) {
                                 Text(
-                                    text = if (prefs.aiBackendMode == "OLLAMA") "OLLAMA LAN" else "LOCAL",
+                                    text = if (prefs.aiBackendMode == "OLLAMA") "OLLAMA" else strings.ai_badge_local,
                                     fontSize = 9.sp,
                                     fontWeight = FontWeight.ExtraBold,
                                     color = MaterialTheme.colorScheme.primary,
@@ -810,7 +850,7 @@ fun SendaAssistantSheet(
                             }
                         }
                         Text(
-                            text = "Inteligencia local en chip • Cero telemetría",
+                            text = if (prefs.aiBackendMode == "OLLAMA") strings.ai_sheet_subtitle_lan else strings.ai_sheet_subtitle,
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -825,7 +865,7 @@ fun SendaAssistantSheet(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.DeleteOutline,
-                                contentDescription = "Limpiar chat",
+                                contentDescription = strings.ai_clear_chat,
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -837,7 +877,7 @@ fun SendaAssistantSheet(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = "Cerrar",
+                            contentDescription = strings.general_close,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -865,7 +905,7 @@ fun SendaAssistantSheet(
                             modifier = Modifier.weight(1f)
                         ) {
                             Text(
-                                text = if (includePageContext) "🌐 Leyendo:" else "🌐 Contexto pausado:",
+                                text = if (includePageContext) strings.ai_ctx_reading else strings.ai_ctx_paused,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = if (includePageContext) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
@@ -880,10 +920,47 @@ fun SendaAssistantSheet(
                             )
                         }
                         Text(
-                            text = if (includePageContext) "Activo ✓" else "Pausado",
+                            text = if (includePageContext) strings.ai_ctx_on else strings.ai_ctx_off,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = if (includePageContext) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            // Consulta en línea: apagada, nada de lo que escribes sale del teléfono (salvo con Ollama, a tu servidor)
+            if (prefs.aiBackendMode != "OLLAMA") {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp)
+                        .clickable {
+                            webLookup = !webLookup
+                            prefs.aiWebLookup = webLookup
+                        },
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (webLookup) MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.45f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(strings.ai_web_lookup, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text(
+                                if (webLookup) strings.ai_web_lookup_on else strings.ai_web_lookup_off,
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = webLookup,
+                            onCheckedChange = {
+                                webLookup = it
+                                prefs.aiWebLookup = it
+                            },
+                            modifier = Modifier.scale(0.8f)
                         )
                     }
                 }
@@ -923,7 +1000,7 @@ fun SendaAssistantSheet(
                         Spacer(modifier = Modifier.height(12.dp))
 
                         Text(
-                            text = "¿En qué te colaboro hoy?",
+                            text = strings.ai_welcome_title,
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -932,7 +1009,7 @@ fun SendaAssistantSheet(
                         Spacer(modifier = Modifier.height(6.dp))
 
                         Text(
-                            text = "Pídeme lo que necesites de forma natural: redactar un documento, resolver dudas, explicarte algo o analizar la página que estás viendo. Se procesa en tu teléfono; si para responder consulto Wikipedia o DuckDuckGo, te lo indico en la respuesta.",
+                            text = strings.ai_welcome_body + if (strings.ai_language_note.isNotBlank()) "\n\n" + strings.ai_language_note else "",
                             fontSize = 12.5.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
@@ -949,19 +1026,17 @@ fun SendaAssistantSheet(
                         ) {
                             val starters = if (hasActivePage) {
                                 listOf(
-                                    "🌐 ¿De qué trata la página que tengo abierta?",
-                                    "⚖️ Escribe un derecho de petición sobre cobro indebido",
-                                    "💻 Escribe un script en Python para procesar datos",
-                                    "✉️ Redáctame una carta formal de renuncia",
-                                    "🛠️ Genera un script en Bash para respaldar archivos"
+                                    strings.ai_starter_page,
+                                    strings.ai_starter_python,
+                                    strings.ai_starter_resignation,
+                                    strings.ai_starter_bash
                                 )
                             } else {
+                                // Sin sugerencias legales: un modelo pequeño o una plantilla no deben parecer asesoría jurídica
                                 listOf(
-                                    "⚖️ Escribe un derecho de petición sobre cobro indebido",
-                                    "💻 Escribe un script en Python para procesar datos",
-                                    "✉️ Redáctame una carta formal de renuncia laboral",
-                                    "🛠️ Genera un script en Bash para respaldar archivos",
-                                    "📑 Elabora un contrato de prestación de servicios"
+                                    strings.ai_starter_python,
+                                    strings.ai_starter_resignation,
+                                    strings.ai_starter_bash
                                 )
                             }
 
@@ -1066,7 +1141,7 @@ fun SendaAssistantSheet(
                                                         shape = RoundedCornerShape(4.dp)
                                                     ) {
                                                         Text(
-                                                            text = "💻 ${msg.codeLanguage?.uppercase() ?: "CÓDIGO"}",
+                                                            text = "💻 ${msg.codeLanguage?.uppercase() ?: strings.ai_code_upper}",
                                                             fontSize = 10.sp,
                                                             fontWeight = FontWeight.SemiBold,
                                                             color = MaterialTheme.colorScheme.onTertiaryContainer,
@@ -1079,7 +1154,7 @@ fun SendaAssistantSheet(
                                                         shape = RoundedCornerShape(4.dp)
                                                     ) {
                                                         Text(
-                                                            text = "📄 Documento",
+                                                            text = "📄 " + strings.ai_document,
                                                             fontSize = 10.sp,
                                                             fontWeight = FontWeight.SemiBold,
                                                             color = MaterialTheme.colorScheme.onSecondaryContainer,
@@ -1112,7 +1187,7 @@ fun SendaAssistantSheet(
                                                         val textToCopy = if (msg.isCode) SendaDocumentExporter.extractCode(msg.text) else msg.text
                                                         val clip = ClipData.newPlainText("Senda AI", textToCopy)
                                                         clipboard.setPrimaryClip(clip)
-                                                        Toast.makeText(context, if (msg.isCode) "✓ Código copiado" else "✓ Copiado al portapapeles", Toast.LENGTH_SHORT).show()
+                                                        Toast.makeText(context, if (msg.isCode) strings.ai_code_copied else strings.ai_text_copied, Toast.LENGTH_SHORT).show()
                                                     },
                                                     modifier = Modifier.weight(1f),
                                                     shape = RoundedCornerShape(8.dp),
@@ -1120,14 +1195,14 @@ fun SendaAssistantSheet(
                                                 ) {
                                                     Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(15.dp))
                                                     Spacer(modifier = Modifier.width(4.dp))
-                                                    Text(if (msg.isCode) "Código" else "Copiar", fontSize = 11.5.sp)
+                                                    Text(if (msg.isCode) strings.ai_btn_code else strings.ai_btn_copy, fontSize = 11.5.sp)
                                                 }
 
                                                 FilledTonalButton(
                                                     onClick = {
                                                         SendaDocumentExporter.shareDocument(
                                                             context = context,
-                                                            title = if (msg.isCode) "Código Senda" else "Documento Senda",
+                                                            title = if (msg.isCode) strings.ai_export_title_code else strings.ai_export_title_doc,
                                                             content = if (msg.isCode) SendaDocumentExporter.extractCode(msg.text) else msg.text
                                                         )
                                                     },
@@ -1137,7 +1212,7 @@ fun SendaAssistantSheet(
                                                 ) {
                                                     Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(15.dp))
                                                     Spacer(modifier = Modifier.width(4.dp))
-                                                    Text("Exportar", fontSize = 11.5.sp)
+                                                    Text(strings.ai_btn_export, fontSize = 11.5.sp)
                                                 }
 
                                                 Button(
@@ -1146,9 +1221,9 @@ fun SendaAssistantSheet(
                                                         val contentToSave = if (msg.isCode) SendaDocumentExporter.extractCode(msg.text) else msg.text
                                                         val ok = SendaDocumentExporter.saveToDownloads(context, filename, contentToSave)
                                                         if (ok) {
-                                                            Toast.makeText(context, "✓ Guardado en Descargas como $filename", Toast.LENGTH_LONG).show()
+                                                            Toast.makeText(context, strings.ai_saved_downloads.format(filename), Toast.LENGTH_LONG).show()
                                                         } else {
-                                                            Toast.makeText(context, "No se pudo guardar en Descargas", Toast.LENGTH_SHORT).show()
+                                                            Toast.makeText(context, strings.ai_save_failed, Toast.LENGTH_SHORT).show()
                                                         }
                                                     },
                                                     modifier = Modifier.weight(1.1f),
@@ -1158,9 +1233,9 @@ fun SendaAssistantSheet(
                                                     Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(15.dp))
                                                     Spacer(modifier = Modifier.width(4.dp))
                                                     val saveLabel = when {
-                                                        msg.isCode -> "Guardar (${msg.suggestedFileName ?: "código"})"
-                                                        msg.isDocument -> "Guardar (.md)"
-                                                        else -> "Guardar"
+                                                        msg.isCode -> strings.ai_save_named.format(msg.suggestedFileName ?: strings.ai_code_word)
+                                                        msg.isDocument -> strings.ai_save_named.format(".md")
+                                                        else -> strings.ai_save
                                                     }
                                                     Text(saveLabel, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                                 }
@@ -1181,11 +1256,26 @@ fun SendaAssistantSheet(
                                 ) {
                                     CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                                     Spacer(modifier = Modifier.width(10.dp))
-                                    Text(
-                                        text = "Analizando y redactando en tu chip...",
-                                        fontSize = 12.sp,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
+                                    if (calibrationStep != null) {
+                                        Text(
+                                            text = strings.ai_calibrating.format(calibrationStep),
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    } else if (partialText.isNotBlank()) {
+                                        Text(
+                                            text = partialText,
+                                            fontSize = 13.5.sp,
+                                            lineHeight = 19.sp,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    } else {
+                                        Text(
+                                            text = if (prefs.aiBackendMode == "OLLAMA") strings.ai_thinking_lan else strings.ai_thinking_local,
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1211,7 +1301,7 @@ fun SendaAssistantSheet(
                     OutlinedTextField(
                         value = inputText,
                         onValueChange = { inputText = it },
-                        placeholder = { Text("Escribe (código, documentos, dudas, web)...", fontSize = 12.5.sp) },
+                        placeholder = { Text(strings.ai_input_placeholder, fontSize = 12.5.sp) },
                         modifier = Modifier.weight(1f),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = Color.Transparent,
@@ -1249,7 +1339,7 @@ fun SendaAssistantSheet(
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.Send,
-                            contentDescription = "Enviar",
+                            contentDescription = strings.ai_send,
                             tint = if (inputText.isNotBlank() && !isGenerating)
                                 MaterialTheme.colorScheme.onPrimary
                             else
@@ -1264,3 +1354,73 @@ fun SendaAssistantSheet(
 }
 
 
+
+
+/**
+ * Qué puede usar este teléfono para la IA y qué eligió la calibración, con las velocidades medidas.
+ * Todo se mide y guarda en el teléfono.
+ */
+@Composable
+private fun SendaAccelerationCard(prefs: PreferencesManager) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val strings = LocalSendaStrings.current
+    val model = SendaAiModels.getById(prefs.selectedLocalAiModel)
+    val modelFile = SendaModelManager.getModelFile(context, model)
+    val step by org.senda.browser.core.ai.SendaAiCalibrator.progress.collectAsState()
+    var refresh by remember { mutableIntStateOf(0) }
+    val devices = remember(refresh) { org.senda.browser.core.ai.llama.SendaLlamaBridge.listDevices() }
+    val result = remember(refresh, step) { org.senda.browser.core.ai.SendaAiCalibrator.storedResult(context, prefs, model) }
+    val gpus = devices.filter { it.isGpu }
+
+    fun label(device: String): String =
+        if (device == "CPU") strings.ai_accel_cpu else gpus.firstOrNull { it.name == device }?.description ?: device
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+    ) {
+        Column(modifier = Modifier.padding(8.dp)) {
+            Text(strings.ai_accel_title, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(4.dp))
+            when {
+                step != null -> Text(strings.ai_calibrating.format(step), fontSize = 10.sp, color = MaterialTheme.colorScheme.primary)
+                gpus.isEmpty() -> Text(strings.ai_accel_no_gpu, fontSize = 10.sp)
+                result == null -> Text(strings.ai_accel_not_measured, fontSize = 10.sp)
+                else -> {
+                    result.measures.forEach { m ->
+                        val name = label(m.device)
+                        val line = when {
+                            m.error != null -> strings.ai_accel_failed.format(name)
+                            !m.correct -> strings.ai_accel_incorrect.format(name)
+                            else -> strings.ai_accel_measure.format(name, m.promptTps, m.genTps)
+                        }
+                        Text(line, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    val chosen = result.measures.firstOrNull { it.device == result.chosenDevice }
+                    // Si la CPU también falló (no debería) el tiempo es infinito y no se muestra
+                    if (chosen != null && chosen.typicalSeconds.isFinite()) {
+                        Text(
+                            strings.ai_accel_chosen.format(label(chosen.device), chosen.typicalSeconds.roundToInt()),
+                            fontSize = 10.5.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+            if (gpus.isNotEmpty() && step == null && SendaModelManager.isModelReady(context, model)) {
+                TextButton(
+                    onClick = {
+                        scope.launch {
+                            org.senda.browser.core.ai.SendaAiCalibrator.recalibrate(context, prefs, model, modelFile)
+                            refresh++
+                        }
+                    },
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                ) {
+                    Text(strings.ai_accel_remeasure, fontSize = 11.sp)
+                }
+            }
+        }
+    }
+}

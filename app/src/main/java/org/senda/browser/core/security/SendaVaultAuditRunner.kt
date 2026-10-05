@@ -47,7 +47,7 @@ object SendaVaultAuditRunner {
     private const val TAG = "SendaVaultAudit"
 
     @SuppressLint("AuthLeak")
-    fun runFullAudit(context: Context, stressCycles: Int = 1000): VaultAuditReport {
+    fun runFullAudit(context: Context, strings: org.senda.browser.core.SendaStringPack, stressCycles: Int = 1000): VaultAuditReport {
         val results = mutableListOf<AuditTestItem>()
         var passedCount = 0
         var failedCount = 0
@@ -60,14 +60,14 @@ object SendaVaultAuditRunner {
         val isHwBacked = securityLevel == "STRONGBOX" || securityLevel == "TEE"
         results.add(
             AuditTestItem(
-                name = "Aislamiento de Clave en Hardware Seguro",
-                description = "Verifica que la clave maestra AES-256 esté custodiada en el silicio (TEE/Keystore) y no en memoria de la app.",
+                name = strings.audit_hw_name,
+                description = strings.audit_hw_desc,
                 passed = isHwBacked,
                 details = when (securityLevel) {
-                    "STRONGBOX" -> "Clave maestra en StrongBox: chip de seguridad dedicado, separado del procesador."
-                    "TEE" -> "Clave maestra en el entorno de ejecución confiable (TEE) del procesador; nunca sale del hardware."
-                    "SOFTWARE" -> "ATENCIÓN: este teléfono guarda la clave en software, no en hardware seguro."
-                    else -> "No se pudo determinar dónde guarda Android la clave."
+                    "STRONGBOX" -> strings.vault_key_strongbox
+                    "TEE" -> strings.vault_key_tee
+                    "SOFTWARE" -> strings.vault_key_software
+                    else -> strings.vault_key_unknown
                 }
             )
         )
@@ -77,11 +77,10 @@ object SendaVaultAuditRunner {
         val authBound = SendaVaultManager.vaultKeyRequiresAuth()
         results.add(
             AuditTestItem(
-                name = "Clave ligada a tu huella o PIN",
-                description = "Verifica que el chip se niegue a descifrar si no te identificaste en los últimos ${SendaVaultManager.AUTH_VALIDITY_SECONDS} s.",
+                name = strings.audit_auth_name,
+                description = strings.audit_auth_desc.format(SendaVaultManager.AUTH_VALIDITY_SECONDS),
                 passed = authBound,
-                details = if (authBound) "El chip exige huella o PIN reciente y el teléfono desbloqueado; una huella nueva invalida la clave."
-                          else "La clave no exige autenticación (¿el teléfono no tiene PIN, patrón o contraseña?)."
+                details = if (authBound) strings.audit_auth_ok else strings.audit_auth_fail
             )
         )
         if (authBound) passedCount++ else failedCount++
@@ -103,14 +102,14 @@ object SendaVaultAuditRunner {
                         val decChars = SendaVaultManager.decryptPassword(enc, iv, SendaVaultManager.APP_KEY_ALIAS)
                         if (!samplePassword.contentEquals(decChars)) {
                             stressFailed = true
-                            stressErrorMessage = "Discrepancia en ciclo $i: el texto descifrado no coincide"
+                            stressErrorMessage = strings.audit_stress_mismatch.format(i)
                         }
                         SendaVaultManager.wipe(decChars)
                     }
                     latencies.add(opTime / 1_000_000.0) // Convertir a ms
                 } catch (e: Exception) {
                     stressFailed = true
-                    stressErrorMessage = "Excepción en ciclo $i: ${e.message}"
+                    stressErrorMessage = strings.audit_stress_exception.format(i, e.message ?: e.javaClass.simpleName)
                     break
                 }
             }
@@ -124,21 +123,25 @@ object SendaVaultAuditRunner {
         if (!stressFailed) {
             results.add(
                 AuditTestItem(
-                    name = "Prueba de Estrés de Alto Rendimiento",
-                    description = "Ejecución continua de $stressCycles ciclos completos de cifrado/descifrado AEAD.",
+                    name = strings.audit_stress_name,
+                    description = strings.audit_stress_desc.format(stressCycles),
                     passed = true,
-                    details = "$stressCycles ciclos superados al 100% sin fugas, bloqueos ni errores.",
-                    metrics = "Latencia promedio: ${String.format(Locale.ROOT, "%.3f", avgLatency)} ms | Latencia pico: ${String.format(Locale.ROOT, "%.3f", maxLatency)} ms | Rendimiento: ${String.format(Locale.ROOT, "%.1f", opsPerSec)} ops/seg"
+                    details = strings.audit_stress_ok.format(stressCycles),
+                    metrics = strings.audit_stress_metrics.format(
+                        String.format(Locale.ROOT, "%.3f", avgLatency),
+                        String.format(Locale.ROOT, "%.3f", maxLatency),
+                        String.format(Locale.ROOT, "%.1f", opsPerSec)
+                    )
                 )
             )
             passedCount++
         } else {
             results.add(
                 AuditTestItem(
-                    name = "Prueba de Estrés de Alto Rendimiento",
-                    description = "Ejecución continua de $stressCycles ciclos completos.",
+                    name = strings.audit_stress_name,
+                    description = strings.audit_stress_desc.format(stressCycles),
                     passed = false,
-                    details = "Fallo en prueba de estrés: $stressErrorMessage"
+                    details = strings.audit_stress_fail.format(stressErrorMessage)
                 )
             )
             failedCount++
@@ -149,12 +152,14 @@ object SendaVaultAuditRunner {
         // -------------------------------------------------------------
         val ivSet = HashSet<String>()
         var ivCollisionDetected = false
+        var ivCollisionAt = -1
         val ivCycles = 500
 
         for (i in 0 until ivCycles) {
             val (_, iv) = SendaVaultManager.encryptPassword(samplePassword, SendaVaultManager.APP_KEY_ALIAS)
             if (!ivSet.add(iv)) {
                 ivCollisionDetected = true
+                ivCollisionAt = i
                 break
             }
         }
@@ -162,20 +167,20 @@ object SendaVaultAuditRunner {
         if (!ivCollisionDetected) {
             results.add(
                 AuditTestItem(
-                    name = "Unicidad de Nonce / IV Criptográfico (Anti-Reutilización)",
-                    description = "Verifica que cada cifrado genere un vector de inicialización de 96 bits totalmente único vía CSPRNG.",
+                    name = strings.audit_iv_name,
+                    description = strings.audit_iv_desc,
                     passed = true,
-                    details = "$ivCycles IVs únicos consecutivos verificados sin colisiones (0% de probabilidad de reutilización de clave en GCM)."
+                    details = strings.audit_iv_ok.format(ivCycles)
                 )
             )
             passedCount++
         } else {
             results.add(
                 AuditTestItem(
-                    name = "Unicidad de Nonce / IV Criptográfico",
-                    description = "Verifica la unicidad del vector de inicialización.",
+                    name = strings.audit_iv_name,
+                    description = strings.audit_iv_desc,
                     passed = false,
-                    details = "ALERTA CRÍTICA: Se detectó una colisión de IV en ciclo $ivCycles."
+                    details = strings.audit_iv_fail.format(ivCollisionAt)
                 )
             )
             failedCount++
@@ -205,20 +210,20 @@ object SendaVaultAuditRunner {
         if (tamperDetected) {
             results.add(
                 AuditTestItem(
-                    name = "Inviolabilidad e Integridad de Mensaje (AEAD Tag)",
-                    description = "Inyección deliberada de 1 bit corrupto en el mensaje cifrado para probar el rechazo criptográfico.",
+                    name = strings.audit_tamper_name,
+                    description = strings.audit_tamper_desc,
                     passed = true,
-                    details = "Rechazado instantáneamente por fallo de etiqueta de autenticación (${tamperEx?.javaClass?.simpleName}). Cero fuga de texto plano."
+                    details = strings.audit_tamper_ok.format(tamperEx?.javaClass?.simpleName ?: "")
                 )
             )
             passedCount++
         } else {
             results.add(
                 AuditTestItem(
-                    name = "Inviolabilidad e Integridad de Mensaje (AEAD Tag)",
-                    description = "Inyección deliberada de 1 bit corrupto.",
+                    name = strings.audit_tamper_name,
+                    description = strings.audit_tamper_desc,
                     passed = false,
-                    details = "FALLO DE SEGURIDAD: El descifrador aceptó un mensaje modificado."
+                    details = strings.audit_tamper_fail
                 )
             )
             failedCount++
@@ -234,20 +239,20 @@ object SendaVaultAuditRunner {
         if (allZeros) {
             results.add(
                 AuditTestItem(
-                    name = "Higiene de Memoria RAM (Zeroization Activa)",
-                    description = "Comprueba que la rutina de sobreescritura con ceros borre físicamente el contenido de la memoria.",
+                    name = strings.audit_wipe_name,
+                    description = strings.audit_wipe_desc,
                     passed = true,
-                    details = "El buffer de prueba quedó sobrescrito con ceros ('\\u0000'). Reduce el tiempo que la contraseña permanece en memoria; no protege frente a un volcado hecho mientras se usa."
+                    details = strings.audit_wipe_ok
                 )
             )
             passedCount++
         } else {
             results.add(
                 AuditTestItem(
-                    name = "Higiene de Memoria RAM (Zeroization Activa)",
-                    description = "Comprueba que la rutina de sobreescritura con ceros borre físicamente el contenido.",
+                    name = strings.audit_wipe_name,
+                    description = strings.audit_wipe_desc,
                     passed = false,
-                    details = "Fallo en la prueba de sanitización: quedaron caracteres residuales en memoria."
+                    details = strings.audit_wipe_fail
                 )
             )
             failedCount++
@@ -260,7 +265,7 @@ object SendaVaultAuditRunner {
             Pair("https://login.banco.com.es/cuenta", "banco.com.es") to true,
             Pair("https://banco.com.es.sitio-malicioso.com/login", "banco.com.es") to false, // Ataque subdominio
             Pair("http://usuario:pass@sub.dominio.co.uk:8080/path?id=1", "dominio.co.uk") to true,
-            Pair("https://paypal.com.evil.org", "paypal.com") to false,                     // Ataque homógrafo
+            Pair("https://paypal.com.evil.org", "paypal.com") to false,                     // Dominio legítimo usado como subdominio de otro
             Pair("https://seguridad.senda.org/admin", "senda.org") to true
         )
 
@@ -272,7 +277,7 @@ object SendaVaultAuditRunner {
             val matched = SendaVaultManager.matchesDomain(url, targetDomain)
             if (matched != expectedMatch) {
                 phishingPassed = false
-                phishingDetails = "Discrepancia en vector: URL=$url contra Dominio=$targetDomain. Esperado=$expectedMatch, Obtenido=$matched"
+                phishingDetails = strings.audit_phish_fail.format(url, targetDomain, expectedMatch, matched)
                 break
             }
         }
@@ -280,18 +285,18 @@ object SendaVaultAuditRunner {
         if (phishingPassed) {
             results.add(
                 AuditTestItem(
-                    name = "Filtrado Anti-Phishing por Dominio Canónico (eTLD+1)",
-                    description = "Verificación estricta contra ataques de subdominio suplantado, puertos arbitrarios y sufijos de dos niveles.",
+                    name = strings.audit_phish_name,
+                    description = strings.audit_phish_desc,
                     passed = true,
-                    details = "Matriz de 5 vectores de ataque procesada con 100% de precisión. Los dominios falsos fueron bloqueados sin excepción."
+                    details = strings.audit_phish_ok.format(phishingVectors.size)
                 )
             )
             passedCount++
         } else {
             results.add(
                 AuditTestItem(
-                    name = "Filtrado Anti-Phishing por Dominio Canónico (eTLD+1)",
-                    description = "Verificación contra ataques de subdominio.",
+                    name = strings.audit_phish_name,
+                    description = strings.audit_phish_desc,
                     passed = false,
                     details = phishingDetails
                 )
@@ -314,29 +319,29 @@ object SendaVaultAuditRunner {
         if (entropyPassed) {
             results.add(
                 AuditTestItem(
-                    name = "Generador de Claves de Alta Entropía (Shannon Entropy)",
-                    description = "Evaluación de aleatoriedad por CSPRNG, distribución de caracteres y resistencia a ataques de diccionario.",
+                    name = strings.audit_entropy_name,
+                    description = strings.audit_entropy_desc,
                     passed = true,
-                    details = "Entropía calculada: ${String.format(Locale.ROOT, "%.1f", entropy)} bits (recomendado: más de 90 bits). Distribución heterogénea verificada."
+                    details = strings.audit_entropy_ok.format(String.format(Locale.ROOT, "%.1f", entropy))
                 )
             )
             passedCount++
         } else {
             results.add(
                 AuditTestItem(
-                    name = "Generador de Claves de Alta Entropía",
-                    description = "Evaluación de aleatoriedad por CSPRNG.",
+                    name = strings.audit_entropy_name,
+                    description = strings.audit_entropy_desc,
                     passed = false,
-                    details = "Entropía insuficiente (${String.format(Locale.ROOT, "%.1f", entropy)} bits) o falta de heterogeneidad."
+                    details = strings.audit_entropy_fail.format(String.format(Locale.ROOT, "%.1f", entropy))
                 )
             )
             failedCount++
         }
 
         val verdict = if (failedCount == 0) {
-            "AUTODIAGNÓSTICO: TODAS LAS PRUEBAS SUPERADAS (no es una certificación externa)"
+            strings.audit_verdict_ok.format(results.size)
         } else {
-            "AUDITORÍA CON OBSERVACIONES: $failedCount PRUEBAS NO SUPERADAS"
+            strings.audit_verdict_fail.format(failedCount)
         }
 
         return VaultAuditReport(

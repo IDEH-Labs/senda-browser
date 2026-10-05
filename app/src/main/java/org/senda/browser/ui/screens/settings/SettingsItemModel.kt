@@ -258,6 +258,23 @@ fun buildSettingsList(
             onClick = { onOpenDialog("tracking_protection") }
         ),
         SettingItemData(
+            id = "safe_browsing",
+            title = strings.st_safe_browsing_title,
+            subtitle = strings.st_safe_browsing_sub,
+            category = strings.cat_privacy,
+            icon = Icons.Default.GppMaybe,
+            isToggle = true,
+            isChecked = prefs.safeBrowsingEnabled,
+            onToggleChange = {
+                prefs.safeBrowsingEnabled = it
+                onSettingsChanged()
+            },
+            onClick = {
+                prefs.safeBrowsingEnabled = !prefs.safeBrowsingEnabled
+                onSettingsChanged()
+            }
+        ),
+        SettingItemData(
             id = "ublock_origin",
             title = "uBlock Origin",
             subtitle = strings.ublock_menu_sub,

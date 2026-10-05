@@ -63,6 +63,38 @@ sealed interface SendaPrompt {
         val onDecision: (Boolean) -> Unit
     ) : SendaPrompt
 
+    /** Autenticación HTTP (Basic/Digest) o de proxy: sin esto la página quedaba en 401 sin poder entrar. */
+    data class Auth(
+        val prompt: GeckoSession.PromptDelegate.AuthPrompt,
+        val result: GeckoResult<GeckoSession.PromptDelegate.PromptResponse>
+    ) : SendaPrompt
+
+    /** Formulario de inicio de sesión con cuentas guardadas en la Bóveda (sin contraseña hasta identificarse). */
+    data class LoginSelect(
+        val request: GeckoSession.PromptDelegate.AutocompleteRequest<org.mozilla.geckoview.Autocomplete.LoginSelectOption>,
+        val result: GeckoResult<GeckoSession.PromptDelegate.PromptResponse>
+    ) : SendaPrompt
+
+    /** Se envió un inicio de sesión con una cuenta que no está en la Bóveda: ofrecer guardarla. */
+    data class LoginSave(
+        val request: GeckoSession.PromptDelegate.AutocompleteRequest<org.mozilla.geckoview.Autocomplete.LoginSaveOption>,
+        val result: GeckoResult<GeckoSession.PromptDelegate.PromptResponse>
+    ) : SendaPrompt
+
+    /** Un script tarda demasiado: el usuario decide si se detiene ([onDecision] true) o se espera. */
+    data class SlowScript(
+        val host: String,
+        val onDecision: (stop: Boolean) -> Unit
+    ) : SendaPrompt
+
+    /** La página inició una descarga y «Preguntar dónde guardar» está apagado: confirmar antes de guardar. */
+    data class Download(
+        val fileName: String,
+        val host: String,
+        val sizeBytes: Long,
+        val onDecision: (Boolean) -> Unit
+    ) : SendaPrompt
+
     /** Pulsación larga sobre un enlace, una imagen o un video. */
     data class ContextMenu(
         val element: GeckoSession.ContentDelegate.ContextElement

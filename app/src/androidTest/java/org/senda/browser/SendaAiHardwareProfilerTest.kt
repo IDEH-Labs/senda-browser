@@ -46,7 +46,7 @@ class SendaAiHardwareProfilerTest {
     @Test
     fun test02_AiCatalogIntegrityAndStorage() {
         val models = SendaAiModels.ALL_MODELS
-        assertEquals("Deben existir 3 niveles de modelos en el catálogo", 3, models.size)
+        assertEquals("Solo el modelo que pasó el banco de pruebas en español (Gemma 4 E2B QAT)", 1, models.size)
 
         for (m in models) {
             assertTrue("ID de modelo debe ser válido", m.id.isNotBlank())

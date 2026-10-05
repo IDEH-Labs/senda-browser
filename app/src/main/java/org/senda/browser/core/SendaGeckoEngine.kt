@@ -66,8 +66,11 @@ object SendaGeckoEngine {
                     .queryParameterStrippingEnabled(true)
                     .queryParameterStrippingPrivateBrowsingEnabled(true)
                     .cookiePurging(true)
+                    .safeBrowsing(if (prefs?.safeBrowsingEnabled != false) ContentBlocking.SafeBrowsing.DEFAULT else ContentBlocking.SafeBrowsing.NONE)
                     .build()
             )
+            // Sin detección de portal cautivo de Firefox: Android ya la hace y así Senda no contacta a Mozilla al arrancar
+            .configFilePath(writeGeckoConfig(context))
             // 2. Habilitar about:config para que el usuario tenga control técnico
             .aboutConfigEnabled(true)
             // 3. Desactivar logs innecesarios en consola y proteger privacidad
@@ -81,12 +84,26 @@ object SendaGeckoEngine {
             .build()
 
         runtime = GeckoRuntime.create(context.applicationContext, settings)
+        // Cuentas de la Bóveda en los formularios de inicio de sesión
+        runtime?.autocompleteStorageDelegate = org.senda.browser.core.security.SendaVaultLoginStorage(context)
 
         if (prefs != null) {
             applyPreferences(prefs)
         }
 
         initializeBuiltInExtensions(context)
+    }
+
+    private fun writeGeckoConfig(context: Context): String {
+        val file = java.io.File(context.filesDir, "geckoview-config.yaml")
+        file.writeText(
+            "prefs:\n" +
+                "  network.captive-portal-service.enabled: false\n" +
+                "  network.connectivity-service.enabled: false\n" +
+                // Contraseñas: nada se rellena solo al cargar la página; se elige la cuenta al tocar el campo
+                "  signon.autofillForms: false\n"
+        )
+        return file.absolutePath
     }
 
     fun getRuntime(): GeckoRuntime {
@@ -104,6 +121,10 @@ object SendaGeckoEngine {
 
         // Depuración remota USB
         s.setRemoteDebuggingEnabled(prefs.remoteDebuggingEnabled)
+
+        s.contentBlocking.setSafeBrowsing(
+            if (prefs.safeBrowsingEnabled) ContentBlocking.SafeBrowsing.DEFAULT else ContentBlocking.SafeBrowsing.NONE
+        )
 
         // Accesibilidad: Forzar zoom en sitios rebeldes y factor de tamaño de texto
         s.setForceUserScalableEnabled(prefs.forceEnableZoom)

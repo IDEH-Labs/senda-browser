@@ -3,6 +3,21 @@ plugins {
     id 'org.jetbrains.kotlin.plugin.compose'
 }
 
+import java.util.Properties
+
+// Firma de publicación: variables de entorno (ver ~/.local/share/jpi59/senda-signing.env) o keystore.properties
+// en la raíz del proyecto (no se sube a git). Sin ellas, la release sale SIN FIRMAR, nunca con la clave de depuración
+def signingProperties = new Properties()
+def signingPropertiesFile = rootProject.file('keystore.properties')
+if (signingPropertiesFile.isFile()) signingPropertiesFile.withInputStream { signingProperties.load(it) }
+
+def releaseKeystorePath = System.getenv('KEYSTORE_PATH') ?: signingProperties.getProperty('storeFile')
+def releaseKeyAlias = System.getenv('KEY_ALIAS') ?: signingProperties.getProperty('keyAlias')
+def releaseStorePassword = System.getenv('STORE_PASSWORD') ?: signingProperties.getProperty('storePassword')
+def releaseKeyPassword = System.getenv('KEY_PASSWORD') ?: signingProperties.getProperty('keyPassword')
+
+def releaseSigningConfigured = [releaseKeystorePath, releaseKeyAlias, releaseStorePassword, releaseKeyPassword].every { it?.trim() }
+
 android {
     namespace 'org.senda.browser'
     compileSdk = 37
@@ -11,7 +26,7 @@ android {
     defaultConfig {
         applicationId 'org.senda.browser'
         minSdk 26
-        targetSdk 34
+        targetSdk 36
         versionCode 1
         versionName '0.1.0-alpha'
 
@@ -25,14 +40,33 @@ android {
         externalNativeBuild {
             cmake {
                 cppFlags "-O3 -flto -frtti -fexceptions"
-                arguments "-DANDROID_STL=c++_shared"
+                // Estática: solo libsenda-llama usa libc++, y la copia compartida del NDK 26 venía alineada a 4 KB
+                arguments "-DANDROID_STL=c++_static"
+                // Compilación de prueba con Vulkan: -PsendaVulkan -PsendaVulkanHeaders=… -PsendaSpirvPrefix=… -PsendaGlslc=…
+                if (project.hasProperty('sendaVulkan')) {
+                    arguments "-DSENDA_VULKAN=ON",
+                        "-DSENDA_VULKAN_HEADERS=${project.property('sendaVulkanHeaders')}",
+                        "-DSENDA_SPIRV_PREFIX=${project.property('sendaSpirvPrefix')}",
+                        "-DSENDA_GLSLC=${project.property('sendaGlslc')}"
+                }
+            }
+        }
+    }
+
+    signingConfigs {
+        release {
+            if (releaseSigningConfigured) {
+                storeFile file(releaseKeystorePath)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
             }
         }
     }
 
     buildTypes {
         release {
-            signingConfig signingConfigs.debug
+            if (releaseSigningConfigured) signingConfig signingConfigs.release
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
@@ -51,6 +85,12 @@ android {
         compose = true
     }
 
+    // Sin el bloque de dependencias cifrado para Google: el APK no lleva metadatos que el usuario no puede leer
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
+
     lint {
         abortOnError false
         checkReleaseBuilds false
@@ -59,6 +99,8 @@ android {
     packaging {
         jniLibs {
             useLegacyPackaging = true
+            // Solo sirve para enlazar libggml-opencl: en el APK taparía el OpenCL del fabricante
+            excludes += ['**/libOpenCL.so']
         }
         resources {
             excludes += '/META-INF/{AL2.0,LGPL2.1}'
@@ -120,7 +162,7 @@ dependencies {
     implementation 'org.lsposed.hiddenapibypass:hiddenapibypass:4.3'
 
     // Tor Nativo Embebido Soberano (Guardian Project)
-    implementation 'info.guardianproject:tor-android:0.4.8.16'
+    implementation 'info.guardianproject:tor-android:0.4.9.13'
     implementation 'info.guardianproject:jtorctl:0.4.5.7'
     implementation 'androidx.localbroadcastmanager:localbroadcastmanager:1.1.0'
 

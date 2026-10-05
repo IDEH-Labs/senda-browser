@@ -199,6 +199,10 @@ fun SendaToolbar(
     }
 
     var showSecurityDialog by remember { mutableStateOf(false) }
+    var showTranslateDialog by remember { mutableStateOf(false) }
+    if (showTranslateDialog && activeTab != null) {
+        TranslateDialog(tab = activeTab, onDismiss = { showTranslateDialog = false })
+    }
     var showProxyDialog by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     var showBackHistoryMenu by remember { mutableStateOf(false) }
@@ -1355,6 +1359,68 @@ fun SendaToolbar(
                                     onClick = {
                                         showMenu = false
                                         onFindInPage()
+                                    }
+                                )
+
+                                // Traducir en el teléfono (o volver al original)
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            when {
+                                                activeTab?.isTranslating == true -> strings.translate_in_progress
+                                                activeTab?.translatedTo != null -> strings.translate_menu_translated
+                                                else -> strings.translate_menu
+                                            }
+                                        )
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.Translate,
+                                            contentDescription = null,
+                                            tint = if (activeTab?.translatedTo != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    },
+                                    onClick = {
+                                        showMenu = false
+                                        showTranslateDialog = true
+                                    }
+                                )
+
+                                // Imprimir o guardar como PDF (el diálogo de Android ofrece ambas cosas)
+                                DropdownMenuItem(
+                                    text = { Text(strings.page_print) },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.Print,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    },
+                                    onClick = {
+                                        showMenu = false
+                                        activeTab?.printPage()
+                                    }
+                                )
+
+                                // Acceso directo en la pantalla de inicio
+                                DropdownMenuItem(
+                                    text = { Text(strings.page_add_to_home) },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.AddToHomeScreen,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    },
+                                    onClick = {
+                                        showMenu = false
+                                        val tab = activeTab
+                                        if (tab != null) {
+                                            org.senda.browser.core.SendaPageActions.addToHomeScreen(context, tab.url, tab.title, null)
+                                        }
                                     }
                                 )
                             }

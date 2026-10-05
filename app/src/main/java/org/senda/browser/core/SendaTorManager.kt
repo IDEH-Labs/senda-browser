@@ -33,7 +33,9 @@ object SendaTorManager {
     var statusMessage by mutableStateOf("Tor apagado")
         private set
 
-    var socksPort by mutableIntStateOf(9050)
+    private const val TOR_SOCKS_PORT = 9050
+
+    var socksPort by mutableIntStateOf(TOR_SOCKS_PORT)
         private set
 
     private var receiverRegistered = false
@@ -50,7 +52,8 @@ object SendaTorManager {
                 }
                 TorService.STATUS_ON -> {
                     state = TorState.CONNECTED
-                    socksPort = if (TorService.socksPort > 0) TorService.socksPort else 9050
+                    // tor-android 0.4.9 ya no expone el puerto como campo estático: es el fijado en ensureTorrc()
+                    socksPort = TOR_SOCKS_PORT
                     statusMessage = "Conectado a la Red Tor (127.0.0.1:$socksPort)"
                     Log.i(TAG, "Tor conectado exitosamente en puerto $socksPort")
                 }
@@ -108,15 +111,10 @@ object SendaTorManager {
 
             scope.launch {
                 var waitMs = 0
+                // El receptor pasa a CONNECTED con STATUS_ON
                 while (state != TorState.CONNECTED && waitMs < 35000) {
                     delay(500)
                     waitMs += 500
-                    if (TorService.socksPort > 0 && state == TorState.STARTING) {
-                        state = TorState.CONNECTED
-                        socksPort = TorService.socksPort
-                        statusMessage = "Conectado a la Red Tor (127.0.0.1:$socksPort)"
-                        break
-                    }
                 }
                 if (state == TorState.CONNECTED) {
                     onConnected?.invoke()
@@ -151,7 +149,7 @@ object SendaTorManager {
 
             val content = """
                 DataDirectory ${torDir.absolutePath}
-                SocksPort 127.0.0.1:9050
+                SocksPort 127.0.0.1:$TOR_SOCKS_PORT
                 ControlPort auto
                 ClientOnly 1
                 SafeLogging 1

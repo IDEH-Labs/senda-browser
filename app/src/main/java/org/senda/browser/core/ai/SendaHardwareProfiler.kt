@@ -33,10 +33,17 @@ data class DeviceHardwareProfile(
     val supportedAbi: String,
     val hasVulkanSupport: Boolean,
     val vulkanVersionMajor: Int,
+    /** Código del estado térmico de Android (NONE, LIGHT, MODERATE, SEVERE, CRITICAL, EMERGENCY, SHUTDOWN, UNKNOWN). */
     val thermalStatusLabel: String,
     val isThermalThrottled: Boolean,
     val recommendedTier: AiDeviceTier,
     val recommendedModelId: String,
+    /**
+     * Si el teléfono puede usar el modelo local: 8 GB de RAM (Android informa 7,2-7,6 GB) y CPU con
+     * instrucciones dotprod. Sin ellas Gemma tardaba 45-70 s por respuesta; con menos RAM, Android cierra apps.
+     */
+    val meetsLocalModelRequirements: Boolean,
+    val hasDotProd: Boolean,
     val maxRecommendedContextTokens: Int,
     val diagnosticSummary: String
 )
@@ -83,6 +90,7 @@ object SendaHardwareProfiler {
 
         // 5. Determinación inteligente del nivel de optimización (Tier)
         val (tier, modelId, maxContext) = evaluateTier(totalRamGb, availRamGb, isLowRam, cores)
+        val dotProd = cpuHasDotProd()
 
         val summary = buildDiagnosticSummary(
             totalRamGb = totalRamGb,
@@ -108,6 +116,8 @@ object SendaHardwareProfiler {
             isThermalThrottled = isThrottled,
             recommendedTier = tier,
             recommendedModelId = modelId,
+            meetsLocalModelRequirements = totalRamGb >= MIN_TOTAL_RAM_GB && !isLowRam && dotProd,
+            hasDotProd = dotProd,
             maxRecommendedContextTokens = maxContext,
             diagnosticSummary = summary
         )
@@ -119,23 +129,23 @@ object SendaHardwareProfiler {
         isLowRam: Boolean,
         cores: Int
     ): Triple<AiDeviceTier, String, Int> {
-        return when {
-            // Dispositivos de alta gama: más de 7.5 GB de RAM física, al menos 2.5 GB libres y sin advertencias
-            totalRamGb >= 7.5 && availRamGb >= 2.5 && !isLowRam && cores >= 6 -> {
-                Triple(AiDeviceTier.POWER, SendaAiModels.MODEL_GEMMA_4_E2B.id, 4096)
-            }
-            // Dispositivos equilibrados (6 GB a 8 GB de RAM con memoria libre holgada >= 1.5 GB):
-            // Límite de contexto seguro en 4096 tokens para evitar que el KV cache dispare OOM
-            totalRamGb >= 5.5 && availRamGb >= 1.5 && !isLowRam -> {
-                Triple(AiDeviceTier.BALANCED, SendaAiModels.MODEL_QWEN_1_5B.id, 4096)
-            }
-            // Dispositivos de 4 GB o con RAM libre reducida (< 1.5 GB por pestañas abiertas):
-            // Presupuesto estricto <= 1.0 GB total (modelo + KV cache + runtime).
-            // Contexto seguro limitado a 2048 tokens.
-            else -> {
-                Triple(AiDeviceTier.LIGHT, SendaAiModels.MODEL_QWEN_3_5_0_8B.id, 2048)
-            }
+        // Solo hay un modelo: el nivel describe el teléfono, no elige un modelo peor para los de menos RAM
+        val tier = when {
+            totalRamGb >= MIN_TOTAL_RAM_GB && availRamGb >= 2.5 && !isLowRam && cores >= 6 -> AiDeviceTier.POWER
+            totalRamGb >= 5.5 && !isLowRam -> AiDeviceTier.BALANCED
+            else -> AiDeviceTier.LIGHT
         }
+        return Triple(tier, SendaAiModels.MODEL_GEMMA_4_E2B.id, 4096)
+    }
+
+    /** Un teléfono de «8 GB» informa 7,2-7,6 GB; el modelo ocupa ~3 GB mientras responde. */
+    private const val MIN_TOTAL_RAM_GB = 7.0
+
+    /** Instrucciones de producto escalar (ARMv8.2 dotprod), las que usa llama.cpp para leer rápido el prompt. */
+    private fun cpuHasDotProd(): Boolean = try {
+        File("/proc/cpuinfo").readLines().any { it.startsWith("Features") && " asimddp" in it }
+    } catch (_: Exception) {
+        false
     }
 
     /**
@@ -186,19 +196,19 @@ object SendaHardwareProfiler {
                 if (powerManager != null) {
                     val status = powerManager.currentThermalStatus
                     return when (status) {
-                        PowerManager.THERMAL_STATUS_NONE -> "Óptimo (Frío)" to false
-                        PowerManager.THERMAL_STATUS_LIGHT -> "Ligero templado" to false
-                        PowerManager.THERMAL_STATUS_MODERATE -> "Moderado (Caliente)" to false
-                        PowerManager.THERMAL_STATUS_SEVERE -> "Severo (Throttling activo)" to true
-                        PowerManager.THERMAL_STATUS_CRITICAL -> "Crítico (Enfriando)" to true
-                        PowerManager.THERMAL_STATUS_EMERGENCY -> "Emergencia" to true
-                        PowerManager.THERMAL_STATUS_SHUTDOWN -> "Apagado inminente" to true
-                        else -> "Normal" to false
+                        PowerManager.THERMAL_STATUS_NONE -> "NONE" to false
+                        PowerManager.THERMAL_STATUS_LIGHT -> "LIGHT" to false
+                        PowerManager.THERMAL_STATUS_MODERATE -> "MODERATE" to false
+                        PowerManager.THERMAL_STATUS_SEVERE -> "SEVERE" to true
+                        PowerManager.THERMAL_STATUS_CRITICAL -> "CRITICAL" to true
+                        PowerManager.THERMAL_STATUS_EMERGENCY -> "EMERGENCY" to true
+                        PowerManager.THERMAL_STATUS_SHUTDOWN -> "SHUTDOWN" to true
+                        else -> "UNKNOWN" to false
                     }
                 }
             } catch (_: Exception) {}
         }
-        return "Normal" to false
+        return "UNKNOWN" to false
     }
 
     private fun buildDiagnosticSummary(

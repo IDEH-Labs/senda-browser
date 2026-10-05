@@ -14,3 +14,10 @@ local.properties
 *.apk
 *.aab
 *.png
+
+# Claves de firma: nunca en el repositorio
+keystore.properties
+*.jks
+*.keystore
+*.p12
+*signing.env

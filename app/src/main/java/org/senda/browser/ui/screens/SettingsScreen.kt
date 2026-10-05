@@ -248,28 +248,28 @@ fun SettingsScreen(
                                     modifier = Modifier
                                         .size(48.dp)
                                         .clip(CircleShape)
-                                        .background(if (prefs.fxaIsConnected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer),
+                                        .background(if (prefs.lastWebdavSync > 0) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
-                                        imageVector = if (prefs.fxaIsConnected) Icons.Default.Sync else Icons.Default.AccountCircle,
+                                        imageVector = if (prefs.lastWebdavSync > 0) Icons.Default.CloudDone else Icons.Default.CloudUpload,
                                         contentDescription = null,
-                                        tint = if (prefs.fxaIsConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSecondaryContainer,
+                                        tint = if (prefs.lastWebdavSync > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSecondaryContainer,
                                         modifier = Modifier.size(28.dp)
                                     )
                                 }
                                 Spacer(modifier = Modifier.width(16.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = if (prefs.fxaIsConnected) "Firefox Sync" else strings.sync_card_title,
+                                        text = strings.sync_card_title,
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Text(
-                                        text = if (prefs.fxaIsConnected) {
-                                            "${strings.sync_card_connected}: ${prefs.fxaEmail}"
+                                        text = if (prefs.lastWebdavSync > 0) {
+                                            "${strings.sync_card_connected} ${java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date(prefs.lastWebdavSync))}"
                                         } else {
                                             strings.sync_card_disconnected
                                         },
@@ -395,48 +395,7 @@ fun SettingsScreen(
             strings = strings,
             onDismiss = { activeDialog = null },
             onRequireBiometricAuth = { callback ->
-                val activity = context as? androidx.fragment.app.FragmentActivity
-                if (activity != null) {
-                    val executor = androidx.core.content.ContextCompat.getMainExecutor(activity)
-                    val prompt = androidx.biometric.BiometricPrompt(
-                        activity,
-                        executor,
-                        object : androidx.biometric.BiometricPrompt.AuthenticationCallback() {
-                            override fun onAuthenticationSucceeded(result: androidx.biometric.BiometricPrompt.AuthenticationResult) {
-                                super.onAuthenticationSucceeded(result)
-                                callback(true)
-                            }
-                            override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                                super.onAuthenticationError(errorCode, errString)
-                                callback(false)
-                            }
-                            override fun onAuthenticationFailed() {
-                                super.onAuthenticationFailed()
-                            }
-                        }
-                    )
-                    // Huella o PIN/patrón del teléfono: sin huella registrada la bóveda quedaba inaccesible
-                    // La clave de la Bóveda solo se desbloquea con huella «fuerte» o PIN (Android 11+)
-                    val authenticators = (if (android.os.Build.VERSION.SDK_INT >= 30)
-                        androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
-                    else
-                        androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_WEAK) or
-                        androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
-                    if (androidx.biometric.BiometricManager.from(activity).canAuthenticate(authenticators) !=
-                        androidx.biometric.BiometricManager.BIOMETRIC_SUCCESS
-                    ) {
-                        // Sin ningún bloqueo en el teléfono no hay con qué verificar
-                        callback(true)
-                    } else {
-                        val promptInfo = androidx.biometric.BiometricPrompt.PromptInfo.Builder()
-                            .setTitle(strings.st_passwords_title)
-                            .setAllowedAuthenticators(authenticators)
-                            .build()
-                        prompt.authenticate(promptInfo)
-                    }
-                } else {
-                    callback(true)
-                }
+                org.senda.browser.core.security.SendaVaultAuth.request(context, strings.st_passwords_title, callback)
             }
         )
     }

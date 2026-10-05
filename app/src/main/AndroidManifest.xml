@@ -92,6 +92,10 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/provider_paths" />
         </provider>
+        <!-- OpenCL del fabricante para la GPU (Adreno). Desde Android 12 las bibliotecas públicas del fabricante
+             hay que declararlas o el sistema no deja cargarlas. required="false": la app se instala igual en
+             teléfonos sin OpenCL, donde la IA usa la CPU -->
+        <uses-native-library android:name="libOpenCL.so" android:required="false" />
     </application>
 
 </manifest>

@@ -53,6 +53,8 @@ class BrowserTab(
     var parentTabId: String? = null
     var title by mutableStateOf("Nueva pestaña")
     var isLoading by mutableStateOf(false)
+    /** Captura reducida de la página para la vista de pestañas. Solo en memoria, también en privado. */
+    var thumbnail by mutableStateOf<android.graphics.Bitmap?>(null)
     var progress by mutableIntStateOf(0)
     var trackersBlocked by mutableIntStateOf(0)
     var canGoBack by mutableStateOf(false)
@@ -155,6 +157,11 @@ class BrowserTab(
                 is SendaPrompt.DateTime -> if (!p.prompt.isComplete) p.result.complete(p.prompt.dismiss())
                 is SendaPrompt.Permission -> p.onDecision(false)
                 is SendaPrompt.OpenInApp -> p.onDecision(false)
+                is SendaPrompt.Auth -> if (!p.prompt.isComplete) p.result.complete(p.prompt.dismiss())
+                is SendaPrompt.LoginSelect -> if (!p.request.isComplete) p.result.complete(p.request.dismiss())
+                is SendaPrompt.LoginSave -> if (!p.request.isComplete) p.result.complete(p.request.dismiss())
+                is SendaPrompt.SlowScript -> p.onDecision(true)
+                is SendaPrompt.Download -> p.onDecision(false)
                 is SendaPrompt.ContextMenu -> {}
             }
         } catch (_: Exception) {}
@@ -298,9 +305,82 @@ class BrowserTab(
          * de pulsación larga. El segundo parámetro indica si debe quedar en segundo plano.
          */
         var tabOpener: ((BrowserTab, Boolean) -> Unit)? = null
+
+        /** Lo asigna MainActivity: abre el diálogo de impresión de Android con el PDF de la página. */
+        var printer: ((java.io.InputStream, String) -> Unit)? = null
+    }
+
+    // --- Traducción en el dispositivo (motor de Firefox: la página no sale del teléfono) ---
+    /** Idioma detectado de la página (BCP 47) y el del usuario según Gecko; null mientras no se sepa. */
+    var pageLanguage by mutableStateOf<String?>(null)
+    var userLanguage by mutableStateOf<String?>(null)
+    /** Idioma al que está traducida la página; null si se ve el original. */
+    var translatedTo by mutableStateOf<String?>(null)
+    var isTranslating by mutableStateOf(false)
+    var translationError by mutableStateOf<String?>(null)
+
+    fun translatePage(from: String, to: String) {
+        val translation = session.sessionTranslation ?: return
+        isTranslating = true
+        translationError = null
+        val options = org.mozilla.geckoview.TranslationsController.SessionTranslation.TranslationOptions.Builder()
+            .downloadModel(true)
+            .build()
+        translation.translate(from, to, options).accept({ }, { e ->
+            isTranslating = false
+            translationError = e?.message ?: "error"
+        })
+    }
+
+    fun showOriginalPage() {
+        session.sessionTranslation?.restoreOriginalPage()
+        translatedTo = null
+        isTranslating = false
+    }
+
+    /** Genera el PDF de la página con Gecko y lo pasa al diálogo de impresión («Guardar como PDF» incluido). */
+    fun printPage() {
+        val context = org.senda.browser.SendaApplication.instance
+        session.saveAsPdf().accept({ stream ->
+            val print = printer
+            if (stream != null && print != null) print(stream, title)
+        }, {
+            android.widget.Toast.makeText(context, org.senda.browser.core.SendaStrings.get("SYSTEM", context).page_print_failed, android.widget.Toast.LENGTH_SHORT).show()
+        })
     }
 
     private fun setupDelegates() {
+        // window.print() de la página: mismo flujo que «Imprimir» del menú
+        session.printDelegate = object : GeckoSession.PrintDelegate {
+            override fun onPrint(session: GeckoSession) {
+                printPage()
+            }
+
+            override fun onPrint(pdf: java.io.InputStream) {
+                android.os.Handler(android.os.Looper.getMainLooper()).post { printer?.invoke(pdf, title) }
+            }
+        }
+
+        session.translationsSessionDelegate = object : org.mozilla.geckoview.TranslationsController.SessionTranslation.Delegate {
+            override fun onTranslationStateChange(
+                session: GeckoSession,
+                state: org.mozilla.geckoview.TranslationsController.SessionTranslation.TranslationState?
+            ) {
+                if (state == null) return
+                state.detectedLanguages?.let { detected ->
+                    pageLanguage = detected.docLangTag
+                    userLanguage = detected.userLangTag
+                }
+                translatedTo = state.requestedTranslationPair?.toLanguage
+                if (state.error != null) {
+                    translationError = state.error
+                    isTranslating = false
+                } else if (state.hasVisibleChange == true || state.requestedTranslationPair == null) {
+                    isTranslating = false
+                }
+            }
+        }
+
         session.navigationDelegate = object : GeckoSession.NavigationDelegate {
             override fun onLocationChange(
                 session: GeckoSession,
@@ -392,6 +472,10 @@ class BrowserTab(
         session.progressDelegate = object : GeckoSession.ProgressDelegate {
             override fun onPageStart(session: GeckoSession, newUrl: String) {
                 isLoading = true
+                pageLanguage = null
+                translatedTo = null
+                translationError = null
+                isTranslating = false
                 progress = 10
                 isSecure = false
             }
@@ -521,12 +605,29 @@ class BrowserTab(
             override fun onExternalResponse(session: GeckoSession, response: org.mozilla.geckoview.WebResponse) {
                 val p = prefs ?: return
                 // Se guarda el flujo que ya trajo Gecko: misma conexión (Tor/proxy), cookies y modo privado
-                org.senda.browser.core.SendaDownloadManager.saveResponse(
-                    context = org.senda.browser.SendaApplication.instance,
-                    prefs = p,
-                    response = response,
-                    isPrivate = isPrivate
-                )
+                val save = {
+                    org.senda.browser.core.SendaDownloadManager.saveResponse(
+                        context = org.senda.browser.SendaApplication.instance,
+                        prefs = p,
+                        response = response,
+                        isPrivate = isPrivate
+                    )
+                }
+                // Con «Preguntar dónde guardar» el selector ya pide permiso; sin él, la página no puede
+                // dejar un archivo en Descargas sin que el usuario lo acepte
+                if (p.askDownloadLocation) { save(); return }
+                val decided = java.util.concurrent.atomic.AtomicBoolean(false)
+                val once: (Boolean) -> Unit = { accept ->
+                    if (decided.compareAndSet(false, true)) {
+                        if (accept) save() else runCatching { response.body?.close() }
+                    }
+                }
+                val name = org.senda.browser.core.SendaDownloadManager.suggestedFileName(response)
+                val host = try { URI(response.uri).host?.removePrefix("www.") } catch (_: Exception) { null } ?: response.uri
+                val size = response.headers["Content-Length"]?.trim()?.toLongOrNull() ?: -1L
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    activePrompt = SendaPrompt.Download(name, host, size, once)
+                }
             }
 
             override fun onCrash(session: GeckoSession) {
@@ -540,8 +641,17 @@ class BrowserTab(
             }
 
             override fun onSlowScript(session: GeckoSession, scriptFileName: String): GeckoResult<SlowScriptResponse> {
-                android.util.Log.w("Senda", "Script lento detectado en $scriptFileName: deteniendo ejecución para evitar congelamiento")
-                return GeckoResult.fromValue(SlowScriptResponse.STOP)
+                // Detenerlo sin preguntar rompía páginas que solo estaban ocupadas (editores, mapas, juegos)
+                val result = GeckoResult<SlowScriptResponse>()
+                val decided = java.util.concurrent.atomic.AtomicBoolean(false)
+                val once: (Boolean) -> Unit = { stop ->
+                    if (decided.compareAndSet(false, true)) result.complete(if (stop) SlowScriptResponse.STOP else SlowScriptResponse.CONTINUE)
+                }
+                val host = try { URI(url).host?.removePrefix("www.") } catch (_: Exception) { null } ?: url
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    activePrompt = SendaPrompt.SlowScript(host, once)
+                }
+                return result
             }
         }
 
@@ -729,6 +839,80 @@ class BrowserTab(
                 val result = GeckoResult<GeckoSession.PromptDelegate.PromptResponse>()
                 android.os.Handler(android.os.Looper.getMainLooper()).post {
                     activePrompt = SendaPrompt.File(prompt, result)
+                }
+                return result
+            }
+
+            override fun onAuthPrompt(
+                session: GeckoSession,
+                prompt: GeckoSession.PromptDelegate.AuthPrompt
+            ): GeckoResult<GeckoSession.PromptDelegate.PromptResponse> {
+                val result = GeckoResult<GeckoSession.PromptDelegate.PromptResponse>()
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    activePrompt = SendaPrompt.Auth(prompt, result)
+                }
+                return result
+            }
+
+            override fun onLoginSelect(
+                session: GeckoSession,
+                request: GeckoSession.PromptDelegate.AutocompleteRequest<org.mozilla.geckoview.Autocomplete.LoginSelectOption>
+            ): GeckoResult<GeckoSession.PromptDelegate.PromptResponse> {
+                val tag = org.senda.browser.core.security.SendaVaultLoginStorage.TAG
+                android.util.Log.i(tag, "onLoginSelect: ${request.options.size} opción(es)")
+                // Tras identificarse con huella el selector anterior suele haberse cancelado: si el usuario ya
+                // eligió la cuenta, se rellena directamente sin volver a preguntar
+                val ctx = SendaGeckoEngine.appContext
+                val pending = org.senda.browser.core.security.SendaVaultLoginStorage.takePending(request.options.map { it.value.guid })
+                if (ctx != null && pending != null) {
+                    val option = request.options.first { it.value.guid == pending }
+                    try {
+                        val filled = org.senda.browser.core.security.SendaVaultLoginStorage.filledOption(ctx, option)
+                        if (filled != null) {
+                            android.util.Log.i(tag, "onLoginSelect: cuenta pendiente rellenada")
+                            return GeckoResult.fromValue(request.confirm(filled))
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.w(tag, "onLoginSelect: no se pudo rellenar la cuenta pendiente: ${e.javaClass.simpleName}")
+                    }
+                }
+                val result = GeckoResult<GeckoSession.PromptDelegate.PromptResponse>()
+                request.setDelegate(object : GeckoSession.PromptDelegate.PromptInstanceDelegate {
+                    override fun onPromptDismiss(prompt: GeckoSession.PromptDelegate.BasePrompt) {
+                        android.util.Log.i(tag, "onLoginSelect: GeckoView canceló el selector")
+                        // Cambió de campo o de página: la barra no debe quedarse a la vista. Si se estaba
+                        // pidiendo la huella, ese flujo sigue y deja el relleno pendiente
+                        android.os.Handler(android.os.Looper.getMainLooper()).post {
+                            if ((activePrompt as? SendaPrompt.LoginSelect)?.request === request) activePrompt = null
+                        }
+                    }
+                })
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    activePrompt = SendaPrompt.LoginSelect(request, result)
+                }
+                return result
+            }
+
+            override fun onLoginSave(
+                session: GeckoSession,
+                request: GeckoSession.PromptDelegate.AutocompleteRequest<org.mozilla.geckoview.Autocomplete.LoginSaveOption>
+            ): GeckoResult<GeckoSession.PromptDelegate.PromptResponse> {
+                val tag = org.senda.browser.core.security.SendaVaultLoginStorage.TAG
+                val entry = request.options.firstOrNull()?.value
+                val ctx = SendaGeckoEngine.appContext
+                if (entry == null || ctx == null || entry.password.isEmpty() || isPrivate) {
+                    return GeckoResult.fromValue(request.dismiss())
+                }
+                // Si la cuenta ya está en la Bóveda no se pregunta: GeckoView solo conoce las cuentas sin contraseña
+                // (no se descifran al cargar la página) y pediría «actualizar» en cada inicio de sesión
+                val domain = org.senda.browser.core.security.SendaVaultManager.extractCanonicalDomain(entry.origin)
+                val known = org.senda.browser.core.security.SendaVaultManager.getCredentials(ctx)
+                    .any { it.domain.equals(domain, ignoreCase = true) && it.username == entry.username }
+                android.util.Log.i(tag, "onLoginSave: ${if (known) "cuenta ya guardada, no se pregunta" else "se ofrece guardar"}")
+                if (known) return GeckoResult.fromValue(request.dismiss())
+                val result = GeckoResult<GeckoSession.PromptDelegate.PromptResponse>()
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    activePrompt = SendaPrompt.LoginSave(request, result)
                 }
                 return result
             }
@@ -1113,7 +1297,7 @@ class BrowserTab(
                                     var bullets = selectedPoints.map(function(p){ 
                                         var clean = p.replace(/^[-•*]\s*/, '');
                                         if (clean.length > 220) clean = clean.substring(0, 220) + '...';
-                                        return '<li style=\"margin-bottom:8px;line-height:1.55;\">' + clean + '</li>'; 
+                                        return '<li style=\"margin-bottom:8px;line-height:1.55;\">' + escapeHtml(clean) + '</li>'; 
                                     }).join('');
 
                                     content.innerHTML = '<ul style=\"margin:0;padding-left:18px;\">' + bullets + '</ul>' +
@@ -1142,19 +1326,30 @@ class BrowserTab(
                                 return (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
                             }
 
+                            // El texto del artículo es de la página: escaparlo siempre antes de usar innerHTML
+                            function escapeHtml(s) {
+                                return String(s).replace(/[&<>"']/g, function(c) {
+                                    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+                                });
+                            }
+
                             function highlightMatches(text, terms) {
-                                if (!text || !terms || terms.length === 0) return text || '';
+                                if (!text) return '';
+                                if (!terms || terms.length === 0) return escapeHtml(text);
                                 var normTerms = terms.map(function(t){ return stripAccents(t.toLowerCase()); });
-                                return text.replace(/[\wÀ-ÿ]+/g, function(token) {
-                                    var normToken = stripAccents(token.toLowerCase());
-                                    for (var i = 0; i < normTerms.length; i++) {
-                                        var t = normTerms[i];
-                                        if (normToken === t || (t.length >= 5 && normToken.indexOf(t.substring(0, t.length - 1)) === 0)) {
-                                            return '<mark style="background:rgba(0,180,255,0.28);color:inherit;padding:1px 3px;border-radius:3px;font-weight:600;">' + token + '</mark>';
+                                // split con grupo: los índices impares son palabras, los pares lo que hay entre ellas
+                                return text.split(/([\wÀ-ÿ]+)/).map(function(part, idx) {
+                                    if (idx % 2 === 1) {
+                                        var normToken = stripAccents(part.toLowerCase());
+                                        for (var i = 0; i < normTerms.length; i++) {
+                                            var t = normTerms[i];
+                                            if (normToken === t || (t.length >= 5 && normToken.indexOf(t.substring(0, t.length - 1)) === 0)) {
+                                                return '<mark style="background:rgba(0,180,255,0.28);color:inherit;padding:1px 3px;border-radius:3px;font-weight:600;">' + escapeHtml(part) + '</mark>';
+                                            }
                                         }
                                     }
-                                    return token;
-                                });
+                                    return escapeHtml(part);
+                                }).join('');
                             }
 
                             function executeSendaAsk() {
@@ -1165,7 +1360,7 @@ class BrowserTab(
                                 if (!query) return;
 
                                 res.style.display = 'block';
-                                res.innerHTML = '<span style=\"opacity:0.7;\">🔍 Analizando texto en tu chip...</span>';
+                                res.innerHTML = '<span style=\"opacity:0.7;\">🔍 Buscando en el artículo...</span>';
 
                                 setTimeout(function() {
                                     var article = document.querySelector('article.reader-body, .reader-body');
@@ -1241,7 +1436,7 @@ class BrowserTab(
                                         res.innerHTML = '<div style=\"color:inherit;\">' +
                                             '<strong>ℹ️ Información no encontrada:</strong> ' +
                                             'Este dato no se menciona explícitamente en el texto del artículo.<br>' +
-                                            '<span style=\"font-size:11px;opacity:0.7;\">🔒 Principio ético de Senda: La IA nunca inventa ni alucina datos fuera del texto.</span>' +
+                                            '<span style=\"font-size:11px;opacity:0.7;\">Senda solo busca frases del artículo que contengan tus palabras; no interpreta la pregunta.</span>' +
                                             '</div>';
                                         return;
                                     }
@@ -1289,14 +1484,14 @@ class BrowserTab(
                                         <span class="reader-domain">📖 $domain</span> · <span>$readTime min de lectura</span>
                                     </div>
                                     <div style="display:flex;align-items:center;gap:6px;">
-                                        <button onclick="toggleSendaSummary()" style="background:rgba(0,210,160,0.15);border:1px solid #00D2A0;color:inherit;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">⚡ Síntesis Soberana</button>
+                                        <button onclick="toggleSendaSummary()" style="background:rgba(0,210,160,0.15);border:1px solid #00D2A0;color:inherit;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">⚡ Frases clave</button>
                                         <button onclick="toggleSendaAsk()" style="background:rgba(0,180,255,0.15);border:1px solid #00B0FF;color:inherit;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">💬 Preguntar al texto</button>
                                     </div>
                                 </div>
                             </div>
                             <div id="senda-summary-box" style="display:none;background:rgba(128,128,128,0.12);border-left:3px solid #00D2A0;border-radius:8px;padding:12px 14px;margin-bottom:14px;">
                                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-                                    <strong style="font-size:12px;color:#00D2A0;">⚡ SÍNTESIS EN CHIP (100% OFFLINE)</strong>
+                                    <strong style="font-size:12px;color:#00D2A0;">⚡ FRASES CLAVE DEL ARTÍCULO</strong>
                                     <button onclick="document.getElementById('senda-summary-box').style.display='none'" style="background:none;border:none;color:inherit;font-size:14px;cursor:pointer;opacity:0.6;">✕</button>
                                 </div>
                                 <div id="senda-summary-content" style="font-size:0.92em;line-height:1.55;"></div>
@@ -1426,17 +1621,18 @@ class BrowserTab(
             "b.innerHTML='<div><span>📖 Modo Lectura · '+time+' min</span></div><div style=\"display:flex;gap:6px;align-items:center;\"><button id=\"senda-fb-sum\" style=\"background:rgba(0,210,160,0.15);border:1px solid #00D2A0;color:inherit;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;\">⚡ Síntesis</button><button id=\"senda-fb-ask\" style=\"background:rgba(0,180,255,0.15);border:1px solid #00B0FF;color:inherit;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;\">💬 Preguntar</button><button id=\"senda-reader-close\" style=\"background:rgba(128,128,128,0.2);border:none;color:inherit;padding:4px 10px;border-radius:14px;font-weight:bold;cursor:pointer;font-size:12px;\">✕</button></div>';" +
             "var w=document.createElement('div');w.style.cssText='max-width:680px;margin:0 auto;word-break:break-word;';" +
             "var sumBox=document.createElement('div');sumBox.id='senda-summary-box';sumBox.style.cssText='display:none;background:rgba(128,128,128,0.12);border-left:3px solid #00D2A0;border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:0.9em;';" +
-            "sumBox.innerHTML='<div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;\"><strong style=\"font-size:12px;color:#00D2A0;\">⚡ SÍNTESIS EN CHIP</strong><button onclick=\"document.getElementById(\\'senda-summary-box\\').style.display=\\'none\\'\" style=\"background:none;border:none;color:inherit;font-size:14px;cursor:pointer;\">✕</button></div><div id=\"senda-summary-content\"></div>';" +
+            "sumBox.innerHTML='<div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;\"><strong style=\"font-size:12px;color:#00D2A0;\">⚡ PRIMERAS FRASES</strong><button onclick=\"document.getElementById(\\'senda-summary-box\\').style.display=\\'none\\'\" style=\"background:none;border:none;color:inherit;font-size:14px;cursor:pointer;\">✕</button></div><div id=\"senda-summary-content\"></div>';" +
             "var askBox=document.createElement('div');askBox.id='senda-ask-box';askBox.style.cssText='display:none;background:rgba(128,128,128,0.12);border-left:3px solid #00B0FF;border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:0.9em;';" +
             "askBox.innerHTML='<div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;\"><strong style=\"font-size:12px;color:#00B0FF;\">💬 CONSULTA SOBERANA AL ARTÍCULO</strong><button onclick=\"document.getElementById(\\'senda-ask-box\\').style.display=\\'none\\'\" style=\"background:none;border:none;color:inherit;font-size:14px;cursor:pointer;\">✕</button></div><div style=\"display:flex;gap:6px;margin-bottom:8px;\"><input type=\"text\" id=\"senda-ask-input\" placeholder=\"Haz una pregunta...\" style=\"flex:1;background:rgba(128,128,128,0.15);border:1px solid rgba(128,128,128,0.3);border-radius:6px;padding:8px;color:inherit;font-size:13px;outline:none;\"/><button id=\"senda-fb-ask-exec\" style=\"background:#00B0FF;color:#FFF;border:none;border-radius:6px;padding:8px 12px;font-weight:600;font-size:12px;cursor:pointer;\">Buscar</button></div><div id=\"senda-ask-result\" style=\"display:none;background:rgba(128,128,128,0.08);border-radius:6px;padding:10px;margin-top:6px;\"></div>';" +
             "var h=document.createElement('h1');h.innerText='$safeTitle';h.style.cssText='font-size:${28 * fontScale}px;line-height:1.3;margin-bottom:20px;font-weight:bold;';" +
             "w.appendChild(h);w.appendChild(sumBox);w.appendChild(askBox);w.appendChild(clone);c.appendChild(b);c.appendChild(w);document.body.appendChild(c);document.body.style.overflow='hidden';" +
             "document.getElementById('senda-reader-close').onclick=function(){c.remove();document.body.style.overflow='';};" +
             "function stripAcc(s){return (s||'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'');}" +
-            "function hlM(txt,tms){if(!tms||tms.length===0)return txt;var nt=tms.map(function(t){return stripAcc(t.toLowerCase());});return txt.replace(/[\\wÀ-ÿ]+/g,function(tok){var ntok=stripAcc(tok.toLowerCase());for(var i=0;i<nt.length;i++){if(ntok===nt[i]||(nt[i].length>=5&&ntok.indexOf(nt[i].substring(0,nt[i].length-1))===0))return '<mark style=\"background:rgba(0,180,255,0.28);color:inherit;padding:1px 3px;border-radius:3px;font-weight:600;\">'+tok+'</mark>';}return tok;});}" +
-            "document.getElementById('senda-fb-sum').onclick=function(){if(sumBox.style.display==='none'||sumBox.style.display===''){sumBox.style.display='block';var raw=(clone.innerText||'').trim();var sens=raw.replace(/\\s+/g,' ').split(/(?<=[.!?])\\s+/).map(function(s){return s.trim();}).filter(function(s){return s.length>30;});var pts=sens.slice(0,3);var ul=pts.map(function(p){return '<li>'+p+'</li>';}).join('');document.getElementById('senda-summary-content').innerHTML='<ul>'+ul+'</ul>';}else{sumBox.style.display='none';}};" +
+            "function escH(x){return String(x).replace(/[&<>\"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c];});}" +
+            "function hlM(txt,tms){if(!tms||tms.length===0)return escH(txt);var nt=tms.map(function(t){return stripAcc(t.toLowerCase());});return txt.split(/([\\wÀ-ÿ]+)/).map(function(tok,ix){if(ix%2===1){var ntok=stripAcc(tok.toLowerCase());for(var i=0;i<nt.length;i++){if(ntok===nt[i]||(nt[i].length>=5&&ntok.indexOf(nt[i].substring(0,nt[i].length-1))===0))return '<mark style=\"background:rgba(0,180,255,0.28);color:inherit;padding:1px 3px;border-radius:3px;font-weight:600;\">'+escH(tok)+'</mark>';}}return escH(tok);}).join('');}" +
+            "document.getElementById('senda-fb-sum').onclick=function(){if(sumBox.style.display==='none'||sumBox.style.display===''){sumBox.style.display='block';var raw=(clone.innerText||'').trim();var sens=raw.replace(/\\s+/g,' ').split(/(?<=[.!?])\\s+/).map(function(s){return s.trim();}).filter(function(s){return s.length>30;});var pts=sens.slice(0,3);var ul=pts.map(function(p){return '<li>'+escH(p)+'</li>';}).join('');document.getElementById('senda-summary-content').innerHTML='<ul>'+ul+'</ul>';}else{sumBox.style.display='none';}};" +
             "document.getElementById('senda-fb-ask').onclick=function(){askBox.style.display=(askBox.style.display==='none'||askBox.style.display==='')?'block':'none';if(askBox.style.display==='block'){document.getElementById('senda-ask-input').focus();}};" +
-            "function doAsk(){var q=document.getElementById('senda-ask-input').value.trim();if(!q)return;var res=document.getElementById('senda-ask-result');res.style.display='block';res.innerHTML='🔍 Analizando...';var stp=new Set(['el','la','los','las','un','una','unos','unas','de','del','a','al','en','con','por','para','que','quien','cual','como','cuando','donde','y','o','pero','si','es','son','fue','era','ha','han','se','su','sus','lo','le','les']);var terms=stripAcc(q.toLowerCase()).replace(/[^a-z0-9\\s]/g,' ').split(/\\s+/).filter(function(w){return w.length>2&&!stp.has(w);});if(terms.length===0)terms=stripAcc(q.toLowerCase()).replace(/[^a-z0-9\\s]/g,' ').split(/\\s+/).filter(function(w){return w.length>1;});var pars=(clone.innerText||'').split(/\\n+/).filter(function(p){return p.length>20;});var sens=[];pars.forEach(function(p,pIdx){p.replace(/\\s+/g,' ').split(/(?<=[.!?])\\s+/).forEach(function(s){if(s.length>20)sens.push({text:s,pNum:pIdx+1,pText:p});});});var m=[];sens.forEach(function(item){var ns=stripAcc(item.text.toLowerCase());var sc=0;var mw=[];terms.forEach(function(t){if(ns.indexOf(t)!==-1){sc+=10;mw.push(t);}});if(sc>0)m.push({item:item,score:sc,mw:mw});});m.sort(function(a,b){return b.score-a.score;});if(m.length===0){res.innerHTML='<strong>ℹ️ Dato no encontrado en el texto.</strong><br><span style=\"font-size:11px;opacity:0.7;\">🔒 Ética Senda: Cero alucinación fuera del texto.</span>';return;}var best=m[0];res.innerHTML='<div>'+hlM(best.item.text,best.mw)+'</div><div style=\"font-size:11px;opacity:0.8;margin-top:6px;border-top:1px solid rgba(128,128,128,0.2);padding-top:4px;\">📌 Párrafo '+best.item.pNum+'</div>';}" +
+            "function doAsk(){var q=document.getElementById('senda-ask-input').value.trim();if(!q)return;var res=document.getElementById('senda-ask-result');res.style.display='block';res.innerHTML='🔍 Analizando...';var stp=new Set(['el','la','los','las','un','una','unos','unas','de','del','a','al','en','con','por','para','que','quien','cual','como','cuando','donde','y','o','pero','si','es','son','fue','era','ha','han','se','su','sus','lo','le','les']);var terms=stripAcc(q.toLowerCase()).replace(/[^a-z0-9\\s]/g,' ').split(/\\s+/).filter(function(w){return w.length>2&&!stp.has(w);});if(terms.length===0)terms=stripAcc(q.toLowerCase()).replace(/[^a-z0-9\\s]/g,' ').split(/\\s+/).filter(function(w){return w.length>1;});var pars=(clone.innerText||'').split(/\\n+/).filter(function(p){return p.length>20;});var sens=[];pars.forEach(function(p,pIdx){p.replace(/\\s+/g,' ').split(/(?<=[.!?])\\s+/).forEach(function(s){if(s.length>20)sens.push({text:s,pNum:pIdx+1,pText:p});});});var m=[];sens.forEach(function(item){var ns=stripAcc(item.text.toLowerCase());var sc=0;var mw=[];terms.forEach(function(t){if(ns.indexOf(t)!==-1){sc+=10;mw.push(t);}});if(sc>0)m.push({item:item,score:sc,mw:mw});});m.sort(function(a,b){return b.score-a.score;});if(m.length===0){res.innerHTML='<strong>ℹ️ Dato no encontrado en el texto.</strong><br><span style=\"font-size:11px;opacity:0.7;\">Senda solo busca frases que contengan tus palabras.</span>';return;}var best=m[0];res.innerHTML='<div>'+hlM(best.item.text,best.mw)+'</div><div style=\"font-size:11px;opacity:0.8;margin-top:6px;border-top:1px solid rgba(128,128,128,0.2);padding-top:4px;\">📌 Párrafo '+best.item.pNum+'</div>';}" +
             "document.getElementById('senda-fb-ask-exec').onclick=doAsk;" +
             "document.getElementById('senda-ask-input').onkeydown=function(e){if(e.key==='Enter')doAsk();};" +
             "}catch(e){console.error(e);}" +
@@ -1487,6 +1683,7 @@ class BrowserTab(
 
     fun close() {
         dismissActivePrompt()
+        thumbnail = null
         try {
             session.setActive(false)
             session.close()

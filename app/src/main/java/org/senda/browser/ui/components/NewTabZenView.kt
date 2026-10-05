@@ -135,6 +135,7 @@ fun NewTabZenView(
     var showNews by remember { mutableStateOf(prefs.showZenNewsFeed) }
     var selectedWallpaperId by remember { mutableStateOf(prefs.selectedWallpaperId) }
     var dimPercent by remember { mutableIntStateOf(prefs.wallpaperDimPercent) }
+    var rotationMinutes by remember { mutableIntStateOf(prefs.wallpaperRotationMinutes) }
 
     val customWallpaperLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -150,7 +151,7 @@ fun NewTabZenView(
                     }
                 }
                 prefs.customWallpaperPath = target.absolutePath
-                prefs.selectedWallpaperId = "custom_user"
+                FreeWallpapers.choose(prefs, "custom_user")
                 selectedWallpaperId = "custom_user"
                 onSettingsChanged()
             } catch (_: Exception) {}
@@ -167,10 +168,6 @@ fun NewTabZenView(
 
     var showAddShortcutDialog by remember { mutableStateOf(false) }
     var editingShortcut by remember { mutableStateOf<ZenShortcut?>(null) }
-
-    val newsList by produceState(initialValue = emptyList<EthicalNewsItem>()) {
-        value = EthicalNewsRepository.fetchEthicalNews()
-    }
 
     val activeWallpaper = remember(selectedWallpaperId, prefs.customWallpaperPath) {
         FreeWallpapers.getById(selectedWallpaperId, prefs.customWallpaperPath)
@@ -197,13 +194,56 @@ fun NewTabZenView(
         ZenHomeLayout.CUSTOM -> showNews
     }
 
+    // Solo se contacta a los medios si este diseño muestra noticias («Enfocado» no debe tocar la red)
+    val wantsNews = displayNewsFeed || currentLayout == ZenHomeLayout.INSPIRATIONAL // artículo destacado
+    val newsList by produceState(initialValue = emptyList<EthicalNewsItem>(), wantsNews) {
+        if (wantsNews) value = EthicalNewsRepository.fetchEthicalNews()
+    }
+
+    // Rotación de fondos: el turno se guarda en preferencias para que siga igual entre pestañas y reinicios
+    var rotatingWallpaper by remember { mutableStateOf<FreeWallpaper?>(null) }
+    LaunchedEffect(rotationMinutes, displayWallpaper, selectedWallpaperId) {
+        if (!displayWallpaper || rotationMinutes == 0) {
+            rotatingWallpaper = null
+            return@LaunchedEffect
+        }
+        fun advance(): FreeWallpaper {
+            val next = FreeWallpapers.nextRandom(prefs.wallpaperRotationCurrentId)
+            prefs.wallpaperRotationCurrentId = next.id
+            prefs.wallpaperRotationChangedAt = System.currentTimeMillis()
+            return next
+        }
+        if (rotationMinutes < 0) {
+            // Recién elegido en el selector: se muestra ese; si no, uno nuevo por cada pestaña
+            val justChosen = System.currentTimeMillis() - prefs.wallpaperRotationChangedAt < 3_000L
+            val current = prefs.wallpaperRotationCurrentId?.let { id -> FreeWallpapers.items.find { it.id == id } }
+            rotatingWallpaper = if (justChosen && current != null) current else advance()
+            return@LaunchedEffect
+        }
+        val intervalMs = rotationMinutes * 60_000L
+        while (true) {
+            val current = prefs.wallpaperRotationCurrentId?.let { id -> FreeWallpapers.items.find { it.id == id } }
+            val elapsed = System.currentTimeMillis() - prefs.wallpaperRotationChangedAt
+            rotatingWallpaper = if (current == null || elapsed !in 0 until intervalMs) advance() else current
+            val waitMs = intervalMs - (System.currentTimeMillis() - prefs.wallpaperRotationChangedAt)
+            kotlinx.coroutines.delay(waitMs.coerceAtLeast(1_000L))
+        }
+    }
+    val shownWallpaper = rotatingWallpaper ?: activeWallpaper
+
     Box(modifier = Modifier.fillMaxSize()) {
         // Fondo artístico libre (GPL/CC0) si está activo en el modo elegido
         if (displayWallpaper) {
-            FreeWallpaperBackground(
-                wallpaper = activeWallpaper,
-                dimPercent = dimPercent
-            )
+            androidx.compose.animation.Crossfade(
+                targetState = shownWallpaper,
+                animationSpec = androidx.compose.animation.core.tween(durationMillis = 1600),
+                label = "fondo"
+            ) { wallpaper ->
+                FreeWallpaperBackground(
+                    wallpaper = wallpaper,
+                    dimPercent = dimPercent
+                )
+            }
         } else {
             Box(
                 modifier = Modifier
@@ -233,7 +273,7 @@ fun NewTabZenView(
                 onSearch = onSearch,
                 displayShortcuts = displayShortcuts,
                 displayWallpaper = displayWallpaper,
-                activeWallpaper = activeWallpaper,
+                activeWallpaper = shownWallpaper,
                 featuredArticle = if (currentLayout == ZenHomeLayout.INSPIRATIONAL) newsList.firstOrNull() else null,
                 displayNewsFeed = displayNewsFeed,
                 newsList = newsList,
@@ -374,6 +414,7 @@ fun NewTabZenView(
                     showNews = prefs.showZenNewsFeed
                     selectedWallpaperId = prefs.selectedWallpaperId
                     dimPercent = prefs.wallpaperDimPercent
+                    rotationMinutes = prefs.wallpaperRotationMinutes
                     onSettingsChanged()
                 }
             )
@@ -411,7 +452,7 @@ fun HomeLayoutSelectorSheet(
                     }
                 }
                 prefs.customWallpaperPath = target.absolutePath
-                prefs.selectedWallpaperId = "custom_user"
+                FreeWallpapers.choose(prefs, "custom_user")
                 selectedWallpaperId = "custom_user"
                 onLayoutChanged()
             } catch (_: Exception) {}
@@ -595,7 +636,7 @@ fun HomeLayoutSelectorSheet(
                                 .clip(RoundedCornerShape(10.dp))
                                 .clickable {
                                     selectedWallpaperId = wallpaper.id
-                                    prefs.selectedWallpaperId = wallpaper.id
+                                    FreeWallpapers.choose(prefs, wallpaper.id)
                                     onLayoutChanged()
                                 }
                                 .border(
@@ -618,7 +659,7 @@ fun HomeLayoutSelectorSheet(
                                         )
                                 )
                                 Text(
-                                    text = wallpaper.name.split(":").firstOrNull() ?: wallpaper.name,
+                                    text = wallpaper.name,
                                     fontSize = 9.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White,
@@ -630,6 +671,29 @@ fun HomeLayoutSelectorSheet(
                                 )
                             }
                         }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                var sheetRotation by remember { mutableIntStateOf(prefs.wallpaperRotationMinutes) }
+                Text(text = strings.wp_rotation_title, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                @OptIn(ExperimentalLayoutApi::class)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                    listOf(
+                        0 to strings.wp_rotation_fixed,
+                        -1 to strings.wp_rotation_new_tab,
+                        1 to "1 min", 5 to "5 min", 15 to "15 min", 60 to "1 h"
+                    ).forEach { (minutes, label) ->
+                        FilterChip(
+                            selected = sheetRotation == minutes,
+                            onClick = {
+                                sheetRotation = minutes
+                                prefs.wallpaperRotationMinutes = minutes
+                                if (minutes != 0) FreeWallpapers.choose(prefs, selectedWallpaperId.takeIf { it != "custom_user" } ?: FreeWallpapers.items.first().id)
+                                onLayoutChanged()
+                            },
+                            label = { Text(label, fontSize = 12.sp) }
+                        )
                     }
                 }
 
@@ -945,7 +1009,7 @@ fun FocusedOrInspirationalLayout(
                 color = Color.Black.copy(alpha = 0.45f)
             ) {
                 Text(
-                    text = "🎨 ${activeWallpaper.name} · ${activeWallpaper.license}",
+                    text = "🎨 ${activeWallpaper.name} — ${activeWallpaper.author} · ${activeWallpaper.license}",
                     fontSize = 10.5.sp,
                     color = Color.White.copy(alpha = 0.85f),
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)

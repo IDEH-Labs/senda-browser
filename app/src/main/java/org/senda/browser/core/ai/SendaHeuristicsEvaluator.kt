@@ -6,6 +6,10 @@ import java.util.*
 
 object SendaHeuristicsEvaluator {
 
+    /** «tor» o «api» como palabra: con contains(), «torta» o «capital» se tomaban por la red Tor o una API. */
+    private fun hasWord(text: String, word: String): Boolean =
+        Regex("(?<![\\p{L}\\d])" + Regex.escape(word) + "(?![\\p{L}\\d])").containsMatchIn(text)
+
     fun normalizePrompt(input: String): String {
         val temp = java.text.Normalizer.normalize(input.lowercase(), java.text.Normalizer.Form.NFD)
         return Regex("\\p{InCombiningDiacriticalMarks}+").replace(temp, "")
@@ -239,72 +243,33 @@ object SendaHeuristicsEvaluator {
             val lowerPrev = lastAssistantMsg.lowercase()
             return when {
                 lowerPrev.contains("hoy es") || lowerPrev.contains("son las") -> """
-                    **Sí, estoy completamente seguro.**
-                    
-                    La información de fecha y hora no es una estimación ni una suposición estadística: proviene directamente del reloj de tiempo real y el calendario del sistema operativo de tu propio dispositivo en el momento exacto de la consulta.
-                """.trimIndent()
-
-                lowerPrev.contains("el resultado de") || lowerPrev.contains("la raiz cuadrada de") || lowerPrev.contains("% de") || lowerPrev.contains(" ^ ") -> """
-                    **Sí, estoy completamente seguro.**
-                    
-                    Este cálculo aritmético fue procesado de forma determinista y exacta mediante algoritmos matemáticos en el procesador de tu móvil, no mediante aproximaciones generativas. Los axiomas de la aritmética garantizan que el resultado es invariable.
+                    La fecha y la hora que da Senda salen del reloj del sistema de tu teléfono, así que son tan exactas como ese reloj.
                 """.trimIndent()
 
                 lowerPrev.contains("informacion del dispositivo") || lowerPrev.contains("dispositivo:") -> """
-                    **Sí, completamente seguro.**
-                    
-                    Los datos del dispositivo (modelo, arquitectura y versión del sistema operativo) son leídos directamente de las interfaces de hardware nativas (`android.os.Build`) de tu teléfono móvil.
+                    Senda lee el modelo y la versión de Android tal cual de `android.os.Build` en tu teléfono.
                 """.trimIndent()
 
-                lowerPrev.contains("senda ai") || lowerPrev.contains("senda browser") -> """
-                    **Sí, lo afirmo con total certeza.**
-                    
-                    Conozco con exactitud mi propia arquitectura y propósito ético: fui diseñado exclusivamente para Senda Browser bajo principios de privacidad absoluta, soberanía técnica y ejecución 100% en el chip sin telemetría ni vigilancia.
+                lowerPrev.contains("el resultado de") || lowerPrev.contains("la raiz cuadrada de") || lowerPrev.contains("% de") || lowerPrev.contains(" ^ ") -> """
+                    **No puedo garantizarlo.** Ese resultado lo calculó un evaluador de expresiones hecho con reglas, no una calculadora certificada, y tiene fallos conocidos. Si el número es importante, compruébalo con la calculadora del teléfono.
                 """.trimIndent()
 
                 lowerPrev.contains("capital de") -> """
-                    **Sí, estoy seguro.**
-                    
-                    Es un dato fáctico y unánimemente reconocido en la geografía política oficial de las naciones y el derecho internacional.
+                    **No lo he comprobado.** Si el dato salió de Senda sin modelo, viene de una tabla fija incluida en Senda; puede estar desactualizada o incompleta. Contrástalo con una fuente actual.
                 """.trimIndent()
 
                 lowerPrev.contains("fuentes") && (lowerPrev.contains("wikipedia") || lowerPrev.contains("red")) -> """
-                    **Sí, con alta certeza fundamentada en fuentes públicas contrastadas.**
-                    
-                    La respuesta anterior fue obtenida en tiempo real consultando fuentes abiertas y verificadas. Puedes comprobar cada enlace y cita directamente desde los vínculos proporcionados en Senda Browser.
+                    **No lo he verificado.** La respuesta anterior es un extracto de Wikipedia o DuckDuckGo; Senda no comprueba su contenido. Abre los enlaces para revisarlo tú.
                 """.trimIndent()
 
-                !activeTopic.isNullOrBlank() -> """
-                    **Sí, completamente seguro con respecto a $activeTopic.**
-                    
-                    Bajo la **Directiva Core de rigor analítico y calibración epistémica**:
-                    * **Premisa evaluada:** Los hechos y datos expuestos sobre *«$activeTopic»*.
-                    * **Nivel de certeza:** La conclusión se sostiene en fundamentos verificados y principios unívocos sin especulaciones.
-                    * **Transparencia:** Si requieres profundizar en detalles adicionales o fuentes de la red, puedo buscarlas de inmediato.
-                """.trimIndent()
-
-                else -> """
-                    **He auditado nuevamente mi respuesta anterior:**
-                    
-                    Bajo la **Directiva Core de rigor analítico y calibración epistémica**:
-                    * **Premisa evaluada:** Respecto a lo expresado sobre *«${lastUserMsg.take(80)}»*.
-                    * **Nivel de certeza:** La conclusión se sostiene en la evidencia lógica y conceptual disponible.
-                    * **Límites y verificación:** Si requieres contrastar datos empíricos de última hora o fuentes primarias adicionales de la red, puedo buscar fuentes en vivo o puedes abrir una pestaña directamente en Senda Browser.
-                """.trimIndent()
+                else -> NO_MODEL_CANNOT_VERIFY
             }
         }
 
         // Si el usuario pregunta "¿por qué?" o "por que"
         val isWhyQuery = clean == "por que" || clean == "porque" || clean.startsWith("por que ") || clean == "como asi" || clean == "como es eso"
         if (isWhyQuery) {
-            val topicPhrase = if (!activeTopic.isNullOrBlank()) " sobre **$activeTopic**" else ""
-            return """
-                **Fundamentación de lo expuesto$topicPhrase:**
-                
-                Siguiendo la Directiva Core, la justificación de mi respuesta anterior radica en:
-                1. **Razón de fondo:** El razonamiento responde a relaciones de causa-efecto y principios definidos, evitando confusiones entre correlación y causalidad.
-                2. **Evidencia:** Si deseas que profundicemos en los supuestos, contraejemplos o implicaciones prácticas de este punto, dime qué aspecto específico te interesa explorar o si prefieres buscar fuentes adicionales en la red.
-            """.trimIndent()
+            return NO_MODEL_CANNOT_VERIFY
         }
 
         // Si el usuario pide continuar, más detalles o profundizar
@@ -354,14 +319,14 @@ object SendaHeuristicsEvaluator {
                     * **Legado Familiar:** Su hija Irène Joliot-Curie también ganó el Premio Nobel de Química en 1935 por el descubrimiento de la radiactividad artificial, convirtiendo a la familia Curie en la más galardonada en la historia de los premios.
                 """.trimIndent()
 
-                lowerTopic.contains("tor") -> """
+                hasWord(lowerTopic, "tor") -> """
                     ### 🧅 Arquitectura Técnica Profunda de la Red Tor
                     * **Cifrado en Capas:** El cliente Tor descarga un directorio de consenso de repetidores y construye un circuito de 3 saltos. Utiliza criptografía asimétrica para acordar claves de sesión simétricas independientes con cada nodo.
                     * **Servicios Onion (.onion):** Permiten hospedar sitios y servicios web de forma completamente anónima donde ni el visitante conoce la IP física del servidor ni el servidor conoce la IP del visitante; la conexión se realiza en un "punto de encuentro" dentro de la red Tor.
                     * **Defensa frente a Vigilancia Masiva:** Evita que el proveedor de internet (ISP) conozca qué páginas visitas y que los sitios sepan desde qué país o ciudad te conectas, frustrando la censura gubernamental y el perfilamiento corporativo.
                 """.trimIndent()
 
-                lowerTopic.contains("api") -> """
+                hasWord(lowerTopic, "api") -> """
                     ### 🔌 Arquitectura Avanzada de APIs
                     * **REST vs GraphQL vs gRPC:**
                       - **REST:** Recursos basados en URIs, verbos HTTP e hipermedios (JSON). Sencillo y universal.
@@ -371,16 +336,7 @@ object SendaHeuristicsEvaluator {
                     * **Control de Tráfico (*Rate Limiting*):** Algoritmos como *Token Bucket* o *Leaky Bucket* para proteger los servidores contra saturación y abusos.
                 """.trimIndent()
 
-                else -> """
-                    ### 🔍 Profundizando sobre $activeTopic
-                    
-                    Ampliando los aspectos clave analizados previamente:
-                    * **Desarrollo y contexto:** Los factores determinantes en torno a **$activeTopic** se articulan mediante relaciones de causa-efecto verificables.
-                    * **Implicaciones prácticas:** Su comprensión permite evaluar tanto ventajas operativas como posibles limitaciones o requerimientos según el entorno de aplicación.
-                    * **Perspectiva crítica:** Siguiendo la Directiva Core, es fundamental contrastar las diferentes interpretaciones teóricas con la evidencia empírica observada.
-                    
-                    ¿Deseas que analicemos algún subtema específico de $activeTopic o que consultemos fuentes adicionales en la red?
-                """.trimIndent()
+                else -> noCannedContentFor(activeTopic)
             }
         }
 
@@ -400,7 +356,7 @@ object SendaHeuristicsEvaluator {
                     3. **Síntesis:** Utilizando la energía química generada, fija el carbono en glucosa (azúcares), que viaja por la savia de la planta para alimentarla y permitirle florecer.
                 """.trimIndent()
 
-                lowerTopic.contains("api") -> """
+                hasWord(lowerTopic, "api") -> """
                     ### 🔌 Ejemplo Cotidiano de una API
                     Imagina la app del clima en tu teléfono móvil:
                     1. **La Petición (Request):** Cuando abres la app, esta envía una petición HTTP por internet a la API meteorológica:
@@ -418,7 +374,7 @@ object SendaHeuristicsEvaluator {
                     4. **Visualización:** Tu app lee ese archivo JSON y dibuja en tu pantalla un sol con una nube y el número 18°. La app nunca tuvo un satélite propio: se comunicó mediante la API.
                 """.trimIndent()
 
-                lowerTopic.contains("tor") -> """
+                hasWord(lowerTopic, "tor") -> """
                     ### 🧅 Ejemplo Práctico de Navegación con Tor
                     Supón que un periodista necesita consultar un portal informativo con estricta privacidad:
                     1. **Salto 1 (Guard):** La petición sale cifrada 3 veces de su dispositivo al Nodo Guard (en Alemania). El nodo Guard sabe quién es el usuario, pero no sabe qué página quiere abrir.
@@ -434,16 +390,7 @@ object SendaHeuristicsEvaluator {
                     * **La Luna en Órbita:** La Luna también está cayendo continuamente hacia la Tierra por el mismo motivo; sin embargo, tiene una enorme velocidad tangencial horizontal (~1 km/s). Por ello, mientras cae hacia la Tierra, la superficie terrestre se curva bajo ella al mismo ritmo: la Luna está en un estado perpetuo de **caída libre orbital**.
                 """.trimIndent()
 
-                else -> """
-                    ### 💡 Ejemplo Práctico sobre $activeTopic
-                    Para ilustrar **$activeTopic** de forma concreta:
-                    * **Escenario de aplicación:** Imagina una situación real donde se implementa este concepto para resolver una necesidad operativa directa.
-                    * **Dinámica paso a paso:**
-                      1. Se establecen las condiciones iniciales y las entradas del proceso.
-                      2. Se aplican los principios característicos de $activeTopic para procesar los datos o transformar el estado.
-                      3. Se obtiene un resultado verificable y medible.
-                    * **Lección clave:** Este caso evidencia cómo los fundamentos teóricos de $activeTopic se traducen en soluciones prácticas y reproducibles en el mundo real.
-                """.trimIndent()
+                else -> noCannedContentFor(activeTopic)
             }
         }
 
@@ -451,69 +398,124 @@ object SendaHeuristicsEvaluator {
     }
 
     fun tryEvaluateMath(prompt: String): String? {
-        val clean = normalizePrompt(prompt)
-            .replace("cuanto es", "")
-            .replace("cuanto da", "")
-            .replace("calcula", "")
-            .replace("calcular", "")
-            .replace("dime el resultado de", "")
-            .replace("resultado de", "")
-            .trim()
+        var clean = normalizePrompt(prompt)
+        listOf("dime el resultado de", "resultado de", "cuanto es", "cuanto da", "calcular", "calcula").forEach {
+            clean = clean.replace(it, " ")
+        }
+        clean = clean.replace(Regex("\\s+"), " ").trim().trimEnd('.', '=', ' ')
+        if (clean.isEmpty()) return null
+        val number = "(\\d[\\d.,]*)"
 
         // 1. Raíz cuadrada: "raiz cuadrada de 64", "raiz de 144", "sqrt(25)"
-        val sqrtRegex = Regex("(?:raiz)(?:\\s+cuadrada)?\\s+de\\s+(\\d+(?:\\.\\d+)?)|sqrt\\((\\d+(?:\\.\\d+)?)\\)")
-        val sqrtMatch = sqrtRegex.find(clean)
-        if (sqrtMatch != null) {
-            val numStr = sqrtMatch.groupValues[1].ifEmpty { sqrtMatch.groupValues[2] }
-            val num = numStr.toDoubleOrNull() ?: return null
-            if (num < 0) return "No es posible calcular la raíz cuadrada de un número negativo en números reales."
-            val res = kotlin.math.sqrt(num)
-            val formatRes = if (res % 1.0 == 0.0) res.toLong().toString() else String.format(java.util.Locale.US, "%.4f", res).trimEnd('0').trimEnd('.')
-            return "La raíz cuadrada de $numStr es **$formatRes**."
+        Regex("^(?:la )?(?:raiz(?: cuadrada)? de |sqrt ?\\( ?)$number ?\\)?$").find(clean)?.let { m ->
+            val num = parseLocalizedNumber(m.groupValues[1]) ?: return null
+            return "La raíz cuadrada de ${m.groupValues[1]} es **${formatMathResult(kotlin.math.sqrt(num))}**."
         }
 
-        // 2. Porcentaje: ej. "15% de 200", "el 20% de 500"
-        val pctRegex = Regex("(?:el\\s+)?(\\d+(?:\\.\\d+)?)\\s*%\\s*de\\s*(\\d+(?:\\.\\d+)?)")
-        val pctMatch = pctRegex.find(clean)
-        if (pctMatch != null) {
-            val pct = pctMatch.groupValues[1].toDoubleOrNull() ?: return null
-            val base = pctMatch.groupValues[2].toDoubleOrNull() ?: return null
-            val res = (pct / 100.0) * base
-            val formatRes = if (res % 1.0 == 0.0) res.toLong().toString() else String.format(java.util.Locale.US, "%.2f", res).trimEnd('0').trimEnd('.')
-            return "El ${pct.toInt()}% de ${base.toInt()} es **$formatRes**."
+        // 2. Porcentaje: "15% de 200", "el 15,5 % de 200"
+        Regex("^(?:el )?$number ?% de $number$").find(clean)?.let { m ->
+            val pct = parseLocalizedNumber(m.groupValues[1]) ?: return null
+            val base = parseLocalizedNumber(m.groupValues[2]) ?: return null
+            return "El ${m.groupValues[1]}% de ${m.groupValues[2]} es **${formatMathResult(pct / 100.0 * base)}**."
         }
 
-        // 3. Potencia: a ^ b
-        val powRegex = Regex("(\\d+(?:\\.\\d+)?)\\s*\\^\\s*(\\d+(?:\\.\\d+)?)")
-        val powMatch = powRegex.find(clean)
-        if (powMatch != null) {
-            val a = powMatch.groupValues[1].toDoubleOrNull() ?: return null
-            val b = powMatch.groupValues[2].toDoubleOrNull() ?: return null
-            val res = Math.pow(a, b)
-            val formatRes = if (res % 1.0 == 0.0) res.toLong().toString() else String.format(java.util.Locale.US, "%.4f", res).trimEnd('0').trimEnd('.')
-            return "El resultado de ${powMatch.groupValues[1]} ^ ${powMatch.groupValues[2]} es **$formatRes**."
+        // 3. Expresión completa. Solo si TODO el texto es una operación: «carta de 3 - 4 párrafos» no lo es
+        val expr = clean
+            .replace(Regex("\\bdividido (?:entre|por)\\b"), "/")
+            .replace(Regex("\\b(?:mas)\\b"), "+")
+            .replace(Regex("\\b(?:menos)\\b"), "-")
+            // «5x4» y «5 x 4»: la x pegada a los números también multiplica (la regla \b solo veía «x» suelta)
+            .replace(Regex("(?<=\\d)\\s*x\\s*(?=\\d)"), "*")
+            .replace(Regex("\\b(?:por|x)\\b"), "*")
+            .replace(Regex("\\bentre\\b"), "/")
+            .replace('×', '*').replace('÷', '/')
+        if (!Regex("^[\\d.,+\\-*/^() ]+$").matches(expr)) return null
+        val tokens = Regex("\\d[\\d.,]*|[-+*/^()]").findAll(expr).map { it.value }.toList()
+        if (tokens.count { it[0].isDigit() } < 2) return null
+        val result = try {
+            MathParser(tokens).parse()
+        } catch (e: ArithmeticException) {
+            return e.message
+        } catch (_: IllegalArgumentException) {
+            return null
+        }
+        return "El resultado de $clean es **${formatMathResult(result)}**."
+    }
+
+    /**
+     * «2,5» → 2.5 y «1.000» → 1000 (formato español); «2.5» se acepta como decimal. Un número que empieza por
+     * 0 nunca lleva separador de miles: «0.125» es 0,125 (antes se leía 125). «1.250» sigue siendo mil
+     * doscientos cincuenta, como se escribe en español
+     */
+    private fun parseLocalizedNumber(raw: String): Double? = when {
+        Regex("^[1-9]\\d{0,2}(\\.\\d{3})+(,\\d+)?$").matches(raw) -> raw.replace(".", "").replace(',', '.').toDoubleOrNull()
+        Regex("^\\d+,\\d+$").matches(raw) -> raw.replace(',', '.').toDoubleOrNull()
+        Regex("^\\d+(\\.\\d+)?$").matches(raw) -> raw.toDoubleOrNull()
+        else -> null
+    }
+
+    private fun formatMathResult(value: Double): String {
+        if (value.isNaN() || value.isInfinite()) return "indefinido"
+        if (value % 1.0 == 0.0 && kotlin.math.abs(value) < 1e15) return value.toLong().toString()
+        return String.format(java.util.Locale.US, "%.6f", value).trimEnd('0').trimEnd('.').replace('.', ',')
+    }
+
+    /** Descenso recursivo con precedencia: suma/resta < producto/división < potencia < signo. */
+    private class MathParser(private val tokens: List<String>) {
+        private var pos = 0
+
+        fun parse(): Double {
+            val value = sum()
+            require(pos == tokens.size) { "sobran símbolos" }
+            return value
         }
 
-        // 4. Operaciones aritméticas básicas: a + b, a - b, a * b, a / b
-        val opRegex = Regex("(\\d+(?:\\.\\d+)?)\\s*([+\\-*xX/÷])\\s*(\\d+(?:\\.\\d+)?)")
-        val opMatch = opRegex.find(clean)
-        if (opMatch != null) {
-            val a = opMatch.groupValues[1].toDoubleOrNull() ?: return null
-            val op = opMatch.groupValues[2]
-            val b = opMatch.groupValues[3].toDoubleOrNull() ?: return null
-            val res = when (op) {
-                "+" -> a + b
-                "-" -> a - b
-                "*", "x", "X" -> a * b
-                "/", "÷" -> if (b != 0.0) a / b else return "No es posible dividir por cero."
-                else -> return null
+        private fun peek() = tokens.getOrNull(pos)
+
+        private fun sum(): Double {
+            var value = product()
+            while (peek() == "+" || peek() == "-") {
+                val op = tokens[pos++]
+                val rhs = product()
+                value = if (op == "+") value + rhs else value - rhs
             }
-            val formatRes = if (res % 1.0 == 0.0) res.toLong().toString() else String.format(java.util.Locale.US, "%.4f", res).trimEnd('0').trimEnd('.')
-            val opSymbol = if (op in listOf("x", "X")) "×" else op
-            return "El resultado de ${opMatch.groupValues[1]} $opSymbol ${opMatch.groupValues[3]} es **$formatRes**."
+            return value
         }
 
-        return null
+        private fun product(): Double {
+            var value = signed()
+            while (peek() == "*" || peek() == "/") {
+                val op = tokens[pos++]
+                val rhs = signed()
+                if (op == "/" && rhs == 0.0) throw ArithmeticException("No es posible dividir por cero.")
+                value = if (op == "*") value * rhs else value / rhs
+            }
+            return value
+        }
+
+        private fun signed(): Double = when (peek()) {
+            "-" -> { pos++; -signed() }
+            "+" -> { pos++; signed() }
+            else -> power()
+        }
+
+        private fun power(): Double {
+            val base = primary()
+            if (peek() == "^") { pos++; return Math.pow(base, signed()) }
+            return base
+        }
+
+        private fun primary(): Double {
+            val token = peek() ?: throw IllegalArgumentException("falta un número")
+            pos++
+            if (token == "(") {
+                val value = sum()
+                require(peek() == ")") { "falta «)»" }
+                pos++
+                return value
+            }
+            return parseLocalizedNumber(token) ?: throw IllegalArgumentException("número no válido")
+        }
     }
 
     fun tryEvaluateTemporal(prompt: String): String? {
@@ -521,24 +523,28 @@ object SendaHeuristicsEvaluator {
         val now = java.util.Date()
         val esLocale = java.util.Locale.forLanguageTag("es-ES")
 
+        // Solo preguntas que son ENTERAS sobre la fecha u hora. Antes bastaba con que aparecieran «día» y «hoy»
+        // o «año actual» en cualquier parte, y «¿qué pasó un día como hoy?», «la inflación del año actual» o
+        // «¿qué hora es en Tokio?» recibían la fecha del reloj sin que el modelo viera la pregunta
+        val q = clean.trimEnd('.', ',', ';', ':', ' ')
+            .replace(Regex("^(?:hola|oye|disculpa|perdona|por favor),? +"), "")
+            .replace(Regex(",? +(?:por favor|porfa|gracias)$"), "")
+            .replace(Regex("\\s+"), " ")
+
         // 1. Fecha / Día de hoy
-        val isDateQuery = clean.contains("dia es hoy") || clean.contains("que fecha es") ||
-                clean.contains("fecha actual") || clean.contains("fecha de hoy") ||
-                clean.contains("que dia estamos") || clean.contains("hoy que dia es") ||
-                clean.contains("a como estamos hoy") || clean == "que dia es" ||
-                clean == "fecha" || clean == "hoy"
+        val isDateQuery = DATE_QUERIES.any { it.matches(q) }
 
         if (isDateQuery) {
             val df = java.text.SimpleDateFormat("EEEE, d 'de' MMMM 'de' yyyy", esLocale)
             val tf = java.text.SimpleDateFormat("h:mm a", esLocale)
             val formattedDate = df.format(now).replaceFirstChar { if (it.isLowerCase()) it.titlecase(esLocale) else it.toString() }
             val formattedTime = tf.format(now)
-            return "Hoy es **$formattedDate** (Hora local: $formattedTime)."
+            val zone = java.util.TimeZone.getDefault().getDisplayName(false, java.util.TimeZone.SHORT, esLocale)
+            return "Hoy es **$formattedDate** (Hora local: $formattedTime, $zone).\n\n*Dato tomado del reloj de tu teléfono.*"
         }
 
         // 2. Hora actual
-        val isTimeQuery = clean.contains("que hora es") || clean.contains("hora actual") ||
-                clean.contains("dime la hora") || clean == "hora" || clean.contains("la hora por favor")
+        val isTimeQuery = TIME_QUERIES.any { it.matches(q) }
 
         if (isTimeQuery) {
             val tf = java.text.SimpleDateFormat("h:mm:ss a", esLocale)
@@ -546,8 +552,7 @@ object SendaHeuristicsEvaluator {
         }
 
         // 3. Año actual
-        val isYearQuery = clean.contains("en que ano estamos") || clean.contains("que ano es") ||
-                clean.contains("ano actual")
+        val isYearQuery = YEAR_QUERY.matches(q)
 
         if (isYearQuery) {
             val yf = java.text.SimpleDateFormat("yyyy", esLocale)
@@ -555,8 +560,7 @@ object SendaHeuristicsEvaluator {
         }
 
         // 4. Mes actual
-        val isMonthQuery = clean.contains("en que mes estamos") || clean.contains("que mes es") ||
-                clean.contains("mes actual")
+        val isMonthQuery = MONTH_QUERY.matches(q)
 
         if (isMonthQuery) {
             val mf = java.text.SimpleDateFormat("MMMM 'de' yyyy", esLocale)
@@ -566,6 +570,23 @@ object SendaHeuristicsEvaluator {
 
         return null
     }
+
+    // Texto ya normalizado (minúsculas, sin tildes ni signos de pregunta)
+    private val DATE_QUERIES = listOf(
+        Regex("^(?:(?:dime|me dices|sabes|cual es) )?(?:que )?(?:el |la )?(?:dia|fecha) (?:es )?(?:hoy|de hoy|actual)$"),
+        Regex("^(?:en )?que (?:dia|fecha) (?:es|estamos)(?: hoy)?$"),
+        Regex("^hoy (?:que dia es|que fecha es|es que dia)$"),
+        Regex("^a (?:como|cuanto) estamos(?: hoy)?$"),
+        Regex("^(?:fecha|hoy|fecha y hora|dia y hora)$"),
+        Regex("^(?:(?:dime|cual es) )?(?:el )?dia y (?:la )?fecha(?: exacta| de hoy| actual)?$"),
+        Regex("^(?:(?:dime|cual es) )?la fecha exacta(?: de hoy)?$")
+    )
+    private val TIME_QUERIES = listOf(
+        Regex("^(?:(?:me dices|dime|sabes) )?(?:que hora es|que horas son|la hora|la hora actual|hora actual)(?: ahora| ahorita)?$"),
+        Regex("^hora$")
+    )
+    private val YEAR_QUERY = Regex("^(?:(?:en )?que ano (?:es|estamos)(?: hoy)?|(?:cual es el )?ano actual)$")
+    private val MONTH_QUERY = Regex("^(?:(?:en )?que mes (?:es|estamos)(?: hoy)?|(?:cual es el )?mes actual)$")
 
     fun tryEvaluateUnitConversion(prompt: String): String? {
         val clean = normalizePrompt(prompt)
@@ -632,7 +653,6 @@ object SendaHeuristicsEvaluator {
                 * **Dispositivo:** $manufacturer $model
                 * **Sistema Operativo:** Android $androidVersion (API $sdk)
                 * **Arquitectura del Chip:** $arch
-                * **Motor Senda AI:** Procesamiento Soberano 100% Local en Chip (Cero telemetría externa)
             """.trimIndent()
         }
         return null
@@ -647,29 +667,12 @@ object SendaHeuristicsEvaluator {
                 clean.contains("creo senda") || clean.contains("diseno senda")
 
         if (isCreatorQuery) {
-            return """
-                Fui diseñado y desarrollado como el sistema de inteligencia artificial soberana integrado en **Senda Browser**.
-                
-                Nací bajo un principio de ingeniería fundamental: **demostrar que la inteligencia artificial puede ser avanzada, precisa y útil sin vigilar ni recopilar la información privada de los usuarios**.
-                
-                * **Arquitectura:** Ejecución 100% nativa en el procesador de tu propio dispositivo (CPU / GPU local).
-                * **Soberanía y Ética:** Cero dependencia de servidores en la nube para responderte, cero telemetría y sin rastreadores comerciales.
-                * **Propósito:** Brindarte asistencia rigurosa en redacción formal, análisis web, ingeniería de software (Senda Codex) y respuestas objetivas rigurosamente calibradas.
-            """.trimIndent()
+            return "Soy el asistente integrado en **Senda Browser**.\n\n$HOW_THIS_ASSISTANT_WORKS"
         }
 
         // 2. Identidad y Nombre
         if (clean.contains("quién eres") || clean.contains("quien eres") || clean.contains("qué eres") || clean.contains("que eres") || clean.contains("cómo te llamas") || clean.contains("como te llamas") || clean == "tu nombre" || clean == "nombre") {
-            return """
-                Soy **Senda AI**, el asistente de inteligencia soberana de Senda Browser.
-                
-                Mi compromiso ético es la **soberanía técnica y la privacidad absoluta**:
-                * Todo mi procesamiento se realiza **100% en el chip de tu dispositivo**, sin servidores remotos ni rastreo.
-                * **Cero telemetría:** Tus conversaciones, documentos y consultas nunca salen de tu teléfono.
-                * **Capacidades:** Responder preguntas directas (fechas, cálculos), redactar documentos formales listos para exportar, generar código de producción (Senda Codex) y auditar páginas web.
-                
-                ¿En qué puedo ayudarte hoy?
-            """.trimIndent()
+            return "Soy **Senda AI**, el asistente de Senda Browser.\n\n$HOW_THIS_ASSISTANT_WORKS"
         }
 
         // 3. Capacidades, colaboración y funciones (soporta 'que podemos hacer jubtos', 'en que me ayudas', etc.)
@@ -685,7 +688,7 @@ object SendaHeuristicsEvaluator {
             val intro = if (isCollaboration) {
                 "Estoy diseñado como tu asistente soberano dentro de Senda Browser. Aquí tienes varias áreas en las que podemos trabajar de inmediato:"
             } else {
-                "Como asistente inteligente que procesa 100% en el chip de tu dispositivo, te puedo asistir en:"
+                "Esto es lo que puedo hacer (sin un modelo de IA cargado, con reglas y plantillas fijas):"
             }
             return """
                 $header
@@ -699,10 +702,10 @@ object SendaHeuristicsEvaluator {
                    Puedo escribir código y scripts en Python, Kotlin, Bash defensivo (`set -euo pipefail`), JavaScript o SQL listos para producción con botón de guardado local.
 
                 3. 🌐 **Búsqueda Soberana e Investigación:**
-                   Puedo consultar fuentes públicas contrastadas en la red (Wikipedia, DuckDuckGo) citando enlaces reales, sin cookies, sin publicidad y con absoluta privacidad.
+                   Si activas la búsqueda web, envío tu pregunta a Wikipedia y DuckDuckGo y te muestro un extracto con los enlaces. La pregunta sale del teléfono hacia esos servicios.
 
                 4. ⚡ **Cálculos y Operaciones Inmediatas:**
-                   Aritmética exacta, porcentajes, raíces cuadradas, conversiones de unidades y fecha/hora del sistema en tiempo real.
+                   Aritmética básica, porcentajes, raíces cuadradas, conversiones de unidades y fecha/hora del sistema en tiempo real.
 
                 5. 🔍 **Auditoría y Síntesis Web:**
                    Analizar la página que estás leyendo en el navegador, resumir artículos extensos o auditar los rastreadores y cookies del sitio.
@@ -720,7 +723,7 @@ object SendaHeuristicsEvaluator {
             return """
                 **Senda Browser** es un navegador móvil diseñado para garantizar soberanía digital, privacidad inquebrantable y alta eficiencia:
                 
-                * **Inteligencia en Chip:** Integra este asistente de IA procesando todo localmente en tu teléfono.
+                * **Asistente local:** Con un modelo GGUF descargado responde en el propio teléfono; sin modelo usa reglas y plantillas fijas.
                 * **Bloqueo Nativo:** Detiene rastreadores, scripts de perfilado publicitario y cookies de terceros.
                 * **Senda Codex:** Herramienta de ingeniería de software integrada para escribir y guardar código.
                 * **Redactor Soberano:** Exportación directa de documentos a Markdown (.md) listos para compartir.
@@ -734,12 +737,7 @@ object SendaHeuristicsEvaluator {
                 clean.contains("mis datos van a la nube") || clean.contains("es seguro usar senda")
 
         if (isPrivacyQuery) {
-            return """
-                ### 🛡️ Garantía de Privacidad Absoluta en Senda AI
-                * **Sin Servidores Remotos:** Tus preguntas, respuestas y documentos nunca se envían a la nube ni a centros de datos corporativos.
-                * **Sin Telemetría:** No registramos tus hábitos de uso, dirección IP ni perfiles publicitarios.
-                * **Aislamiento en Memoria:** Todo ocurre de forma efímera en la memoria privada de Senda Browser; al limpiar el chat o cerrar la pestaña, los datos se eliminan.
-            """.trimIndent()
+            return "### 🛡️ A dónde va lo que escribes\n$HOW_THIS_ASSISTANT_WORKS\n* Senda no guarda el historial del chat en el almacenamiento del teléfono."
         }
 
         // 6. Saludos y estado conversacional
@@ -888,7 +886,7 @@ object SendaHeuristicsEvaluator {
             """.trimIndent()
         }
 
-        if ((clean.contains("tor") || clean.contains("onion")) && !clean.contains("autor") && !clean.contains("motor") && !clean.contains("doctor") && !clean.contains("pastor") && !clean.contains("sector") && !clean.contains("factor") && !clean.contains("historia")) {
+        if (hasWord(clean, "tor") || clean.contains("onion")) {
             if (clean.contains("ventaja") || clean.contains("desventaja") || clean.contains("pro") || clean.contains("contra") || clean.contains("riesgo") || clean.contains("problema")) {
                 return """
                     ### 🧅 Ventajas y Desventajas de la Red Tor
@@ -1091,6 +1089,22 @@ object SendaHeuristicsEvaluator {
         return null
     }
 
+    /** Sin modelo, Senda no razona: no puede revisar ni justificar lo que dijo antes. */
+    private val NO_MODEL_CANNOT_VERIFY = """
+        **No puedo confirmarlo.** Sin un modelo de IA cargado, Senda responde con reglas y textos fijos y no es capaz de revisar ni justificar su respuesta anterior. Contrástala con una fuente fiable, activa la búsqueda web o carga un modelo en **Ajustes › IA**.
+    """.trimIndent()
+
+    private val HOW_THIS_ASSISTANT_WORKS = """
+        * **Con un modelo descargado (GGUF):** respondo en el propio teléfono, sin enviar tu texto a ningún servidor. Los modelos pequeños se equivocan con frecuencia: no los uses para asuntos legales, médicos o financieros sin revisar.
+        * **Sin modelo:** respondo con reglas y textos fijos que no entienden tu pregunta.
+        * **Con Ollama:** tu texto viaja a tu servidor en la red local.
+        * **Con la búsqueda web activada:** tu pregunta se envía a Wikipedia y DuckDuckGo.
+    """.trimIndent()
+
+    private fun noCannedContentFor(topic: String) = """
+        No tengo más información guardada sobre **$topic**. Sin un modelo de IA cargado no puedo ampliar el tema; activa la búsqueda web o carga un modelo en **Ajustes › IA**.
+    """.trimIndent()
+
     fun generateNaturalAnswer(prompt: String): String {
         // 1. Evaluación matemática exacta
         tryEvaluateMath(prompt)?.let { return it }
@@ -1112,7 +1126,7 @@ object SendaHeuristicsEvaluator {
 
         val lower = prompt.lowercase()
         return when {
-            lower.contains("privacidad") || lower.contains("tor") || lower.contains("seguridad") || lower.contains("rastreo") || lower.contains("soberanía") -> """
+            lower.contains("privacidad") || hasWord(lower, "tor") || lower.contains("seguridad") || lower.contains("rastreo") || lower.contains("soberanía") -> """
                 ### 🛡️ Privacidad Digital y Soberanía Técnica
                 
                 En el ecosistema digital actual, la privacidad no es ocultar secretos; es **el derecho fundamental a no ser vigilado ni perfilado sin tu consentimiento explícito**.
@@ -1125,7 +1139,7 @@ object SendaHeuristicsEvaluator {
                 *Consejo práctico:* Mantén activas las protecciones de cookies de Senda y utiliza la navegación en chip para tus consultas delicadas.
 
                 ---
-                🔒 *Senda AI Soberana: Procesado 100% en chip local. Cero rastreo, cero telemetría.*
+                *Texto fijo incluido en Senda; no es una respuesta generada para tu pregunta.*
             """.trimIndent()
 
             lower.contains("cuántica") || lower.contains("cuantica") || lower.contains("qubit") -> """
@@ -1153,15 +1167,12 @@ object SendaHeuristicsEvaluator {
             """.trimIndent()
 
             else -> """
-                Entiendo tu consulta sobre **«$prompt»**.
+                No tengo una respuesta para **«$prompt»**.
 
-                Como tu asistente soberano en Senda:
-                * **Investigación y datos:** Si buscas un hecho o tema específico, descríbemelo con un poco más de detalle o pídeme buscarlo en la red para consultar fuentes contrastadas en tiempo real.
-                * **Redacción de documentos:** Si requieres una carta, petición, reclamo, contrato o informe formal, dime los datos principales y lo redactamos de inmediato para descargarlo a tu dispositivo.
-                * **Ingeniería (Senda Codex):** Si necesitas una función o script en Python, Kotlin, Bash, JavaScript o SQL, dime los requerimientos y lo programamos al instante.
+                No hay un modelo de IA cargado, así que solo puedo responder con reglas fijas: fecha y hora, cálculos sencillos, conversiones, algunos datos de una tabla y plantillas de documentos o código.
 
-                ---
-                🔒 *Senda AI: Procesamiento 100% soberano en chip.*
+                * Para preguntas abiertas, descarga un modelo en **Ajustes › IA** o conecta tu servidor Ollama.
+                * O activa la búsqueda web para consultar Wikipedia y DuckDuckGo (tu pregunta saldrá del teléfono hacia esos servicios).
             """.trimIndent()
         }
     }

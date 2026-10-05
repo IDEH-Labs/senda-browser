@@ -437,6 +437,38 @@ object SendaVaultManager {
     }
 
     /**
+     * Modifica una credencial existente (sitio, usuario y contraseña). Devuelve false si ya hay otra cuenta
+     * con el mismo sitio y usuario, para no dejar dos entradas iguales.
+     */
+    fun updateCredential(
+        context: Context,
+        credentialId: String,
+        domainOrUrl: String,
+        username: String,
+        passwordChars: CharArray
+    ): Boolean {
+        val currentList = getCredentials(context).toMutableList()
+        val index = currentList.indexOfFirst { it.id == credentialId }
+        if (index < 0) return false
+        val canonicalDomain = extractCanonicalDomain(domainOrUrl)
+        if (currentList.any { it.id != credentialId && it.domain.equals(canonicalDomain, ignoreCase = true) && it.username == username }) {
+            return false
+        }
+        val (encryptedPass, iv) = encryptPassword(passwordChars)
+        val existing = currentList[index]
+        currentList[index] = existing.copy(
+            domain = canonicalDomain,
+            originUrl = if (canonicalDomain.equals(existing.domain, ignoreCase = true)) existing.originUrl else domainOrUrl,
+            username = username,
+            encryptedPasswordBase64 = encryptedPass,
+            ivBase64 = iv,
+            updatedAt = System.currentTimeMillis()
+        )
+        saveAll(context, currentList)
+        return true
+    }
+
+    /**
      * Elimina una credencial por su identificador único.
      */
     fun deleteCredential(context: Context, credentialId: String) {
@@ -494,15 +526,15 @@ object SendaVaultManager {
         scope.launch {
             delay(30_000L)
             try {
+                // Desde Android 10 una app en segundo plano no puede leer el portapapeles (devuelve null).
+                // En ese caso se borra igualmente: es preferible perder una copia posterior que dejar la contraseña
                 val currentClip = clipboard.primaryClip
-                if (currentClip != null && currentClip.itemCount > 0) {
-                    val currentText = currentClip.getItemAt(0)?.text?.toString()
-                    if (currentText == passString) {
-                        // Sobrescribir con portapapeles vacío
-                        val emptyClip = ClipData.newPlainText("", "")
-                        clipboard.setPrimaryClip(emptyClip)
-                        Log.i(TAG, "Portapapeles confidencial purgado con éxito tras 30s")
-                    }
+                val stillOurs = currentClip == null ||
+                    (currentClip.itemCount > 0 && currentClip.getItemAt(0)?.text?.toString() == passString)
+                if (stillOurs) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) clipboard.clearPrimaryClip()
+                    else clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
+                    Log.i(TAG, "Portapapeles confidencial purgado tras 30 s")
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "No se pudo purgar el portapapeles: ${e.message}")
@@ -535,12 +567,22 @@ object SendaVaultManager {
         if (includeDigits) pool.append(digits)
         if (includeSymbols) pool.append(symbols)
 
+        val classes = listOfNotNull(
+            upper.takeIf { includeUpper }, lower.takeIf { includeLower },
+            digits.takeIf { includeDigits }, symbols.takeIf { includeSymbols }
+        ).ifEmpty { listOf(lower, digits) }
         if (pool.isEmpty()) pool.append(lower).append(digits)
 
+        // Al azar puro, ~13 % de las claves de 20 salían sin dígito: se garantiza uno de cada clase elegida
+        // y luego se mezcla todo para que esas posiciones no sean predecibles
         val result = CharArray(length)
         for (i in 0 until length) {
-            val idx = secureRandom.nextInt(pool.length)
-            result[i] = pool[idx]
+            val source = if (i < classes.size) classes[i] else pool
+            result[i] = source[secureRandom.nextInt(source.length)]
+        }
+        for (i in length - 1 downTo 1) {
+            val j = secureRandom.nextInt(i + 1)
+            val tmp = result[i]; result[i] = result[j]; result[j] = tmp
         }
 
         // Entropía de Shannon: E = L * log2(poolSize)

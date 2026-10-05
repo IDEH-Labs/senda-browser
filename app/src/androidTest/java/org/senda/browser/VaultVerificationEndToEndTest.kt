@@ -16,6 +16,7 @@ class VaultVerificationEndToEndTest {
 
     @Test
     fun testWebdavPasswordHardwareEncryption() {
+        DestructiveTestGuard.requireExplicitPermission("deja vacía la contraseña de WebDAV")
         val context = ApplicationProvider.getApplicationContext<Context>()
         val prefs = PreferencesManager(context)
         val rawPrefs = context.getSharedPreferences("senda_preferences", Context.MODE_PRIVATE)

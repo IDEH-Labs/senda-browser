@@ -48,7 +48,7 @@ class SendaAiProductionAuditTest {
     @Test
     fun test02_ModelCatalogIntegrityAndLicensing() {
         val models = SendaAiModels.ALL_MODELS
-        assertEquals("El catálogo depurado debe contener exactamente los 3 mejores modelos por segmento", 3, models.size)
+        assertEquals("Solo el modelo que pasó el banco de pruebas en español (Gemma 4 E2B QAT)", 1, models.size)
 
         for (m in models) {
             assertTrue("ID de modelo no debe estar vacío", m.id.isNotBlank())
@@ -59,7 +59,7 @@ class SendaAiProductionAuditTest {
             assertEquals("Todos los modelos depurados deben ser estrictamente Apache 2.0", "Apache 2.0", m.license)
         }
 
-        println("[PASS 2/5] Integridad de catálogo depurado (3 modelos, 100% Apache 2.0) verificada con éxito.")
+        println("[PASS 2/5] Catálogo (1 modelo, Apache 2.0, HTTPS y SHA-256) verificado.")
     }
 
     // =========================================================================
@@ -79,8 +79,7 @@ class SendaAiProductionAuditTest {
         assertTrue("El espacio libre reportado debe ser mayor a 0", freeBytes > 0)
 
         // Prueba de creación y eliminación segura de archivo de prueba
-        val testModel = SendaAiModels.MODEL_QWEN_3_5_0_8B
-        val testFile = File(modelsDir, "test_verification.tmp")
+                val testFile = File(modelsDir, "test_verification.tmp")
         testFile.writeText("Senda Sovereign Model Verification Checksum")
         assertTrue("El archivo de prueba debe crearse", testFile.exists())
         testFile.delete()
@@ -281,9 +280,15 @@ class SendaAiProductionAuditTest {
             docType = "Derecho de Petición"
         )
         assertTrue("La redacción de petición debe ser exitosa", peticionResult.success)
-        assertTrue("Debe fundamentarse en el artículo 23 constitucional", peticionResult.outputText.contains("Artículo 23"))
+        assertTrue("Debe fundamentarse en el artículo 23 constitucional", peticionResult.outputText.contains("artículo 23"))
         assertTrue("Debe contener sección de hechos", peticionResult.outputText.contains("HECHOS"))
-        assertTrue("Debe contener peticiones concretas", peticionResult.outputText.contains("PETICIONES CONCRETAS"))
+        assertTrue("Debe contener peticiones", peticionResult.outputText.contains("PETICIONES"))
+        assertTrue("Debe avisar que es una plantilla fija", peticionResult.outputText.contains("Plantilla fija"))
+        assertFalse("No debe inventar que se agotaron las vías", peticionResult.outputText.contains("agotado"))
+
+        val reclamo = SendaInferenceEngine.chat("Redacta un reclamo a Claro porque me cobraron dos veces la factura de junio")
+        assertFalse("No debe inventar fallas reiteradas", reclamo.outputText.contains("reiteradas"))
+        assertTrue("Debe conservar lo que pidió el usuario", reclamo.outputText.contains("dos veces la factura de junio"))
 
         // 3. Asistente General para cualquier consulta
         val generalResult = SendaInferenceEngine.generateResponse(
@@ -292,7 +297,8 @@ class SendaAiProductionAuditTest {
         )
         assertTrue("La respuesta general debe ser exitosa", generalResult.success)
         assertTrue("Debe estructurar la explicación con fundamentos", generalResult.outputText.contains("Fundamentos"))
-        assertTrue("Debe incluir la garantía ética de Senda", generalResult.outputText.contains("Senda AI Soberana"))
+        assertTrue("Debe aclarar que es un texto fijo", generalResult.outputText.contains("Texto fijo"))
+        assertFalse("No debe prometer cero telemetría", generalResult.outputText.contains("cero telemetría"))
 
         println("[PASS 8/9] Asistente Universal y Redactor de Documentos en Chip 100% auditado y verificado.")
     }
@@ -328,7 +334,7 @@ class SendaAiProductionAuditTest {
         )
         assertTrue("Debe marcarse como documento", renunciaResult.isDocument)
         assertEquals("Nombre de archivo debe ser Carta_de_Renuncia.md", "Carta_de_Renuncia.md", renunciaResult.suggestedFileName)
-        assertTrue("Debe contener renuncia irrevocable", renunciaResult.outputText.contains("renuncia irrevocable"))
+        assertTrue("Debe contener renuncia voluntaria", renunciaResult.outputText.contains("renuncia voluntaria"))
 
         // D. Extractor de código para portapapeles limpio
         val extractedPython = org.senda.browser.ui.components.SendaDocumentExporter.extractCode(pythonResult.outputText)
@@ -370,7 +376,8 @@ class SendaAiProductionAuditTest {
         // F. Identidad soberana y ética: "¿Quién eres?"
         val identityResult = SendaInferenceEngine.chat("¿Quién eres?")
         assertTrue("Debe identificarse como Senda AI", identityResult.outputText.contains("Senda AI"))
-        assertTrue("Debe explicitar que corre 100% en chip sin telemetría", identityResult.outputText.contains("chip") || identityResult.outputText.contains("telemetría"))
+        assertTrue("Debe explicar cuándo el texto sale del teléfono", identityResult.outputText.contains("Wikipedia") && identityResult.outputText.contains("Ollama"))
+        assertFalse("No debe afirmar 100% en chip", identityResult.outputText.contains("100%"))
 
         // G. Conversión de unidades: "100 km a millas"
         val convResult = SendaInferenceEngine.chat("100 km a millas")
@@ -383,7 +390,7 @@ class SendaAiProductionAuditTest {
         // I. Origen y diseñador/creador: "¿Quién te creó?" y "quien te diseño"
         val creadorResult = SendaInferenceEngine.chat("¿Quién te creó?")
         assertTrue("Debe responder sobre su origen en Senda Browser", creadorResult.outputText.contains("Senda Browser"))
-        assertTrue("Debe mencionar su principio de privacidad soberana", creadorResult.outputText.contains("privada") || creadorResult.outputText.contains("soberana"))
+        assertTrue("Debe explicar cómo funciona sin modelo", creadorResult.outputText.contains("Sin modelo"))
 
         val disenoResult = SendaInferenceEngine.chat("quien te diseño")
         assertTrue("Debe responder adecuadamente a quien lo diseñó", disenoResult.outputText.contains("Senda Browser"))
@@ -423,8 +430,8 @@ class SendaAiProductionAuditTest {
 
         // NO debe tener la plantilla abstracta y robótica
         assertFalse("No debe contener plantilla genérica de 'Análisis sobre estas seguro'", seguroResp.outputText.contains("Análisis sobre «estas seguro?"))
-        // DEBE confirmar con rigor epistémico referenciando el reloj del sistema
-        assertTrue("Debe afirmar seguridad fundamentada", seguroResp.outputText.contains("estoy completamente seguro"))
+        // La fecha sí puede confirmarse: sale del reloj del sistema
+        assertFalse("No debe afirmar certeza absoluta", seguroResp.outputText.contains("completamente seguro"))
         assertTrue("Debe mencionar el reloj o calendario del dispositivo", seguroResp.outputText.contains("reloj") || seguroResp.outputText.contains("sistema operativo"))
 
         // B. Pregunta sobre cálculo y posterior "¿de verdad?"
@@ -434,7 +441,15 @@ class SendaAiProductionAuditTest {
         mathHistory.add(SendaChatMessage(text = mathResp.outputText, sender = ChatSender.ASSISTANT))
 
         val deVerdadResp = SendaInferenceEngine.chat("¿de verdad?", history = mathHistory)
-        assertTrue("Debe confirmar con certeza aritmética", deVerdadResp.outputText.contains("seguro") || deVerdadResp.outputText.contains("aritmética"))
+        assertTrue("No debe garantizar un cálculo hecho con reglas", deVerdadResp.outputText.contains("No puedo garantizarlo"))
+
+        // B2. Sobre un tema abierto, «¿estás seguro?» nunca debe confirmar sin poder verificar
+        val topicHistory = mutableListOf(
+            SendaChatMessage(text = "háblame de la economía de Islandia", sender = ChatSender.USER),
+            SendaChatMessage(text = "La economía de Islandia depende de la pesca.", sender = ChatSender.ASSISTANT)
+        )
+        val topicSeguro = SendaInferenceEngine.chat("¿estás seguro?", history = topicHistory)
+        assertTrue("Debe reconocer que no puede confirmarlo", topicSeguro.outputText.contains("No puedo confirmarlo"))
 
         // C. Preguntas con erratas comunes: "quein te creoo"
         val typoResp = SendaInferenceEngine.chat("quein te creoo")
@@ -550,28 +565,16 @@ class SendaAiProductionAuditTest {
         println("RAM Libre en Caliente: ${String.format(java.util.Locale.US, "%.1f", availRamMb)} MB")
         println("Umbral Crítico LMK (threshold): ${String.format(java.util.Locale.US, "%.1f", thresholdMb)} MB")
 
-        // 1. Presupuesto estricto de ingeniería para dispositivos de 4 GB: máximo 1024 MB total
-        val MAX_BUDGET_4GB_MB = 1024
+        // 1. Único modelo del catálogo: Gemma 4 E2B QAT. Medido en un moto g34: 2,8-3,1 GB con mmap y
+        // embeddings por capa bajo demanda; el catálogo debe declarar al menos eso
+        assertEquals("Solo debe quedar el modelo que pasó el banco de pruebas", 1, SendaAiModels.ALL_MODELS.size)
+        val gemma = SendaAiModels.MODEL_GEMMA_4_E2B
+        assertTrue("La RAM declarada debe cubrir lo medido (>= 3000 MB)", gemma.ramRequiredMb >= 3000)
+        println("-> Gemma 4 E2B QAT: RAM declarada ${gemma.ramRequiredMb} MB")
 
-        // 2. Evaluación empírica de Qwen 3.5 (0.8B)
-        val m35 = SendaAiModels.MODEL_QWEN_3_5_0_8B
-        val estimatedQwen35FootprintMb = m35.ramRequiredMb // ~850 MB (pesos Q4 + KV Cache 2048 + runtime)
-        assertTrue(
-            "Qwen 3.5 (0.8B) DEBE cumplir el presupuesto estricto de <= 1.0 GB en 4 GB",
-            estimatedQwen35FootprintMb <= MAX_BUDGET_4GB_MB
-        )
-        println("-> [EVALUACIÓN 1] Qwen 3.5 (0.8B) con contexto 2048 tokens:")
-        println("   Huella estimada: $estimatedQwen35FootprintMb MB | Presupuesto: $MAX_BUDGET_4GB_MB MB | ESTADO: SEGURO PARA 4 GB")
-
-        // 3. Evaluación empírica de Qwen 2.5 (1.5B)
-        val m25 = SendaAiModels.MODEL_QWEN_1_5B
-        val estimatedQwen25FootprintMb = m25.ramRequiredMb // ~1300 MB
-        assertTrue(
-            "Qwen 2.5 (1.5B) supera el presupuesto de 1.0 GB y requiere degradación dinámica si la RAM libre es baja",
-            estimatedQwen25FootprintMb > MAX_BUDGET_4GB_MB
-        )
-        println("-> [EVALUACIÓN 2] Qwen 2.5 (1.5B) con contexto 2048/4096 tokens:")
-        println("   Huella estimada: $estimatedQwen25FootprintMb MB | Presupuesto: $MAX_BUDGET_4GB_MB MB | ESTADO: RIESGO EN 4 GB CON PESTAÑAS ABIERTAS")
+        // 2. Ids retirados (preferencias antiguas) deben resolver al modelo vigente, nunca a uno retirado
+        assertEquals(gemma.id, SendaAiModels.getById("qwen2.5_1.5b").id)
+        assertEquals(gemma.id, SendaAiModels.getById("qwen3.5_0.8b").id)
 
         // 4. Verificación del comportamiento del profiler dinámico en tiempo de ejecución
         val profile = SendaHardwareProfiler.analyze(context)
@@ -583,7 +586,11 @@ class SendaAiProductionAuditTest {
         // El límite de contexto no debe superar 4096 tokens bajo ninguna circunstancia
         assertTrue("El contexto nunca debe superar 4096 tokens para proteger contra OOM", profile.maxRecommendedContextTokens <= 4096)
 
-        println("[PASS 13/13] Auditoría empírica de presupuesto de memoria y reglas de seguridad para 4 GB completada.")
+        // 3. Requisitos: sin 7 GB informados o sin dotprod no se ofrece el modelo
+        println("   Cumple requisitos: ${profile.meetsLocalModelRequirements} (RAM ${profile.totalRamGb} GB, dotprod ${profile.hasDotProd})")
+        assertEquals(profile.totalRamGb >= 7.0 && !profile.isLowRamDevice && profile.hasDotProd, profile.meetsLocalModelRequirements)
+
+        println("[PASS 13/13] Presupuesto de memoria del modelo y requisitos del teléfono verificados.")
     }
 }
 
