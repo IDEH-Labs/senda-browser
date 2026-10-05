@@ -16,7 +16,7 @@ import java.net.URL
 object SendaNet {
 
     /** User-Agent genérico de Firefox para Android: uno propio de Senda identificaría a sus usuarios. */
-    const val USER_AGENT = "Mozilla/5.0 (Android 15; Mobile; rv:156.0) Gecko/156.0 Firefox/156.0"
+    const val USER_AGENT = "Mozilla/5.0 (Android 15; Mobile; rv:157.0) Gecko/157.0 Firefox/157.0"
 
     fun open(url: String): HttpURLConnection {
         val target = URL(url)
@@ -25,7 +25,8 @@ object SendaNet {
         return conn
     }
 
-    private fun proxyFor(host: String?): Proxy {
+    /** El mismo Tor o proxy que la navegación (directo en la red local). También lo usa el cliente de Anthropic. */
+    fun proxyFor(host: String?): Proxy {
         val prefs = SendaGeckoEngine.appContext?.let { PreferencesManager(it) } ?: return Proxy.NO_PROXY
         if (host == null || isLocal(host)) return Proxy.NO_PROXY
         return when (prefs.proxyMode) {
@@ -37,7 +38,7 @@ object SendaNet {
         }
     }
 
-    private fun isLocal(host: String): Boolean {
+    fun isLocal(host: String): Boolean {
         val h = host.lowercase().trim('[', ']')
         if (h == "localhost" || h.endsWith(".local") || h.endsWith(".lan") || h == "::1") return true
         val parts = h.split('.').mapNotNull { it.toIntOrNull() }

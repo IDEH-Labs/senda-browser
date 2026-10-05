@@ -69,6 +69,7 @@ fun BrowserScreen(
 
     var showTabsSheet by remember { mutableStateOf(false) }
     var showDevToolsSheet by remember { mutableStateOf(false) }
+    var showAssistant by remember { mutableStateOf(false) }
     var showFireConfirmDialog by remember { mutableStateOf(false) }
     var showCastDialog by remember { mutableStateOf(false) }
     var showBookmarksDialog by remember { mutableStateOf(false) }
@@ -180,6 +181,7 @@ fun BrowserScreen(
                         onRefresh = { activeTab?.reload() },
                         onOpenTabsOverview = openTabsOverview,
                         onOpenDevTools = { showDevToolsSheet = true },
+                        onOpenAssistant = { showAssistant = true },
                         onOpenSettings = onOpenSettings,
                         onOpenCast = { showCastDialog = true },
                         onOpenBookmarks = { showBookmarksDialog = true },
@@ -227,6 +229,7 @@ fun BrowserScreen(
                         onRefresh = { activeTab?.reload() },
                         onOpenTabsOverview = openTabsOverview,
                         onOpenDevTools = { showDevToolsSheet = true },
+                        onOpenAssistant = { showAssistant = true },
                         onOpenSettings = onOpenSettings,
                         onOpenCast = { showCastDialog = true },
                         onOpenBookmarks = { showBookmarksDialog = true },
@@ -373,6 +376,11 @@ fun BrowserScreen(
                 activeTab = activeTab,
                 onDismiss = { showDevToolsSheet = false }
             )
+        }
+
+        // Asistente con la IA externa que configure el usuario
+        if (showAssistant) {
+            org.senda.browser.ui.components.SendaAssistantSheet(prefs = prefs, activeTab = activeTab, onDismiss = { showAssistant = false })
         }
 
         // El reproductor de TV solo se activa si el usuario habilitó explícitamente el modo TV en horizontal en ajustes

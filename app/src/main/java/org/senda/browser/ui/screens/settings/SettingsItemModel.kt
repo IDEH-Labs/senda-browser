@@ -177,6 +177,14 @@ fun buildSettingsList(
             onClick = { onOpenDialog("reader_mode") }
         ),
         SettingItemData(
+            id = "assistant",
+            title = strings.as_settings_title,
+            subtitle = strings.as_menu_sub,
+            category = strings.cat_nav,
+            icon = Icons.Default.AutoAwesome,
+            onClick = { onOpenDialog("assistant") }
+        ),
+        SettingItemData(
             id = "default_browser",
             title = strings.st_default_browser_title,
             subtitle = strings.st_default_browser_sub,
