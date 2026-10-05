@@ -42,7 +42,6 @@ import org.senda.browser.ui.components.DevToolsSheet
 import org.senda.browser.ui.components.DownloadsManagerDialog
 import org.senda.browser.ui.components.HistoryManagerDialog
 import org.senda.browser.ui.components.NewTabZenView
-import org.senda.browser.ui.components.SendaAssistantSheet
 import org.senda.browser.ui.components.BookmarksBar
 import org.senda.browser.ui.components.SendaPromptHost
 import org.senda.browser.ui.components.SendaToolbar
@@ -77,7 +76,6 @@ fun BrowserScreen(
     var showClearDataDialog by remember { mutableStateOf(false) }
     var showDownloadsDialog by remember { mutableStateOf(false) }
     var showSyncDialog by remember { mutableStateOf(false) }
-    var showAiAssistantSheet by remember { mutableStateOf(false) }
     var isAddressBarEditing by remember { mutableStateOf(false) }
     var showFindBar by remember { mutableStateOf(false) }
 
@@ -189,7 +187,6 @@ fun BrowserScreen(
                         onOpenDownloads = { showDownloadsDialog = true },
                         onFindInPage = { showFindBar = true },
                         onOpenSync = { showSyncDialog = true },
-                        onOpenAiAssistant = { showAiAssistantSheet = true },
                         onGoHome = { activeTab?.loadUri("about:blank") },
                         onSwitchNextTab = {
                             val idx = tabs.indexOf(activeTab)
@@ -237,7 +234,6 @@ fun BrowserScreen(
                         onOpenDownloads = { showDownloadsDialog = true },
                         onFindInPage = { showFindBar = true },
                         onOpenSync = { showSyncDialog = true },
-                        onOpenAiAssistant = { showAiAssistantSheet = true },
                         onGoHome = { activeTab?.loadUri("about:blank") },
                         onSwitchNextTab = {
                             val idx = tabs.indexOf(activeTab)
@@ -376,15 +372,6 @@ fun BrowserScreen(
             DevToolsSheet(
                 activeTab = activeTab,
                 onDismiss = { showDevToolsSheet = false }
-            )
-        }
-
-        // Hoja del Asistente Soberano Senda (IA en chip / Redacción / Consultas / Exportación)
-        if (showAiAssistantSheet) {
-            SendaAssistantSheet(
-                activeTab = activeTab,
-                prefs = prefs,
-                onDismiss = { showAiAssistantSheet = false }
             )
         }
 

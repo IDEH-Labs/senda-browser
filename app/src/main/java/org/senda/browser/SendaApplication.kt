@@ -54,14 +54,13 @@ class SendaApplication : Application() {
         org.senda.browser.core.cast.SendaTvMode.init(this)
         // Inicializar subsistema de transmisión DLNA y Cast V2
         org.senda.browser.core.cast.SendaUnifiedCast.initialize(this)
-        // Restos de descargas de modelos interrumpidas (pueden ocupar cientos de MB)
         Thread {
-            org.senda.browser.core.ai.SendaModelManager.cleanupInterruptedDownloads(this)
+            // Senda ya no incluye IA (2026-10-05): ningún modelo pequeño respondía con fiabilidad en sus 8 idiomas
+            // en un teléfono. Se borran los modelos descargados (hasta 3,3 GB) que ya no se pueden usar
+            java.io.File(filesDir, "models_ai").deleteRecursively()
             // Copias de archivos subidos a páginas en la sesión anterior
             org.senda.browser.core.SendaWebUploads.cleanup(this)
         }.start()
-        // Inicializar motor neuronal nativo en chip (llama.cpp ARM64 NEON)
-        org.senda.browser.core.ai.llama.SendaLlamaBridge.initialize(this)
         // Inicializar gestor de Tor integrado
         org.senda.browser.core.SendaTorManager.init(this)
         if (prefs.proxyMode == "TOR_ORBOT") {

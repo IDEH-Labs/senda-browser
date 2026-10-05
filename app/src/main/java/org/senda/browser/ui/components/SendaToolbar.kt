@@ -98,7 +98,6 @@ fun SendaToolbar(
     onFindInPage: () -> Unit = {},
     onOpenExtensions: () -> Unit = {},
     onOpenSync: () -> Unit = {},
-    onOpenAiAssistant: (() -> Unit)? = null,
     onGoHome: (() -> Unit)? = null,
     onSwitchNextTab: (() -> Unit)? = null,
     onSwitchPrevTab: (() -> Unit)? = null,
@@ -1187,43 +1186,6 @@ fun SendaToolbar(
                             }
 
                             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-
-                            // Senda AI (Asistente en chip / Codex / Documentos)
-                            DropdownMenuItem(
-                                text = {
-                                    Column {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text("Senda AI", fontWeight = FontWeight.Bold)
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Surface(
-                                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                                                shape = RoundedCornerShape(4.dp)
-                                            ) {
-                                                Text(
-                                                    "LOCAL",
-                                                    fontSize = 9.sp,
-                                                    fontWeight = FontWeight.ExtraBold,
-                                                    color = MaterialTheme.colorScheme.primary,
-                                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                                                )
-                                            }
-                                        }
-                                        Text("Asistente, documentos y código", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
-                                },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Default.AutoAwesome,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                },
-                                onClick = {
-                                    showMenu = false
-                                    onOpenAiAssistant?.invoke()
-                                }
-                            )
 
                             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 

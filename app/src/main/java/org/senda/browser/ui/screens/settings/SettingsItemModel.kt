@@ -177,14 +177,6 @@ fun buildSettingsList(
             onClick = { onOpenDialog("reader_mode") }
         ),
         SettingItemData(
-            id = "ai_controls",
-            title = strings.st_ai_title,
-            subtitle = strings.st_ai_sub,
-            category = strings.cat_nav,
-            icon = Icons.Default.Psychology,
-            onClick = { onOpenDialog("ai_controls") }
-        ),
-        SettingItemData(
             id = "default_browser",
             title = strings.st_default_browser_title,
             subtitle = strings.st_default_browser_sub,

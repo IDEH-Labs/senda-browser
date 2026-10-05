@@ -51,6 +51,12 @@ class PreferencesManager(context: Context) {
         context.getSharedPreferences("senda_preferences", Context.MODE_PRIVATE)
 
     init {
+        // Ajustes de la IA retirada: no deben quedar datos de una función que ya no existe
+        if (prefs.all.keys.any { it.startsWith("ai_") || it == "selected_local_ai_model" }) {
+            prefs.edit().apply {
+                prefs.all.keys.filter { it.startsWith("ai_") || it == "selected_local_ai_model" }.forEach { remove(it) }
+            }.apply()
+        }
         // Versiones anteriores simulaban Firefox Sync: borrar la «cuenta conectada» que nunca existió.
         if (prefs.contains("fxa_is_connected") || prefs.contains("sync_type")) {
             prefs.edit()
@@ -541,33 +547,6 @@ class PreferencesManager(context: Context) {
     var userCustomScript: String
         get() = prefs.getString("user_custom_script", "") ?: ""
         set(value) = prefs.edit().putString("user_custom_script", value).apply()
-
-    // --- INTELIGENCIA ARTIFICIAL SOBERANA ---
-    /** El asistente puede consultar Wikipedia y DuckDuckGo; desactivado: nada de lo que escribes sale del teléfono. */
-    var aiWebLookup: Boolean
-        get() = prefs.getBoolean("ai_web_lookup", false)
-        set(value) = prefs.edit().putBoolean("ai_web_lookup", value).apply()
-
-    var aiBackendMode: String
-        get() = prefs.getString("ai_backend_mode", "CHIP") ?: "CHIP"
-        set(value) = prefs.edit().putString("ai_backend_mode", value).apply()
-
-    var aiOllamaUrl: String
-        get() = prefs.getString("ai_ollama_url", "http://192.168.1.100:11434") ?: "http://192.168.1.100:11434"
-        set(value) = prefs.edit().putString("ai_ollama_url", value).apply()
-
-    var aiOllamaModel: String
-        get() = prefs.getString("ai_ollama_model", "llama3.2") ?: "llama3.2"
-        set(value) = prefs.edit().putString("ai_ollama_model", value).apply()
-
-    /** Resultado de la calibración CPU/GPU de este teléfono (JSON de SendaAiCalibrator), o null si no se midió. */
-    var aiCalibration: String?
-        get() = prefs.getString("ai_calibration", null)
-        set(value) = prefs.edit().putString("ai_calibration", value).apply()
-
-    var selectedLocalAiModel: String
-        get() = prefs.getString("selected_local_ai_model", org.senda.browser.core.ai.SendaAiModels.MODEL_GEMMA_4_E2B.id) ?: org.senda.browser.core.ai.SendaAiModels.MODEL_GEMMA_4_E2B.id
-        set(value) = prefs.edit().putString("selected_local_ai_model", value).apply()
 
     // --- FAVORITOS / MARCADORES ---
     var showBookmarksBar: Boolean

@@ -10,7 +10,7 @@ import java.net.URL
  * Usan el mismo Tor o proxy que la navegación: si no, con Tor activado estas peticiones salían
  * directas, con la IP real. Si Tor no está listo la conexión falla, nunca sale sin protección.
  *
- * Las direcciones de la red local (TV, servidor Ollama o WebDAV en casa) van directas: un proxy
+ * Las direcciones de la red local (TV o WebDAV en casa) van directas: un proxy
  * externo no puede alcanzarlas.
  */
 object SendaNet {
