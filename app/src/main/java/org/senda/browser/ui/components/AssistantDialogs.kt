@@ -511,7 +511,8 @@ private val OFFICIAL_AI_SITES = listOf(
     "Claude" to "https://claude.ai",
     "Gemini" to "https://gemini.google.com",
     "Grok" to "https://grok.com",
-    "Le Chat" to "https://chat.mistral.ai"
+    // «Le Chat» pasó a llamarse «Vibe» (28-05-2026): se muestra la marca de la empresa
+    "Mistral" to "https://chat.mistral.ai"
 )
 
 /**
