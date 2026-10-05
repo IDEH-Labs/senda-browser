@@ -29,6 +29,8 @@ class SendaChatGptPlanTest {
     fun loopbackFlowReachesTokenEndpoint() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val prefs = PreferencesManager(context)
+        // Con una sesión real del usuario no se prueba: el inicio de sesión de prueba usaría su cliente y su id_token
+        org.junit.Assume.assumeTrue("Hay una sesión real de ChatGPT en este teléfono", !ChatGptPlanAuth.isSignedIn(prefs) && prefs.assistantChatGptClientId.isBlank())
         var authorizeUrl = ""
         try {
             ChatGptPlanAuth.signIn(context, prefs) { url ->

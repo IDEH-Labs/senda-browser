@@ -356,6 +356,10 @@ interface SendaStringPack {
     val st_licenses_title: String
     val st_licenses_sub: String
     val summary_tabs_manual: String
+    val as_web_title: String
+    val as_web_note: String
+    val as_web_copy_page: String
+    val as_web_copied: String
     val as_chatgpt_continue: String
     val as_chatgpt_plan_note: String
     val as_chatgpt_waiting: String
@@ -1131,6 +1135,10 @@ object SendaStringsDe : SendaStringPack {
     override val st_licenses_title = "Open-Source-Lizenzen"
     override val st_licenses_sub = "GeckoView, Mozilla, AndroidX, Kotlin und freie Software"
     override val summary_tabs_manual = "Manuell schließen"
+    override val as_web_title = "Auf der offiziellen Website nutzen"
+    override val as_web_note = "Du meldest dich auf der Seite des jeweiligen Dienstes an (Google, GitHub, Microsoft …). Senda sieht deine Zugangsdaten nie."
+    override val as_web_copy_page = "Diese Seite beim Öffnen kopieren"
+    override val as_web_copied = "Seite kopiert: Füge sie in den Chat von %s ein."
     override val as_chatgpt_continue = "Weiter mit ChatGPT"
     override val as_chatgpt_plan_note = "Nutzt dein ChatGPT-Plus- oder -Pro-Abo ohne API-Schlüssel: Du meldest dich auf der Seite von OpenAI an."
     override val as_chatgpt_waiting = "Schließe die Anmeldung im Browser ab und kehre hierher zurück…"
@@ -1905,6 +1913,10 @@ object SendaStringsEn : SendaStringPack {
     override val st_licenses_title = "Open Source Licenses"
     override val st_licenses_sub = "GeckoView, Mozilla, AndroidX, Kotlin and free software"
     override val summary_tabs_manual = "Close manually"
+    override val as_web_title = "Use on its official website"
+    override val as_web_note = "You sign in on each service's own page (Google, GitHub, Microsoft…). Senda never sees your credentials."
+    override val as_web_copy_page = "Copy this page when opening"
+    override val as_web_copied = "Page copied: paste it into the %s chat."
     override val as_chatgpt_continue = "Continue with ChatGPT"
     override val as_chatgpt_plan_note = "Uses your ChatGPT Plus or Pro plan, no API key: you sign in on OpenAI's page."
     override val as_chatgpt_waiting = "Finish signing in in the browser and come back here…"
@@ -2679,6 +2691,10 @@ object SendaStringsEs : SendaStringPack {
     override val st_licenses_title = "Licencias de código abierto"
     override val st_licenses_sub = "GeckoView, Mozilla, AndroidX, Kotlin y software libre"
     override val summary_tabs_manual = "Cerrar manualmente"
+    override val as_web_title = "Usar en su web oficial"
+    override val as_web_note = "Inicias sesión en la página de cada servicio (Google, GitHub, Microsoft…). Senda no ve tus credenciales."
+    override val as_web_copy_page = "Copiar esta página al abrir"
+    override val as_web_copied = "Página copiada: pégala en el chat de %s."
     override val as_chatgpt_continue = "Continuar con ChatGPT"
     override val as_chatgpt_plan_note = "Usa tu plan ChatGPT Plus o Pro, sin clave de API: inicias sesión en la página de OpenAI."
     override val as_chatgpt_waiting = "Termina de iniciar sesión en el navegador y vuelve aquí…"
@@ -3453,6 +3469,10 @@ object SendaStringsFr : SendaStringPack {
     override val st_licenses_title = "Licences Open Source"
     override val st_licenses_sub = "GeckoView, Mozilla, AndroidX, Kotlin et logiciels libres"
     override val summary_tabs_manual = "Fermer manuellement"
+    override val as_web_title = "Utiliser sur son site officiel"
+    override val as_web_note = "Vous vous connectez sur la page de chaque service (Google, GitHub, Microsoft…). Senda ne voit jamais vos identifiants."
+    override val as_web_copy_page = "Copier cette page à l'ouverture"
+    override val as_web_copied = "Page copiée : collez-la dans le chat de %s."
     override val as_chatgpt_continue = "Continuer avec ChatGPT"
     override val as_chatgpt_plan_note = "Utilise votre abonnement ChatGPT Plus ou Pro, sans clé d'API : vous vous connectez sur la page d'OpenAI."
     override val as_chatgpt_waiting = "Terminez la connexion dans le navigateur puis revenez ici…"
@@ -4227,6 +4247,10 @@ object SendaStringsPt : SendaStringPack {
     override val st_licenses_title = "Licenças de código aberto"
     override val st_licenses_sub = "GeckoView, Mozilla, AndroidX, Kotlin e software livre"
     override val summary_tabs_manual = "Fechar manualmente"
+    override val as_web_title = "Usar no site oficial"
+    override val as_web_note = "Inicia sessão na página de cada serviço (Google, GitHub, Microsoft…). O Senda nunca vê as suas credenciais."
+    override val as_web_copy_page = "Copiar esta página ao abrir"
+    override val as_web_copied = "Página copiada: cole-a no chat do %s."
     override val as_chatgpt_continue = "Continuar com o ChatGPT"
     override val as_chatgpt_plan_note = "Usa o seu plano ChatGPT Plus ou Pro, sem chave de API: inicia sessão na página da OpenAI."
     override val as_chatgpt_waiting = "Termine o início de sessão no navegador e volte aqui…"
@@ -5001,6 +5025,10 @@ object SendaStringsIt : SendaStringPack {
     override val st_licenses_title = "Licenze Open Source"
     override val st_licenses_sub = "GeckoView, Mozilla, AndroidX, Kotlin e software libero"
     override val summary_tabs_manual = "Chiudi manualmente"
+    override val as_web_title = "Usa sul sito ufficiale"
+    override val as_web_note = "Accedi dalla pagina di ciascun servizio (Google, GitHub, Microsoft…). Senda non vede mai le tue credenziali."
+    override val as_web_copy_page = "Copia questa pagina all'apertura"
+    override val as_web_copied = "Pagina copiata: incollala nella chat di %s."
     override val as_chatgpt_continue = "Continua con ChatGPT"
     override val as_chatgpt_plan_note = "Usa il tuo piano ChatGPT Plus o Pro, senza chiave API: accedi dalla pagina di OpenAI."
     override val as_chatgpt_waiting = "Completa l'accesso nel browser e torna qui…"
@@ -5775,6 +5803,10 @@ object SendaStringsJa : SendaStringPack {
     override val st_licenses_title = "オープンソースライセンス"
     override val st_licenses_sub = "GeckoView、Mozilla、AndroidX、Kotlin および自由ソフトウェア"
     override val summary_tabs_manual = "手動で閉じる"
+    override val as_web_title = "公式サイトで使う"
+    override val as_web_note = "各サービスのページ(Google、GitHub、Microsoftなど)でサインインします。Sendaが認証情報を見ることはありません。"
+    override val as_web_copy_page = "開くときにこのページをコピー"
+    override val as_web_copied = "ページをコピーしました：%sのチャットに貼り付けてください。"
     override val as_chatgpt_continue = "ChatGPTで続ける"
     override val as_chatgpt_plan_note = "APIキーなしでChatGPT PlusまたはProのプランを使います。OpenAIのページでサインインします。"
     override val as_chatgpt_waiting = "ブラウザでサインインを完了して、ここに戻ってください…"
@@ -6549,6 +6581,10 @@ object SendaStringsZh : SendaStringPack {
     override val st_licenses_title = "开源软件许可证"
     override val st_licenses_sub = "GeckoView、Mozilla、AndroidX、Kotlin 及其他自由开源组件"
     override val summary_tabs_manual = "手动关闭"
+    override val as_web_title = "在官方网站使用"
+    override val as_web_note = "在各服务自己的页面登录(Google、GitHub、Microsoft 等)。Senda 不会看到你的登录凭据。"
+    override val as_web_copy_page = "打开时复制此网页"
+    override val as_web_copied = "网页已复制：请粘贴到 %s 的对话中。"
     override val as_chatgpt_continue = "使用 ChatGPT 继续"
     override val as_chatgpt_plan_note = "使用你的 ChatGPT Plus 或 Pro 套餐，无需 API 密钥：在 OpenAI 页面登录。"
     override val as_chatgpt_waiting = "请在浏览器中完成登录，然后返回这里…"
