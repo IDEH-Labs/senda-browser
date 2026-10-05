@@ -424,10 +424,15 @@ fun SendaAssistantSheet(prefs: PreferencesManager, activeTab: BrowserTab?, onDis
                 Text(strings.as_not_configured, fontSize = 15.sp)
                 Spacer(Modifier.height(12.dp))
                 Button(onClick = { showSettings = true }) { Text(strings.as_configure) }
+                Spacer(Modifier.height(24.dp))
+                AssistantWebShortcuts(prefs, activeTab) { busy?.cancel(); onDismiss() }
                 return@Column
             }
             Text(strings.as_drafts_note, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             LazyColumn(state = listState, modifier = Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
+                if (messages.isEmpty() && busy == null) {
+                    item { Column { Spacer(Modifier.height(12.dp)); AssistantWebShortcuts(prefs, activeTab) { onDismiss() } } }
+                }
                 items(messages) { m -> AssistantBubble(m, strings, context) }
                 if (busy != null) {
                     item {
@@ -495,6 +500,65 @@ private fun AssistantBubble(m: AssistantMessage, strings: SendaStringPack, conte
                     }
                 }
             }
+        }
+    }
+}
+
+
+/** Webs oficiales de cada IA: se abren en una pestaña de Senda y el usuario entra con los botones de cada servicio. */
+private val OFFICIAL_AI_SITES = listOf(
+    "ChatGPT" to "https://chatgpt.com",
+    "Claude" to "https://claude.ai",
+    "Gemini" to "https://gemini.google.com",
+    "Grok" to "https://grok.com",
+    "Le Chat" to "https://chat.mistral.ai"
+)
+
+/**
+ * Accesos directos a las webs oficiales. Con «Copiar esta página» se copia la página actual al portapapeles (solo
+ * al pulsar, nada se envía por sí solo) para pegarla en el chat de ese servicio.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AssistantWebShortcuts(prefs: PreferencesManager, activeTab: BrowserTab?, onOpened: () -> Unit) {
+    val context = LocalContext.current
+    val strings = LocalSendaStrings.current
+    val scope = rememberCoroutineScope()
+    val hasPage = activeTab != null && activeTab.url.isNotBlank() && activeTab.url != "about:blank"
+    var copyPage by remember { mutableStateOf(false) }
+
+    Text(strings.as_web_title, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+    Text(strings.as_web_note, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    if (hasPage) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { copyPage = !copyPage }) {
+            Checkbox(checked = copyPage, onCheckedChange = { copyPage = it })
+            Text(strings.as_web_copy_page, fontSize = 12.sp)
+        }
+    }
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OFFICIAL_AI_SITES.forEach { (name, url) ->
+            AssistChip(
+                onClick = {
+                    scope.launch {
+                        if (copyPage && hasPage) {
+                            val text = activeTab?.extractPageText().orEmpty().take(SendaAssistant.PAGE_MAX_CHARS)
+                            val clip = "${activeTab?.title.orEmpty()}\n${activeTab?.url.orEmpty()}\n\n$text".trim()
+                            (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager)
+                                .setPrimaryClip(ClipData.newPlainText(activeTab?.title ?: "Senda", clip))
+                            Toast.makeText(context, strings.as_web_copied.format(name), Toast.LENGTH_LONG).show()
+                        }
+                        val opener = BrowserTab.tabOpener
+                        if (opener != null) {
+                            opener(BrowserTab(isPrivate = activeTab?.isPrivate ?: false, prefs = prefs,
+                                searchBaseUrl = activeTab?.searchBaseUrl ?: prefs.customSearchEngineUrl, initialUrl = url), false)
+                        } else {
+                            openInBrowser(context, url)
+                        }
+                        onOpened()
+                    }
+                },
+                label = { Text(name, fontSize = 13.sp) }
+            )
         }
     }
 }

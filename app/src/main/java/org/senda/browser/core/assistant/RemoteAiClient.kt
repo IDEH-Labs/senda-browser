@@ -325,7 +325,12 @@ class ChatGptPlanClient(private val prefs: org.senda.browser.core.PreferencesMan
     }
 
     /** Códigos de la guía «Errors and recovery» y la acción que piden. */
-    private fun planError(code: String, http: Int): RemoteAiException = when (code) {
+    private fun planError(code: String, http: Int): RemoteAiException {
+        android.util.Log.w("SendaChatGpt", "Respuesta del plan: HTTP $http código=$code")
+        return planErrorFor(code, http)
+    }
+
+    private fun planErrorFor(code: String, http: Int): RemoteAiException = when (code) {
         "subscription_sharing_usage_limit_exceeded" -> RemoteAiException(RemoteAiException.Kind.USAGE_LIMIT, code)
         "subscription_sharing_user_not_eligible" -> RemoteAiException(RemoteAiException.Kind.NOT_ELIGIBLE, code)
         "subscription_sharing_invalid_user" -> RemoteAiException(RemoteAiException.Kind.AUTH, code)

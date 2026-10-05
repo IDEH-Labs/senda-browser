@@ -156,8 +156,6 @@ object ChatGptPlanAuth {
                 // Como el kit oficial: guardar el cliente emitido antes del canje, para que un nuevo intento no
                 // registre otra app si el código caduca o falla
                 prefs.assistantChatGptClientId = clientId
-                android.util.Log.i("SendaChatGpt", "Canje: cliente=${clientId.take(12)}… verificador=${verifier.length} car., " +
-                    "reto coincide=${b64url(MessageDigest.getInstance("SHA-256").digest(verifier.toByteArray())) == challenge}, parámetros de vuelta=${callback.keys}")
                 val tokens = postForm(TOKEN, mapOf(
                     "grant_type" to "authorization_code", "code" to code, "client_id" to clientId,
                     "code_verifier" to verifier, "redirect_uri" to REDIRECT, "resource" to RESOURCE
@@ -222,7 +220,6 @@ object ChatGptPlanAuth {
     fun deliverCallback(url: String): Boolean {
         if (_signInState.value != SignInState.Waiting || !url.startsWith(REDIRECT)) return false
         injectedCallback = parseQuery(url.substringAfter('?', ""))
-        android.util.Log.i("SendaChatGpt", "Vuelta de OpenAI recibida dentro de Senda")
         return true
     }
 
@@ -274,7 +271,7 @@ object ChatGptPlanAuth {
                 val json = runCatching { JSONObject(text) }.getOrNull()
                 val err = json?.optString("error").orEmpty()
                 // La descripción de OpenAI explica el rechazo; no contiene el código ni los tokens
-                android.util.Log.w("SendaChatGpt", "HTTP $code en ${url.substringAfterLast('/')}: $err — ${json?.optString("error_description")?.take(300)} (campos: ${fields.keys})")
+                android.util.Log.w("SendaChatGpt", "HTTP $code en ${url.substringAfterLast('/')}: $err")
                 throw AuthException(err.ifBlank { "http_$code" })
             }
             return if (text.isBlank()) JSONObject() else JSONObject(text)
