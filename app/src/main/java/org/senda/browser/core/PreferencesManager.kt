@@ -548,6 +548,57 @@ class PreferencesManager(context: Context) {
         get() = prefs.getString("user_custom_script", "") ?: ""
         set(value) = prefs.edit().putString("user_custom_script", value).apply()
 
+    // --- ASISTENTE CON IA REMOTA ---
+    // Prefijo «assistant_»: los «ai_*» de la IA local retirada se borran al arrancar
+    /** Proveedor elegido (RemoteAiProvider.id) o null si el asistente no está configurado. */
+    var assistantProvider: String?
+        get() = prefs.getString("assistant_provider", null)
+        set(value) = prefs.edit().putString("assistant_provider", value).apply()
+
+    var assistantModel: String
+        get() = prefs.getString("assistant_model", "") ?: ""
+        set(value) = prefs.edit().putString("assistant_model", value).apply()
+
+    /** URL base del servidor propio compatible con OpenAI (p. ej. http://192.168.1.20:11434/v1). */
+    var assistantServerUrl: String
+        get() = prefs.getString("assistant_server_url", "") ?: ""
+        set(value) = prefs.edit().putString("assistant_server_url", value.trim().trimEnd('/')).apply()
+
+    /** Confirmó el aviso de que el texto y las páginas que envíe salen hacia el proveedor. */
+    var assistantPrivacyAccepted: Boolean
+        get() = prefs.getBoolean("assistant_privacy_accepted", false)
+        set(value) = prefs.edit().putBoolean("assistant_privacy_accepted", value).apply()
+
+    /** Clave del proveedor, cifrada con el almacén de claves del teléfono; nunca en texto plano. */
+    fun getAssistantKey(providerId: String): String {
+        val enc = prefs.getString("assistant_key_enc_$providerId", null) ?: return ""
+        val iv = prefs.getString("assistant_key_iv_$providerId", null) ?: return ""
+        return try {
+            val chars = org.senda.browser.core.security.SendaVaultManager.decryptPassword(enc, iv, org.senda.browser.core.security.SendaVaultManager.APP_KEY_ALIAS)
+            String(chars).also { org.senda.browser.core.security.SendaVaultManager.wipe(chars) }
+        } catch (e: Exception) {
+            ""
+        }
+    }
+
+    /** Guarda la clave cifrada; si el chip no puede cifrar, no se guarda (devuelve false). */
+    fun setAssistantKey(providerId: String, key: String): Boolean {
+        if (key.isBlank()) {
+            prefs.edit().remove("assistant_key_enc_$providerId").remove("assistant_key_iv_$providerId").apply()
+            return true
+        }
+        return try {
+            val chars = key.trim().toCharArray()
+            val (enc, iv) = org.senda.browser.core.security.SendaVaultManager.encryptPassword(chars, org.senda.browser.core.security.SendaVaultManager.APP_KEY_ALIAS)
+            org.senda.browser.core.security.SendaVaultManager.wipe(chars)
+            prefs.edit().putString("assistant_key_enc_$providerId", enc).putString("assistant_key_iv_$providerId", iv).apply()
+            true
+        } catch (e: Exception) {
+            android.util.Log.e("SendaPrefs", "No se pudo cifrar la clave del asistente: ${e.javaClass.simpleName}")
+            false
+        }
+    }
+
     // --- FAVORITOS / MARCADORES ---
     var showBookmarksBar: Boolean
         get() = prefs.getBoolean("show_bookmarks_bar", false)

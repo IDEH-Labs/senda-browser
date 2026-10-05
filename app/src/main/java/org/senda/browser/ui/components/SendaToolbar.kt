@@ -89,6 +89,7 @@ fun SendaToolbar(
     onRefresh: () -> Unit,
     onDissolveCurrentTab: () -> Unit = {},
     onOpenTabsOverview: () -> Unit,
+    onOpenAssistant: (() -> Unit)? = null,
     onOpenDevTools: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenCast: () -> Unit = {},
@@ -1186,6 +1187,23 @@ fun SendaToolbar(
                             }
 
                             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+                            // Asistente con IA externa (el proveedor que configure el usuario)
+                            DropdownMenuItem(
+                                text = {
+                                    Column {
+                                        Text(strings.as_menu_title, fontWeight = FontWeight.SemiBold)
+                                        Text(strings.as_menu_sub, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                                },
+                                onClick = {
+                                    showMenu = false
+                                    onOpenAssistant?.invoke()
+                                }
+                            )
 
                             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 

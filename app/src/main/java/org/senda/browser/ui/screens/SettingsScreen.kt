@@ -461,6 +461,11 @@ fun SettingsScreen(
         )
     }
 
+    // DIÁLOGO: ASISTENTE CON IA EXTERNA
+    if (activeDialog == "assistant") {
+        org.senda.browser.ui.components.SendaAssistantSettingsDialog(prefs = prefs, onDismiss = { activeDialog = null })
+    }
+
     // DIÁLOGO: ENRUTAMIENTO TOR & PROXY SOCKS5
     if (activeDialog == "tor_proxy") {
         SettingsTorDialog(

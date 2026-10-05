@@ -87,7 +87,9 @@ android {
             useLegacyPackaging = true
         }
         resources {
-            excludes += '/META-INF/{AL2.0,LGPL2.1}'
+            excludes += ['/META-INF/{AL2.0,LGPL2.1}', '/META-INF/DEPENDENCIES']
+            // Avisos de licencia de las dependencias (Apache 2.0 exige distribuirlos): se combinan, no se descartan
+            merges += ['/META-INF/LICENSE', '/META-INF/LICENSE.txt', '/META-INF/NOTICE', '/META-INF/NOTICE.txt']
         }
     }
 
@@ -115,6 +117,8 @@ configurations.all {
 dependencies {
     // GeckoView - Motor web libre de Mozilla
     implementation 'org.mozilla.geckoview:geckoview:157.0.20260924084938'
+    // IA remota con Claude: SDK oficial de Anthropic (los demás proveedores usan su API compatible con OpenAI)
+    implementation 'com.anthropic:anthropic-java:2.34.0'
 
     // AndroidX & Kotlin
     implementation 'androidx.core:core-ktx:1.15.0'
