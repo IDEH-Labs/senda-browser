@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Settings
@@ -580,7 +581,9 @@ fun OfficialSiteChips(prefs: PreferencesManager, activeTab: BrowserTab?, copyPag
                         onOpened()
                     }
                 },
-                label = { Text(name, fontSize = 13.sp) }
+                label = { Text(name, fontSize = 13.sp) },
+                // Abre su web en una pestaña: no conecta el asistente de Senda (solo ChatGPT lo permite)
+                trailingIcon = { Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(14.dp)) }
             )
         }
     }
