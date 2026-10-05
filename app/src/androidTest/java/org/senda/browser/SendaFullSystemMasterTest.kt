@@ -61,6 +61,7 @@ class SendaFullSystemMasterTest {
     // =========================================================================
     @Test
     fun test02_BookmarksAndHistoryPersistence() {
+        DestructiveTestGuard.requireExplicitPermission("borra el historial")
         // 2.1 Marcadores
         prefs.toggleBookmark(title = "Senda Sovereign Test", url = "https://senda.org/test")
         val bookmarks = prefs.getBookmarks()
@@ -73,7 +74,14 @@ class SendaFullSystemMasterTest {
 
         // 2.2 Historial local
         prefs.addHistoryItem(title = "History Test Item", url = "https://senda.org/history")
-        val historyList = prefs.getHistory()
+        // addHistoryItem guarda en segundo plano: se espera a que el elemento aparezca
+        var historyList = prefs.getHistory()
+        var waitedMs = 0
+        while (historyList.none { it.url == "https://senda.org/history" } && waitedMs < 3000) {
+            Thread.sleep(50)
+            waitedMs += 50
+            historyList = prefs.getHistory()
+        }
         assertTrue("El historial debe registrar la navegación", historyList.any { it.url == "https://senda.org/history" })
         prefs.clearHistory()
         assertTrue("El historial debe quedar limpio tras clearHistory", prefs.getHistory().isEmpty())
@@ -101,6 +109,7 @@ class SendaFullSystemMasterTest {
     // =========================================================================
     @Test
     fun test03_WebdavHardwareEncryptionInStorage() {
+        DestructiveTestGuard.requireExplicitPermission("deja vacía la contraseña de WebDAV")
         val rawPrefs = context.getSharedPreferences("senda_preferences", Context.MODE_PRIVATE)
         val testPassword = "HardwareVaultWebDavKey_2026!#"
 
@@ -138,12 +147,16 @@ class SendaFullSystemMasterTest {
         val user = "usuario_seguro"
         val passChars = "ClaveUltraSegura#2026_ñ!".toCharArray()
 
-        // 4.1 Guardado y extracción canónica de dominio (eTLD+1)
-        val cred = SendaVaultManager.saveCredential(context, domain, user, passChars)
-        assertEquals("El dominio canónico debe ser banco.com.es", "banco.com.es", cred.domain)
+        // 4.1 Extracción canónica de dominio (eTLD+1)
+        assertEquals("El dominio canónico debe ser banco.com.es", "banco.com.es", SendaVaultManager.extractCanonicalDomain(domain))
+
+        // La clave de la Bóveda exige huella o PIN (validez 30 s); las pruebas de cifrado usan la clave de la
+        // app, que está en el mismo chip pero sin autenticación
+        val alias = SendaVaultManager.APP_KEY_ALIAS
+        val (encryptedBase64, ivBase64) = SendaVaultManager.encryptPassword(passChars.copyOf(), alias)
 
         // 4.2 Descifrado a CharArray y Zeroization
-        val retrievedChars = SendaVaultManager.decryptPassword(cred.encryptedPasswordBase64, cred.ivBase64)
+        val retrievedChars = SendaVaultManager.decryptPassword(encryptedBase64, ivBase64, alias)
         assertArrayEquals("La contraseña descifrada debe coincidir", passChars, retrievedChars)
         SendaVaultManager.wipe(retrievedChars)
         assertTrue("La memoria RAM debe quedar en ceros", retrievedChars.all { it == '\u0000' })
@@ -151,18 +164,25 @@ class SendaFullSystemMasterTest {
         // 4.3 Inviolabilidad de mensaje (Tamper Resistance con AEAD tag)
         var tamperDetected = false
         try {
-            val encBytes = android.util.Base64.decode(cred.encryptedPasswordBase64, android.util.Base64.NO_WRAP)
+            val encBytes = android.util.Base64.decode(encryptedBase64, android.util.Base64.NO_WRAP)
             encBytes[0] = (encBytes[0].toInt() xor 0xFF).toByte() // Corromper byte
             val tamperedBase64 = android.util.Base64.encodeToString(encBytes, android.util.Base64.NO_WRAP)
-            SendaVaultManager.decryptPassword(tamperedBase64, cred.ivBase64)
+            SendaVaultManager.decryptPassword(tamperedBase64, ivBase64, alias)
         } catch (e: Exception) {
             tamperDetected = true
         }
         assertTrue("La etiqueta AEAD debe rechazar cualquier alteración de bits", tamperDetected)
 
-        // 4.4 Limpiar credencial
-        SendaVaultManager.deleteCredential(context, cred.id)
-        assertFalse("La credencial debe eliminarse de la bóveda", SendaVaultManager.getCredentials(context).any { it.id == cred.id })
+        // 4.4 Guardar en la Bóveda: sin identificarse debe negarse; si el teléfono se desbloqueó hace
+        // menos de 30 s se guarda, y entonces la credencial debe poder eliminarse
+        try {
+            val cred = SendaVaultManager.saveCredential(context, domain, user, passChars.copyOf())
+            assertEquals("banco.com.es", cred.domain)
+            SendaVaultManager.deleteCredential(context, cred.id)
+            assertFalse("La credencial debe eliminarse de la bóveda", SendaVaultManager.getCredentials(context).any { it.id == cred.id })
+        } catch (e: org.senda.browser.core.security.VaultLockedException) {
+            assertTrue("Sin huella ni PIN la Bóveda no guarda nada", SendaVaultManager.getCredentials(context).none { it.username == user && it.domain == "banco.com.es" })
+        }
 
         println("[PASS 4/8] Bóveda Criptográfica: eTLD+1, Zeroization y resistencia a manipulación AEAD verificados.")
     }

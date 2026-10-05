@@ -276,289 +276,254 @@ $code
     fun generateDocumentDraftWithFilename(docType: String, topicPrompt: String): Pair<String, String> {
         val dateFormat = java.text.SimpleDateFormat("d 'de' MMMM 'de' yyyy", java.util.Locale.forLanguageTag("es-ES"))
         val dateStr = dateFormat.format(java.util.Date())
-        val cleanTopic = if (topicPrompt.isNotBlank()) topicPrompt else "Asunto General"
+        val request = topicPrompt.trim().ifBlank { "(sin detalles)" }
 
         val lowerTopic = topicPrompt.lowercase()
         val lowerDoc = docType.lowercase()
 
-        return when {
-            lowerTopic.contains("renuncia") || lowerDoc.contains("renuncia") -> {
-                val doc = """
-# CARTA FORMAL DE RENUNCIA LABORAL
-
-**Fecha:** $dateStr  
-**Ciudad:** Territorio Nacional  
-**Para:** Dirección de Gestión Humana / Gerencia General  
-**Empresa / Entidad:** $cleanTopic  
-**Asunto:** Notificación formal de renuncia voluntaria con entrega de cargo  
-
----
-
-**Estimados señores:**  
-
-Por medio de la presente comunicación, de manera libre, voluntaria e informada, me permito presentar mi **renuncia irrevocable** al cargo que vengo desempeñando en su distinguida organización.
-
-### 1. MOTIVACIÓN Y TÉRMINOS
-Esta decisión responde a proyectos de desarrollo personal y profesional. En cumplimiento de las disposiciones laborales y los principios de buena fe contractual, me encuentro a su entera disposición durante los días correspondientes para llevar a cabo una transición ordenada, realizar el empalme y hacer entrega formal de las tareas, inventarios y documentación a mi cargo.
-
-### 2. AGRADECIMIENTOS
-Deseo expresar mi más sincero agradecimiento a la empresa, directivos y compañeros de equipo por la confianza brindada durante mi estancia. La experiencia compartida ha sido de inmenso valor para mi crecimiento profesional.
-
-### 3. LIQUIDACIÓN
-Solicito amablemente disponer la expedición de mi certificación laboral y la liquidación definitiva de salarios y prestaciones sociales de conformidad con la ley vigente.
-
----
-**Atentamente,**  
-
-__________________________________________  
-*Firma del Trabajador*  
-*Cédula / Documento de Identidad:* ____________________  
-*Teléfono / Correo de Notificación:* __________________  
+        // Plantilla fija: no conoce los hechos del usuario, así que todo lo que no dijo queda entre corchetes.
+        val notice = """
+> **Plantilla fija, no redactada por IA.** Senda no conoce tu caso: completa o borra todo lo que está entre [corchetes] y revisa el texto antes de enviarlo. No es asesoría legal.
+>
+> Lo que pediste: «$request»
 """.trimIndent()
-                Pair(doc, "Carta_de_Renuncia.md")
-            }
 
-            lowerTopic.contains("reclamo") || lowerTopic.contains("cancelar") || lowerTopic.contains("queja") || lowerTopic.contains("falla") || lowerTopic.contains("cobro") -> {
-                val doc = """
-# RECLAMACIÓN FORMAL Y SOLICITUD DE CANCELACIÓN DE SERVICIOS
-**(Régimen de Protección al Consumidor y Usuarios de Comunicaciones)**
+        val (body, fileName) = when {
+            lowerTopic.contains("renuncia") || lowerDoc.contains("renuncia") -> """
+# CARTA DE RENUNCIA
 
-**Fecha:** $dateStr  
-**Destinatario:** Departamento de Atención al Cliente / Peticiones, Quejas y Reclamos (PQR)  
-**Empresa / Operador:** $cleanTopic  
-**Asunto:** Reclamación formal por cobro indebido / fallas reiteradas del servicio y solicitud de terminación unilateral de contrato  
+**Fecha:** $dateStr
+**Ciudad:** [ciudad]
+**Para:** [nombre y cargo de quien recibe]
+**Empresa:** [nombre de la empresa]
+**Asunto:** Renuncia voluntaria al cargo de [cargo]
 
 ---
 
-### I. IDENTIFICACIÓN DEL USUARIO Y DEL SERVICIO
-* **Titular del Servicio:** Peticionario Registrado  
-* **Identificación (C.C. / NIT):** ________________________  
-* **Número de Cuenta / Línea / Contrato:** _________________  
-* **Referencia del Caso:** $cleanTopic  
+Respetado/a [nombre]:
 
-### II. HECHOS Y MOTIVOS DEL RECLAMO
-1. **Contratación:** En calidad de usuario suscribí el plan de servicios con su entidad bajo la premisa de continuidad, velocidad y calidad garantizadas.
-2. **Incumplimiento:** En reiteradas ocasiones el servicio ha presentado suspensiones no programadas, cobros no autorizados e intermitencias severas que impiden su normal aprovechamiento.
-3. **Falta de Solución:** A pesar de haber reportado los incidentes por los canales habituales, no se ha brindado una solución de fondo ni restablecimiento oportuno.
+Por medio de la presente presento mi renuncia voluntaria al cargo de [cargo], con efecto a partir del [fecha del último día de trabajo].
 
-### III. PRETENSIONES CONCRETAS
-De manera expresa y respetuosa exijo:
-* **PRIMERA:** Se proceda a la **cancelación inmediata** del contrato o plan de servicios sin penalidad, cobro de cláusulas de permanencia ni cobros adicionales, conforme al régimen de usuarios.
-* **SEGUNDA:** Se aplique el ajuste y compensación en la facturación por el tiempo en que el servicio no fue suministrado con la calidad prometida.
-* **TERCERA:** Se me expida la constancia escrita del paz y salvo definitivo a la fecha de radicación.
+[Opcional: motivo de la renuncia, si quieres indicarlo.]
+
+Quedo a disposición para hacer la entrega del cargo durante [periodo acordado o el que corresponda según tu contrato].
+
+Solicito la expedición de mi certificado laboral y la liquidación de salarios y prestaciones que me correspondan.
 
 ---
-**Atentamente,**  
+**Atentamente,**
 
-__________________________________________  
-*Firma del Usuario Titular*  
-*Cédula / Documento de Identidad:* ____________________  
-*Teléfono:* __________________ | *Correo:* _______________  
-""".trimIndent()
-                Pair(doc, "Reclamacion_Servicios.md")
-            }
+__________________________________________
+[Nombre completo]
+[Documento de identidad]
+[Teléfono o correo]
+""".trimIndent() to "Carta_de_Renuncia.md"
 
-            lowerTopic.contains("contrato") || lowerTopic.contains("acuerdo") || lowerTopic.contains("nda") || lowerTopic.contains("confidencialidad") -> {
-                val doc = """
-# CONTRATO DE PRESTACIÓN DE SERVICIOS Y ACUERDO DE CONFIDENCIALIDAD
+            lowerDoc.contains("petición") || lowerDoc.contains("peticion") -> """
+# DERECHO DE PETICIÓN
 
-Entre los suscritos a saber: de una parte **EL CONTRATANTE** y de otra parte **EL CONTRATISTA**, ambos plenamente identificados al pie de este documento, se ha convenido celebrar el presente contrato regido por las siguientes cláusulas:
-
-* **Fecha de Celebración:** $dateStr  
-* **Objeto Contractual:** $cleanTopic  
+**Fecha:** $dateStr
+**Ciudad:** [ciudad]
+**Para:** [entidad y dependencia]
+**Asunto:** [qué solicitas, en una línea]
 
 ---
 
-### CLÁUSULA PRIMERA: OBJETO
-El CONTRATISTA se compromete a ejecutar a favor del CONTRATANTE los servicios profesionales y técnicos relacionados con **$cleanTopic**, con total autonomía técnica, administrativa y bajo los más altos estándares de calidad.
+[Nombre completo], identificado/a con [documento], en ejercicio del derecho de petición [en Colombia: artículo 23 de la Constitución y Ley 1755 de 2015; ajusta la norma si estás en otro país], presento la siguiente solicitud:
 
-### CLÁUSULA SEGUNDA: ENTREGABLES Y PLAZOS
-El CONTRATISTA entregará los productos convenidos en las fechas pactadas, garantizando la trazabilidad y soporte técnico de los mismos.
+### I. HECHOS
+1. [Qué pasó, con fechas.]
+2. [Si ya hiciste otras solicitudes: cuándo y con qué número de radicado.]
 
-### CLÁUSULA TERCERA: CONFIDENCIALIDAD
-Toda información, código, datos personales o secretos comerciales que las partes se confíen mutuamente en virtud de este acuerdo tendrán el carácter de estrictamente confidencial. Queda prohibida su cesión o divulgación sin autorización previa y escrita.
+### II. PETICIONES
+1. [Primera solicitud concreta.]
+2. [Segunda solicitud, si la hay.]
 
-### CLÁUSULA CUARTA: PROPIEDAD INTELECTUAL
-Los derechos patrimoniales sobre los desarrollos y creaciones resultantes de la ejecución del objeto pertenecerán de manera exclusiva al CONTRATANTE una vez satisfecho el pago convenido.
+### III. ANEXOS
+* [Documentos que adjuntas.]
+
+### IV. NOTIFICACIONES
+[Dirección, correo y teléfono donde quieres recibir la respuesta.]
 
 ---
-Para constancia se firma en dos ejemplares del mismo tenor y valor probatorio:
+**Atentamente,**
+
+__________________________________________
+[Nombre completo]
+[Documento de identidad]
+""".trimIndent() to "Derecho_de_Peticion.md"
+
+            lowerDoc.contains("reclamo") || lowerTopic.contains("reclamo") || lowerTopic.contains("cancelar") || lowerTopic.contains("queja") || lowerTopic.contains("falla") || lowerTopic.contains("cobro") -> """
+# RECLAMACIÓN
+
+**Fecha:** $dateStr
+**Para:** [Empresa] — Atención al cliente / PQR
+**Asunto:** [resumen del reclamo en una línea]
+
+---
+
+### I. DATOS DEL TITULAR
+* **Nombre:** [nombre completo]
+* **Documento:** [número]
+* **Cuenta / línea / contrato:** [número]
+
+### II. HECHOS
+1. [Qué pasó, con fechas y valores. Ejemplo: «En la factura de [mes] se cobró [valor] dos veces».]
+2. [Si ya reclamaste antes: cuándo, por qué canal y número de radicado.]
+3. [Otros hechos relevantes.]
+
+### III. SOLICITUD
+* [Qué pides exactamente. Ejemplo: devolución de [valor], corrección de la factura, cancelación del servicio.]
+
+### IV. ANEXOS
+* [Facturas, capturas, números de radicado.]
+
+---
+**Atentamente,**
+
+__________________________________________
+[Nombre completo]
+[Documento de identidad]
+[Teléfono] | [Correo para notificaciones]
+""".trimIndent() to "Reclamacion.md"
+
+            lowerDoc.contains("contrato") || lowerTopic.contains("contrato") || lowerTopic.contains("acuerdo") || lowerTopic.contains("nda") || lowerTopic.contains("confidencialidad") -> """
+# CONTRATO DE PRESTACIÓN DE SERVICIOS
+
+**Fecha:** $dateStr
+**Contratante:** [nombre y documento]
+**Contratista:** [nombre y documento]
+
+---
+
+### PRIMERA. OBJETO
+El contratista prestará al contratante los siguientes servicios: [descripción concreta].
+
+### SEGUNDA. ENTREGABLES Y PLAZOS
+[Qué se entrega y en qué fechas.]
+
+### TERCERA. VALOR Y FORMA DE PAGO
+[Valor total, fechas de pago y medio de pago.]
+
+### CUARTA. CONFIDENCIALIDAD
+[Qué información es confidencial y por cuánto tiempo, si aplica.]
+
+### QUINTA. PROPIEDAD INTELECTUAL
+[A quién pertenece lo que se produzca.]
+
+### SEXTA. TERMINACIÓN
+[Causales y preaviso.]
+
+---
+Un contrato tiene efectos legales: haz que lo revise una persona con conocimientos jurídicos de tu país antes de firmarlo.
 
 ______________________________          ______________________________
-**EL CONTRATANTE**                      **EL CONTRATISTA**
-C.C. / NIT:                             C.C. / NIT:
-""".trimIndent()
-                Pair(doc, "Contrato_Servicios.md")
-            }
+[Contratante]                           [Contratista]
+""".trimIndent() to "Contrato_Servicios.md"
 
-            lowerDoc.contains("petición") || lowerDoc.contains("peticion") -> {
-                val doc = """
-# DERECHO DE PETICIÓN
-**(Artículo 23 de la Constitución Política y Normativa Legal Vigente)**
+            lowerDoc.contains("informe") || lowerDoc.contains("reporte") -> """
+# INFORME
 
-**Fecha:** $dateStr  
-**Ciudad:** Territorio Nacional  
-**Destinatario:** A la Entidad o Autoridad Competente  
-**Asunto:** Solicitud formal de Derecho de Petición respecto a: $cleanTopic
+* **Tema:** [tema]
+* **Fecha:** $dateStr
+* **Autor:** [nombre]
 
 ---
 
-### I. IDENTIFICACIÓN Y FUNDAMENTO
-Por medio de la presente, en ejercicio del derecho fundamental consagrado en el artículo 23 constitucional y disposiciones concordantes del Código de Procedimiento Administrativo y de lo Contencioso Administrativo, acudo respetuosamente ante su despacho con el fin de exponer y solicitar lo siguiente:
+### 1. RESUMEN
+[Dos o tres frases con lo esencial.]
 
-### II. HECHOS Y ANTECEDENTES
-1. **Origen:** Con relación a **$cleanTopic**, se han presentado circunstancias fácticas que ameritan un pronunciamiento formal y una actuación administrativa expedita.
-2. **Afectación:** La situación descrita compromete el normal ejercicio de los derechos legítimos de la parte interesada, requiriendo claridad, acceso a la información y adopción de medidas correctivas.
-3. **Diligencia previa:** Se han agotado las vías ordinarias de comunicación sin obtener una respuesta de fondo, oportuna y congruente.
+### 2. CONTEXTO
+[Antecedentes y por qué se hace el informe.]
 
-### III. PETICIONES CONCRETAS
-De manera respetuosa solicito a ustedes:
-* **PRIMERA:** Disponer el estudio integral de los hechos relacionados con: $cleanTopic.
-* **SEGUNDA:** Emitir una respuesta escrita, motivada, precisa y de fondo dentro de los términos legales establecidos por la ley.
-* **TERCERA:** Aportar copias de los actos, registros o expedientes administrativos vinculados con esta solicitud.
+### 3. HALLAZGOS
+* [Hallazgo 1, con datos.]
+* [Hallazgo 2, con datos.]
 
-### IV. FUNDAMENTOS DE DERECHO
-Fundamento esta petición en el Artículo 23 Constitucional, la Ley Estatutaria de Transparencia y Acceso a la Información, y los principios de eficacia, celeridad y debido proceso administrativo.
-
-### V. NOTIFICACIONES
-Recibiré comunicaciones oficiales y notificaciones en los canales previstos en el expediente correspondiente.
-
----
-**Atentamente,**  
-*Firma del Peticionario / Ciudadano*  
-*Cédula / Documento de Identidad:* ____________________
-""".trimIndent()
-                Pair(doc, "Derecho_de_Peticion.md")
-            }
-
-            lowerDoc.contains("informe") || lowerDoc.contains("reporte") -> {
-                val doc = """
-# INFORME EJECUTIVO Y ANÁLISIS DE SITUACIÓN
-**Documento Estratégico y Técnico • Senda Soberana**
-
-* **Tema / Objetivo:** $cleanTopic
-* **Fecha de Emisión:** $dateStr
-* **Nivel de Clasificación:** Interno / Confiable
-
----
-
-### 1. RESUMEN EJECUTIVO
-El presente informe expone el diagnóstico, los hallazgos sustantivos y las recomendaciones de acción en torno a **$cleanTopic**. El objetivo primordial es dotar a la toma de decisiones de insumos claros, verificables y estructurados.
-
-### 2. CONTEXTO Y DIAGNÓSTICO
-La evaluación realizada permite constatar que los factores asociados a este requerimiento presentan una dinámica crítica que exige intervención ordenada. Se identifican variables clave de operatividad, gestión de riesgos y optimización de recursos.
-
-### 3. HALLAZGOS Y PUNTOS CLAVE
-* **Evaluación de Factibilidad:** Los procesos vinculados requieren alineación metodológica y monitoreo continuo.
-* **Gestión de Recursos:** Es imperativo focalizar los esfuerzos en resolver los cuellos de botella detectados sin comprometer la seguridad ni la autonomía operativa.
-* **Riesgo Residual:** La falta de actuación oportuna podría generar retrasos e impactos desfavorables en los objetivos planteados.
-
-### 4. PLAN DE ACCIÓN Y RECOMENDACIONES
-1. **Corto Plazo (Inmediato):** Formalizar el protocolo de atención y asignar responsabilidades directas para abordar $cleanTopic.
-2. **Mediano Plazo:** Implementar auditorías periódicas de seguimiento y verificar los indicadores de desempeño comprometidos.
-3. **Largo Plazo:** Consolidar un repositorio de lecciones aprendidas para prevenir desviaciones futuras.
+### 4. RECOMENDACIONES
+1. [Acción, responsable y plazo.]
 
 ### 5. CONCLUSIÓN
-Se concluye que existen condiciones óptimas para avanzar, siempre que se cumpla con el plan de acción propuesto con rigurosidad y trazabilidad.
+[Conclusión basada en los hallazgos.]
+""".trimIndent() to "Informe.md"
 
----
-*Elaborado de forma confidencial y soberana en Senda Browser.*
-""".trimIndent()
-                Pair(doc, "Informe_Ejecutivo.md")
-            }
+            lowerDoc.contains("minuta") || lowerDoc.contains("acta") -> """
+# ACTA DE REUNIÓN
 
-            lowerDoc.contains("minuta") || lowerDoc.contains("acta") -> {
-                val doc = """
-# ACTA / MINUTA DE REUNIÓN
-**Sesión de Coordinación y Acuerdos de Trabajo**
-
-* **Fecha:** $dateStr  
-* **Hora de Inicio:** 09:00 AM | **Hora de Cierre:** 10:30 AM  
-* **Tema Central:** $cleanTopic  
-* **Moderador:** Dirección / Coordinación Técnica  
+* **Fecha:** $dateStr
+* **Hora de inicio:** [hora] | **Hora de cierre:** [hora]
+* **Tema:** [tema]
+* **Asistentes:** [nombres]
 
 ---
 
 ### 1. ORDEN DEL DÍA
-1. Verificación del quórum y apertura de sesión.
-2. Presentación del estado actual sobre: $cleanTopic.
-3. Debate y propuestas de los asistentes.
-4. Asignación de compromisos y plazos de entrega.
+1. [Punto 1]
+2. [Punto 2]
 
-### 2. DESARROLLO DE LA SESIÓN
-Se dio inicio a la reunión revisando los antecedentes. Se discutieron las prioridades inherentes a **$cleanTopic**, destacando la necesidad de optimizar tiempos de respuesta y garantizar máxima transparencia y calidad técnica. Los participantes coincidieron en la viabilidad de la estrategia planteada.
+### 2. DESARROLLO
+[Qué se discutió en cada punto.]
 
-### 3. TABLA DE COMPROMISOS Y RESPONSABLES
-| # | Acción Comprometida | Responsable | Fecha Límite |
+### 3. COMPROMISOS
+| # | Acción | Responsable | Fecha límite |
 |---|---|---|---|
-| 1 | Revisar documentación soporte de $cleanTopic | Área Técnica | 3 días hábiles |
-| 2 | Elaborar borrador definitivo de implementación | Coordinación | 5 días hábiles |
-| 3 | Presentar informe de avance a la mesa | Equipo de Trabajo | Próxima sesión |
+| 1 | [acción] | [persona] | [fecha] |
 
 ### 4. CIERRE
-No habiendo más temas por tratar, se da por concluida la sesión y se firma el acta para constancia.
+[Hora de cierre y próxima reunión.]
+""".trimIndent() to "Acta_Reunion.md"
 
----
-*Firma de Asistentes y Coordinador de Sesión.*
-""".trimIndent()
-                Pair(doc, "Minuta_Reunion.md")
-            }
+            lowerDoc.contains("ensayo") || lowerDoc.contains("artículo") || lowerDoc.contains("articulo") -> """
+# [TÍTULO DEL ENSAYO]
 
-            lowerDoc.contains("ensayo") || lowerDoc.contains("artículo") || lowerDoc.contains("articulo") -> {
-                val doc = """
-# ENSAYO ANALÍTICO: REFLEXIÓN SOBRE ${cleanTopic.uppercase()}
-
-**Autor:** Redacción Soberana Senda  
-**Fecha:** $dateStr  
+**Autor:** [nombre]
+**Fecha:** $dateStr
 
 ---
 
 ### INTRODUCCIÓN
-El abordaje de **$cleanTopic** constituye un desafío contemporáneo ineludible. En un entorno saturado de información y transformaciones vertiginosas, comprender las raíces conceptuales y las implicaciones prácticas de este fenómeno se convierte en una herramienta decisiva para el pensamiento crítico y la soberanía del individuo.
+[Presenta el tema y tu tesis en una o dos frases.]
 
-### DESARROLLO ARGUMENTATIVO
-En primer lugar, es menester examinar los principios que fundamentan esta materia. Lejos de ser un aspecto aislado, **$cleanTopic** se interconecta directamente con la libertad, la técnica y la capacidad de autodeterminación. Cuando se analizan sus aristas, se advierte que las soluciones convencionales a menudo omiten la dimensión ética y la preservación de la privacidad.
+### DESARROLLO
+[Primer argumento, con evidencia o fuentes.]
 
-Por otra parte, la evidencia disponible demuestra que los modelos descentralizados, éticos y transparentes no solo son viables, sino necesarios frente a monopolios digitales y esquemas de control centralizado. La aplicación práctica de estos postulados permite recuperar el control sobre los propios procesos y datos.
+[Segundo argumento, con evidencia o fuentes.]
+
+[Posible objeción y tu respuesta.]
 
 ### CONCLUSIÓN
-En definitiva, avanzar en **$cleanTopic** exige coherencia entre los medios utilizados y los fines perseguidos. La autonomía técnica y la ética compartida representan la única senda sostenible hacia un porvenir más equitativo y consciente.
-""".trimIndent()
-                Pair(doc, "Ensayo_Analitico.md")
-            }
+[Retoma la tesis y lo que se desprende de los argumentos.]
 
-            else -> {
-                val doc = """
-# CARTA FORMAL DE COMUNICACIÓN
+### FUENTES
+* [Autor, título, año.]
+""".trimIndent() to "Ensayo.md"
 
-**Fecha:** $dateStr  
-**Ciudad:** Territorio Nacional  
-**Asunto:** $cleanTopic  
+            else -> """
+# CARTA
 
-**Señores:**  
-Presente / A quien corresponda  
-
-**Respetados señores:**  
-
-Por medio de la presente comunicación, me dirijo a ustedes de manera atenta y respetuosa con el propósito de manifestar lo siguiente con relación a **$cleanTopic**:
-
-Es de conocimiento que los asuntos vinculados a este requerimiento demandan una atención oportuna y formal. Tras una valoración detallada, considero imprescindible dejar constancia escrita de las circunstancias que motivan este acercamiento y de la necesidad de concertar acciones claras al respecto.
-
-Por lo anterior, solicito amablemente se sirvan tomar nota de esta comunicación, dar curso al trámite pertinente y disponer las gestiones necesarias para resolver de manera favorable y expedita lo planteado.
-
-Agradeciendo de antemano su atención a la presente solicitud y en espera de su pronta y valiosa respuesta, me suscribo de ustedes.
+**Fecha:** $dateStr
+**Ciudad:** [ciudad]
+**Para:** [nombre, cargo y entidad]
+**Asunto:** [asunto en una línea]
 
 ---
-**Atentamente,**  
 
-____________________________________  
-*Firma de la Parte Remitente*  
-*Documento de Identidad:* ____________  
-*Contacto:* _________________________  
-""".trimIndent()
-                Pair(doc, "Carta_Formal.md")
-            }
+Respetado/a [nombre]:
+
+[Explica en uno o dos párrafos el motivo de la carta, con los datos concretos.]
+
+[Indica qué solicitas o qué esperas como respuesta.]
+
+---
+**Atentamente,**
+
+____________________________________
+[Nombre completo]
+[Documento de identidad]
+[Teléfono o correo]
+""".trimIndent() to "Carta.md"
         }
+        return Pair("$notice\n\n$body", fileName)
     }
 
 

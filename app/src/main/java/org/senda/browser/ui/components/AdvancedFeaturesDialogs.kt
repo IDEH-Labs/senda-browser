@@ -457,7 +457,7 @@ fun ExtensionsManagerDialog(
 }
 
 // =========================================================================
-// 3. SINCRONIZACIÓN SOBERANA & RED (FIREFOX SYNC, WEBDAV & HTML EXPORT)
+// 3. COPIA DE MARCADORES (WEBDAV & HTML EXPORT)
 // =========================================================================
 
 @Composable
@@ -468,18 +468,7 @@ fun SovereignSyncDialog(
     val strings = LocalSendaStrings.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var selectedTab by remember { mutableIntStateOf(if (prefs.fxaIsConnected) 0 else 0) }
-
-    // Firefox Sync States
-    var fxaEmailInput by remember { mutableStateOf(prefs.fxaEmail) }
-    var fxaCustomServerInput by remember { mutableStateOf(prefs.fxaCustomSyncServer) }
-    var showCustomServerField by remember { mutableStateOf(prefs.fxaCustomSyncServer.isNotBlank()) }
-    var syncBookmarks by remember { mutableStateOf(prefs.syncBookmarks) }
-    var syncTabs by remember { mutableStateOf(prefs.syncTabs) }
-    var syncHistory by remember { mutableStateOf(prefs.syncHistory) }
-    var isFxaConnected by remember { mutableStateOf(prefs.fxaIsConnected) }
-    var fxaSyncNotice by remember { mutableStateOf<String?>(null) }
-    var isFxaSyncing by remember { mutableStateOf(false) }
+    var selectedTab by remember { mutableIntStateOf(0) }
 
     // WebDAV states
     var serverUrl by rememberSaveable { mutableStateOf(prefs.webdavUrl) }
@@ -487,6 +476,8 @@ fun SovereignSyncDialog(
     var password by rememberSaveable { mutableStateOf(prefs.webdavPassword) }
     var syncStatus by remember { mutableStateOf<String?>(null) }
     var isSyncing by remember { mutableStateOf(false) }
+    // Con http:// la contraseña viaja legible: se avisa una vez y hay que pulsar de nuevo.
+    var plainHttpAcknowledged by remember { mutableStateOf(false) }
 
     // Launcher para importar HTML estándar
     val importHtmlLauncher = rememberLauncherForActivityResult(
@@ -531,260 +522,19 @@ fun SovereignSyncDialog(
                     Tab(
                         selected = selectedTab == 0,
                         onClick = { selectedTab = 0 },
-                        text = { Text(strings.sync_tab_fxa, fontSize = 11.sp, fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal) }
+                        text = { Text(strings.sync_tab_webdav, fontSize = 11.sp, fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal) }
                     )
                     Tab(
                         selected = selectedTab == 1,
                         onClick = { selectedTab = 1 },
-                        text = { Text(strings.sync_tab_webdav, fontSize = 11.sp, fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal) }
-                    )
-                    Tab(
-                        selected = selectedTab == 2,
-                        onClick = { selectedTab = 2 },
-                        text = { Text(strings.sync_tab_html, fontSize = 11.sp, fontWeight = if (selectedTab == 2) FontWeight.Bold else FontWeight.Normal) }
+                        text = { Text(strings.sync_tab_html, fontSize = 11.sp, fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal) }
                     )
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))
 
                 if (selectedTab == 0) {
-                    // TAB 0: FIREFOX SYNC A TRAVÉS DE LA RED (E2EE)
-                    Text(
-                        text = strings.sync_fxa_title,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = strings.sync_fxa_desc,
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    if (isFxaConnected) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = strings.sync_fxa_connected_header,
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = fxaEmailInput.ifBlank { "usuario@firefox.com" },
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                if (prefs.fxaCustomSyncServer.isNotBlank()) {
-                                    Text(
-                                        text = "${strings.sync_server_label} ${prefs.fxaCustomSyncServer}",
-                                        fontSize = 11.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                if (prefs.lastSyncTime > 0) {
-                                    Text(
-                                        text = "${strings.sync_last_sync_prefix} ${syncDateFormat.format(Date(prefs.lastSyncTime))}",
-                                        fontSize = 10.sp,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        // Elementos a sincronizar
-                        Text(text = strings.sync_items_title, style = MaterialTheme.typography.labelLarge)
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    syncBookmarks = !syncBookmarks
-                                    prefs.syncBookmarks = syncBookmarks
-                                },
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Checkbox(checked = syncBookmarks, onCheckedChange = {
-                                syncBookmarks = it
-                                prefs.syncBookmarks = it
-                            })
-                            Text(strings.sync_item_bookmarks, style = MaterialTheme.typography.bodyMedium)
-                        }
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    syncTabs = !syncTabs
-                                    prefs.syncTabs = syncTabs
-                                },
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Checkbox(checked = syncTabs, onCheckedChange = {
-                                syncTabs = it
-                                prefs.syncTabs = it
-                            })
-                            Text(strings.sync_item_tabs, style = MaterialTheme.typography.bodyMedium)
-                        }
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    syncHistory = !syncHistory
-                                    prefs.syncHistory = syncHistory
-                                },
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Checkbox(checked = syncHistory, onCheckedChange = {
-                                syncHistory = it
-                                prefs.syncHistory = it
-                            })
-                            Text(strings.sync_item_history, style = MaterialTheme.typography.bodyMedium)
-                        }
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        Button(
-                            onClick = {
-                                isFxaSyncing = true
-                                fxaSyncNotice = strings.sync_notice_fxa_syncing
-                                scope.launch {
-                                    kotlinx.coroutines.delay(1200)
-                                    prefs.lastSyncTime = System.currentTimeMillis()
-                                    isFxaSyncing = false
-                                    fxaSyncNotice = strings.sync_notice_fxa_success
-                                }
-                            },
-                            enabled = !isFxaSyncing,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(10.dp)
-                        ) {
-                            if (isFxaSyncing) {
-                                CircularProgressIndicator(modifier = Modifier.size(16.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
-                                Spacer(modifier = Modifier.width(8.dp))
-                            } else {
-                                Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                            }
-                            Text(strings.sync_btn_sync_network)
-                        }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        OutlinedButton(
-                            onClick = {
-                                isFxaConnected = false
-                                prefs.fxaIsConnected = false
-                                prefs.fxaEmail = ""
-                                fxaSyncNotice = strings.sync_notice_fxa_disconnected
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(10.dp)
-                        ) {
-                            Icon(Icons.Default.PowerSettingsNew, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(strings.sync_btn_disconnect)
-                        }
-                    } else {
-                        OutlinedTextField(
-                            value = fxaEmailInput,
-                            onValueChange = { fxaEmailInput = it },
-                            label = { Text(strings.sync_field_email) },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(10.dp)
-                        )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { showCustomServerField = !showCustomServerField }
-                                .padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Checkbox(
-                                checked = showCustomServerField,
-                                onCheckedChange = { showCustomServerField = it }
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Column {
-                                Text(text = strings.sync_chk_self_hosted, fontSize = 12.sp)
-                                Text(text = strings.sync_chk_self_hosted_sub, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-
-                        if (showCustomServerField) {
-                            Spacer(modifier = Modifier.height(4.dp))
-                            OutlinedTextField(
-                                value = fxaCustomServerInput,
-                                onValueChange = { fxaCustomServerInput = it },
-                                label = { Text(strings.sync_field_custom_server) },
-                                placeholder = { Text("https://sync.mi-red-local.org/1.5/") },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(10.dp)
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        Button(
-                            onClick = {
-                                if (fxaEmailInput.isNotBlank()) {
-                                    isFxaConnected = true
-                                    prefs.fxaIsConnected = true
-                                    prefs.fxaEmail = fxaEmailInput.trim()
-                                    prefs.fxaCustomSyncServer = if (showCustomServerField) fxaCustomServerInput.trim() else ""
-                                    prefs.syncType = "FIREFOX_SYNC"
-                                    prefs.lastSyncTime = System.currentTimeMillis()
-                                    fxaSyncNotice = strings.sync_notice_fxa_connected
-                                } else {
-                                    fxaSyncNotice = strings.sync_notice_fxa_email_req
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(10.dp)
-                        ) {
-                            Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(strings.sync_btn_connect_fxa)
-                        }
-                    }
-
-                    if (fxaSyncNotice != null) {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Surface(
-                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = fxaSyncNotice ?: "",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.padding(10.dp)
-                            )
-                        }
-                    }
-
-                } else if (selectedTab == 1) {
-                    // TAB 1: NUBE PROPIA WEBDAV
+                    // TAB 0: COPIA EN NUBE PROPIA WEBDAV
                     Text(
                         text = strings.sync_webdav_title,
                         fontWeight = FontWeight.Bold,
@@ -802,7 +552,7 @@ fun SovereignSyncDialog(
 
                     OutlinedTextField(
                         value = serverUrl,
-                        onValueChange = { serverUrl = it; prefs.webdavUrl = it },
+                        onValueChange = { serverUrl = it; prefs.webdavUrl = it; plainHttpAcknowledged = false },
                         label = { Text(strings.sync_webdav_url_label) },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(10.dp),
@@ -855,6 +605,11 @@ fun SovereignSyncDialog(
                         onClick = {
                             if (serverUrl.isBlank()) {
                                 Toast.makeText(context, strings.sync_webdav_url_req, Toast.LENGTH_SHORT).show()
+                                return@Button
+                            }
+                            if (serverUrl.trim().startsWith("http://", ignoreCase = true) && !plainHttpAcknowledged) {
+                                plainHttpAcknowledged = true
+                                syncStatus = strings.sync_webdav_http_warning
                                 return@Button
                             }
                             isSyncing = true
@@ -919,7 +674,7 @@ fun SovereignSyncDialog(
                     }
 
                 } else {
-                    // TAB 2: RESPALDO HTML UNIVERSAL & LOCAL
+                    // TAB 1: RESPALDO HTML UNIVERSAL & LOCAL
                     Text(
                         text = strings.sync_html_title,
                         fontWeight = FontWeight.Bold,

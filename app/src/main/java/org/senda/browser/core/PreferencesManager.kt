@@ -41,10 +41,24 @@ class PreferencesManager(context: Context) {
     private companion object {
         val historyExecutor: java.util.concurrent.ExecutorService =
             java.util.concurrent.Executors.newSingleThreadExecutor { r -> Thread(r, "senda-history") }
+
+        // Borrar sube la generación: las visitas que ya estaban en cola no deben volver a escribir el historial
+        val historyLock = Any()
+        val historyGeneration = java.util.concurrent.atomic.AtomicLong()
     }
 
     private val prefs: SharedPreferences =
         context.getSharedPreferences("senda_preferences", Context.MODE_PRIVATE)
+
+    init {
+        // Versiones anteriores simulaban Firefox Sync: borrar la «cuenta conectada» que nunca existió.
+        if (prefs.contains("fxa_is_connected") || prefs.contains("sync_type")) {
+            prefs.edit()
+                .remove("sync_type").remove("fxa_email").remove("fxa_is_connected").remove("fxa_custom_server")
+                .remove("sync_bookmarks").remove("sync_tabs").remove("sync_history").remove("last_sync_time")
+                .apply()
+        }
+    }
 
     // --- PÁGINA DE INICIO Y ESTILO ZEN ---
     var zenHomeLayout: ZenHomeLayout
@@ -71,8 +85,22 @@ class PreferencesManager(context: Context) {
         set(value) = prefs.edit().putBoolean("show_zen_news_feed", value).apply()
 
     var selectedWallpaperId: String
-        get() = prefs.getString("selected_wallpaper_id", "wallpaper_gnulinux") ?: "wallpaper_gnulinux"
+        get() = prefs.getString("selected_wallpaper_id", "debian_ceratopsian") ?: "debian_ceratopsian"
         set(value) = prefs.edit().putString("selected_wallpaper_id", value).apply()
+
+    /** Cambio de fondo: 0 = fijo, -1 = uno distinto en cada pestaña nueva, >0 = cada tantos minutos. */
+    var wallpaperRotationMinutes: Int
+        get() = prefs.getInt("wallpaper_rotation_minutes", 0)
+        set(value) = prefs.edit().putInt("wallpaper_rotation_minutes", value).apply()
+
+    /** Fondo que se está mostrando en la rotación y cuándo empezó (para seguir el turno entre pestañas). */
+    var wallpaperRotationCurrentId: String?
+        get() = prefs.getString("wallpaper_rotation_current_id", null)
+        set(value) = prefs.edit().putString("wallpaper_rotation_current_id", value).apply()
+
+    var wallpaperRotationChangedAt: Long
+        get() = prefs.getLong("wallpaper_rotation_changed_at", 0L)
+        set(value) = prefs.edit().putLong("wallpaper_rotation_changed_at", value).apply()
 
     var customWallpaperPath: String?
         get() = prefs.getString("custom_wallpaper_path", null)
@@ -293,6 +321,14 @@ class PreferencesManager(context: Context) {
     /** Pestaña guardada para reabrirla al volver a Senda (nunca se guardan las privadas). */
     data class SavedTab(val url: String, val title: String, val lastUsed: Long)
 
+    /**
+     * Al abrir Senda: HOME = página de inicio limpia al frente (las pestañas anteriores siguen en la lista),
+     * RESUME = continuar en la última pestaña, CLEAN = empezar sin las pestañas anteriores.
+     */
+    var startupMode: String
+        get() = prefs.getString("startup_mode", "HOME") ?: "HOME"
+        set(value) = prefs.edit().putString("startup_mode", value).apply()
+
     fun saveOpenTabs(tabs: List<SavedTab>, activeIndex: Int) {
         val array = org.json.JSONArray()
         tabs.forEach { t ->
@@ -489,6 +525,11 @@ class PreferencesManager(context: Context) {
         set(value) = prefs.edit().putBoolean("offer_translations", value).apply()
 
     // --- SENDA LABS & DESARROLLADOR ---
+    /** Safe Browsing descarga listas de Google al arrancar: activado por defecto, pero el usuario puede quitarlo. */
+    var safeBrowsingEnabled: Boolean
+        get() = prefs.getBoolean("safe_browsing_enabled", true)
+        set(value) = prefs.edit().putBoolean("safe_browsing_enabled", value).apply()
+
     var remoteDebuggingEnabled: Boolean
         get() = prefs.getBoolean("remote_debugging_enabled", false)
         set(value) = prefs.edit().putBoolean("remote_debugging_enabled", value).apply()
@@ -501,40 +542,12 @@ class PreferencesManager(context: Context) {
         get() = prefs.getString("user_custom_script", "") ?: ""
         set(value) = prefs.edit().putString("user_custom_script", value).apply()
 
-    // --- SINCRONIZACIÓN (P2P ÉTICO Y FIREFOX SYNC E2EE) ---
-    var syncType: String
-        get() = prefs.getString("sync_type", "P2P_LOCAL") ?: "P2P_LOCAL"
-        set(value) = prefs.edit().putString("sync_type", value).apply()
-
-    var fxaEmail: String
-        get() = prefs.getString("fxa_email", "") ?: ""
-        set(value) = prefs.edit().putString("fxa_email", value).apply()
-
-    var fxaIsConnected: Boolean
-        get() = prefs.getBoolean("fxa_is_connected", false)
-        set(value) = prefs.edit().putBoolean("fxa_is_connected", value).apply()
-
-    var fxaCustomSyncServer: String
-        get() = prefs.getString("fxa_custom_server", "") ?: ""
-        set(value) = prefs.edit().putString("fxa_custom_server", value).apply()
-
-    var syncBookmarks: Boolean
-        get() = prefs.getBoolean("sync_bookmarks", true)
-        set(value) = prefs.edit().putBoolean("sync_bookmarks", value).apply()
-
-    var syncTabs: Boolean
-        get() = prefs.getBoolean("sync_tabs", true)
-        set(value) = prefs.edit().putBoolean("sync_tabs", value).apply()
-
-    var syncHistory: Boolean
-        get() = prefs.getBoolean("sync_history", false)
-        set(value) = prefs.edit().putBoolean("sync_history", value).apply()
-
-    var lastSyncTime: Long
-        get() = prefs.getLong("last_sync_time", 0L)
-        set(value) = prefs.edit().putLong("last_sync_time", value).apply()
-
     // --- INTELIGENCIA ARTIFICIAL SOBERANA ---
+    /** El asistente puede consultar Wikipedia y DuckDuckGo; desactivado: nada de lo que escribes sale del teléfono. */
+    var aiWebLookup: Boolean
+        get() = prefs.getBoolean("ai_web_lookup", false)
+        set(value) = prefs.edit().putBoolean("ai_web_lookup", value).apply()
+
     var aiBackendMode: String
         get() = prefs.getString("ai_backend_mode", "CHIP") ?: "CHIP"
         set(value) = prefs.edit().putString("ai_backend_mode", value).apply()
@@ -547,8 +560,13 @@ class PreferencesManager(context: Context) {
         get() = prefs.getString("ai_ollama_model", "llama3.2") ?: "llama3.2"
         set(value) = prefs.edit().putString("ai_ollama_model", value).apply()
 
+    /** Resultado de la calibración CPU/GPU de este teléfono (JSON de SendaAiCalibrator), o null si no se midió. */
+    var aiCalibration: String?
+        get() = prefs.getString("ai_calibration", null)
+        set(value) = prefs.edit().putString("ai_calibration", value).apply()
+
     var selectedLocalAiModel: String
-        get() = prefs.getString("selected_local_ai_model", org.senda.browser.core.ai.SendaAiModels.MODEL_QWEN_3_5_0_8B.id) ?: org.senda.browser.core.ai.SendaAiModels.MODEL_QWEN_3_5_0_8B.id
+        get() = prefs.getString("selected_local_ai_model", org.senda.browser.core.ai.SendaAiModels.MODEL_GEMMA_4_E2B.id) ?: org.senda.browser.core.ai.SendaAiModels.MODEL_GEMMA_4_E2B.id
         set(value) = prefs.edit().putString("selected_local_ai_model", value).apply()
 
     // --- FAVORITOS / MARCADORES ---
@@ -680,32 +698,38 @@ class PreferencesManager(context: Context) {
         val now = System.currentTimeMillis()
         // Leer, editar y guardar ~1000 entradas en JSON se hacía en el hilo principal en cada página (dos
         // veces): ahora va en segundo plano y en orden, sin trabar el desplazamiento ni la carga
+        val generation = historyGeneration.get()
         historyExecutor.execute {
-            val current = getHistory().toMutableList()
-            val cleanUrl = url.trim()
-            val cleanTitle = title.ifBlank { cleanUrl }
-            // Misma página que la última visitada (recarga, sesión restaurada, volver a abrir Senda):
-            // se actualiza su hora en vez de repetirla en la lista
-            current.removeAll { it.url == cleanUrl && now - it.timestamp < 30_000L }
-            if (current.firstOrNull()?.url == cleanUrl) current.removeAt(0)
-            current.add(0, HistoryItem(title = cleanTitle, url = cleanUrl, timestamp = now))
-            saveHistory(current)
+            synchronized(historyLock) {
+                if (generation != historyGeneration.get()) return@execute
+                val current = getHistory().toMutableList()
+                val cleanUrl = url.trim()
+                val cleanTitle = title.ifBlank { cleanUrl }
+                // Misma página que la última visitada (recarga, sesión restaurada, volver a abrir Senda):
+                // se actualiza su hora en vez de repetirla en la lista
+                current.removeAll { it.url == cleanUrl && now - it.timestamp < 30_000L }
+                if (current.firstOrNull()?.url == cleanUrl) current.removeAt(0)
+                current.add(0, HistoryItem(title = cleanTitle, url = cleanUrl, timestamp = now))
+                saveHistory(current)
+            }
         }
     }
 
-    fun deleteHistoryItem(id: String) {
+    fun deleteHistoryItem(id: String) = synchronized(historyLock) {
         val current = getHistory().filterNot { it.id == id }
         saveHistory(current)
     }
 
-    fun clearHistory() {
+    fun clearHistory() = synchronized(historyLock) {
+        historyGeneration.incrementAndGet()
         prefs.edit().remove("user_browsing_history").apply()
     }
 
     fun clearHistoryRange(rangeMillis: Long) {
         if (rangeMillis <= 0L) {
             clearHistory()
-        } else {
+        } else synchronized(historyLock) {
+            historyGeneration.incrementAndGet()
             val cutoff = System.currentTimeMillis() - rangeMillis
             val filtered = getHistory().filter { it.timestamp < cutoff }
             saveHistory(filtered)

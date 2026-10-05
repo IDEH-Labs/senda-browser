@@ -28,6 +28,7 @@ fun SettingsTabsDialog(
     onSettingsChanged: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    var startupMode by remember { mutableStateOf(prefs.startupMode) }
     var closePolicy by remember { mutableStateOf(prefs.closeTabsPolicy) }
     var viewMode by remember { mutableStateOf(prefs.tabsViewMode) }
     var openInBackground by remember { mutableStateOf(prefs.openLinksInBackground) }
@@ -37,6 +38,42 @@ fun SettingsTabsDialog(
         title = { Text(strings.st_tabs_title) },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text(
+                    text = strings.dlg_startup_title,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                listOf(
+                    "HOME" to strings.dlg_startup_home,
+                    "RESUME" to strings.dlg_startup_resume,
+                    "CLEAN" to strings.dlg_startup_clean
+                ).forEach { (key, label) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                startupMode = key
+                                prefs.startupMode = key
+                                onSettingsChanged()
+                            }
+                            .padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = startupMode == key,
+                            onClick = {
+                                startupMode = key
+                                prefs.startupMode = key
+                                onSettingsChanged()
+                            }
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = label, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+
                 Text(
                     text = strings.dlg_tabs_autoclose_title,
                     style = MaterialTheme.typography.titleSmall,
@@ -171,7 +208,7 @@ fun SettingsHomeDialog(
                 }
                 prefs.customWallpaperPath = target.absolutePath
                 customWpPath = target.absolutePath
-                prefs.selectedWallpaperId = "custom_user"
+                FreeWallpapers.choose(prefs, "custom_user")
                 selectedWp = "custom_user"
                 onSettingsChanged()
             } catch (_: Exception) {}
@@ -243,6 +280,39 @@ fun SettingsHomeDialog(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
 
+                    // Fondo fijo o rotativo
+                    var rotation by remember { mutableIntStateOf(prefs.wallpaperRotationMinutes) }
+                    Text(text = strings.wp_rotation_title, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+                    androidx.compose.foundation.layout.FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        listOf(
+                            0 to strings.wp_rotation_fixed,
+                            -1 to strings.wp_rotation_new_tab,
+                            1 to "1 min", 5 to "5 min", 15 to "15 min", 60 to "1 h"
+                        ).forEach { (minutes, label) ->
+                            FilterChip(
+                                selected = rotation == minutes,
+                                onClick = {
+                                    rotation = minutes
+                                    prefs.wallpaperRotationMinutes = minutes
+                                    // Al activar la rotación se empieza por el fondo elegido
+                                    if (minutes != 0) FreeWallpapers.choose(prefs, selectedWp.takeIf { it != "custom_user" } ?: FreeWallpapers.items.first().id)
+                                    onSettingsChanged()
+                                },
+                                label = { Text(label, fontSize = 12.sp) }
+                            )
+                        }
+                    }
+                    Text(
+                        text = if (rotation == 0) strings.wp_rotation_fixed_hint else strings.wp_rotation_on_hint,
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -259,7 +329,7 @@ fun SettingsHomeDialog(
                             onClick = {
                                 if (customWpPath != null) {
                                     selectedWp = "custom_user"
-                                    prefs.selectedWallpaperId = "custom_user"
+                                    FreeWallpapers.choose(prefs, "custom_user"); rotation = 0
                                     onSettingsChanged()
                                 } else {
                                     try {
@@ -293,7 +363,7 @@ fun SettingsHomeDialog(
                                 .fillMaxWidth()
                                 .clickable {
                                     selectedWp = wp.id
-                                    prefs.selectedWallpaperId = wp.id
+                                    FreeWallpapers.choose(prefs, wp.id)
                                     onSettingsChanged()
                                 }
                                 .padding(vertical = 5.dp),
@@ -303,14 +373,15 @@ fun SettingsHomeDialog(
                                 selected = selectedWp == wp.id,
                                 onClick = {
                                     selectedWp = wp.id
-                                    prefs.selectedWallpaperId = wp.id
+                                    FreeWallpapers.choose(prefs, wp.id)
                                     onSettingsChanged()
                                 }
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Column {
                                 Text(text = wp.name, style = MaterialTheme.typography.bodyMedium, fontWeight = if (selectedWp == wp.id) FontWeight.Bold else FontWeight.Normal)
-                                Text(text = "${wp.category} • ${wp.license}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(text = "${wp.category} · ${wp.author} · ${wp.license}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                wp.sourceUrl?.let { Text(text = it, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)) }
                             }
                         }
                     }

@@ -59,9 +59,9 @@ fun SendaVaultDialog(
         fun explain(e: org.senda.browser.core.security.VaultUnavailableException) {
             val msg = when (e.reason) {
                 org.senda.browser.core.security.VaultUnavailableException.Reason.NO_SCREEN_LOCK ->
-                    "Configura un PIN, patrón o contraseña en el teléfono para usar la bóveda"
+                    strings.vault_err_no_lock
                 org.senda.browser.core.security.VaultUnavailableException.Reason.KEY_INVALIDATED ->
-                    "Se registró una huella nueva: por seguridad la clave de la bóveda quedó invalidada"
+                    strings.vault_err_key_invalidated
             }
             Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
         }
@@ -75,18 +75,30 @@ fun SendaVaultDialog(
                 } catch (e: org.senda.browser.core.security.VaultUnavailableException) {
                     explain(e)
                 } catch (e: Exception) {
-                    Toast.makeText(context, "No se pudo usar la bóveda: ${e.message}", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, strings.vault_err_generic.format(e.message ?: ""), Toast.LENGTH_LONG).show()
                 }
             }
         } catch (e: org.senda.browser.core.security.VaultUnavailableException) {
             explain(e)
         } catch (e: Exception) {
-            Toast.makeText(context, "No se pudo usar la bóveda: ${e.message}", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, strings.vault_err_generic.format(e.message ?: ""), Toast.LENGTH_LONG).show()
         }
     }
     val coroutineScope = rememberCoroutineScope()
 
-    var activeSubView by rememberSaveable { mutableStateOf("main") } // main, list, generator, audit, add
+    var activeSubView by rememberSaveable { mutableStateOf("main") } // main, list, generator, audit, add, edit
+    // Edición: la contraseña descifrada vive solo en memoria mientras el formulario está abierto
+    var editId by remember { mutableStateOf<String?>(null) }
+    var editSite by remember { mutableStateOf("") }
+    var editUser by remember { mutableStateOf("") }
+    var editPass by remember { mutableStateOf("") }
+    var editPassVisible by remember { mutableStateOf(false) }
+    fun closeEdit() {
+        editId = null
+        editPass = ""
+        editPassVisible = false
+        activeSubView = "list"
+    }
     var credentials by remember { mutableStateOf(SendaVaultManager.getCredentials(context)) }
     var searchQuery by remember { mutableStateOf("") }
 
@@ -116,6 +128,9 @@ fun SendaVaultDialog(
         refreshGeneratedPassword()
     }
 
+    // Dónde guarda Android realmente la clave maestra (se muestra tal cual, sin suponer hardware seguro)
+    val keyLevel = remember { SendaVaultManager.keySecurityLevel() }
+
     // Auditoría & Estrés
     var isRunningAudit by remember { mutableStateOf(false) }
     var auditReport by remember { mutableStateOf<VaultAuditReport?>(null) }
@@ -140,10 +155,11 @@ fun SendaVaultDialog(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = when (activeSubView) {
-                        "audit" -> "Auditoría Forense & Estrés"
-                        "generator" -> "Generador de Claves Seguras"
-                        "list" -> "Credenciales Guardadas (${credentials.size})"
-                        "add" -> "Añadir Credencial"
+                        "audit" -> strings.vault_title_audit
+                        "generator" -> strings.vault_title_generator
+                        "list" -> strings.vault_title_list.format(credentials.size)
+                        "add" -> strings.vault_title_add
+                        "edit" -> strings.vault_title_edit
                         else -> strings.st_passwords_title
                     },
                     style = MaterialTheme.typography.titleMedium,
@@ -184,13 +200,18 @@ fun SendaVaultDialog(
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Column {
                                         Text(
-                                            text = "Cifrado Hardware AES-256-GCM Activo",
+                                            text = strings.vault_badge_title,
                                             fontWeight = FontWeight.SemiBold,
                                             fontSize = 12.sp,
                                             color = MaterialTheme.colorScheme.onPrimaryContainer
                                         )
                                         Text(
-                                            text = "Custodiado en el silicio (Keystore / TEE)",
+                                            text = when (keyLevel) {
+                                                "STRONGBOX" -> strings.vault_key_strongbox
+                                                "TEE" -> strings.vault_key_tee
+                                                "SOFTWARE" -> strings.vault_key_software
+                                                else -> strings.vault_key_unknown
+                                            },
                                             fontSize = 10.sp,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -200,8 +221,7 @@ fun SendaVaultDialog(
 
                             Spacer(modifier = Modifier.height(14.dp))
 
-                            // «Recordar inicios de sesión» y «Exigir huella para autocompletar» se quitaron: Senda aún
-                            // no guarda ni rellena contraseñas en las páginas, y los interruptores no hacían nada
+                            // Guardar y rellenar en las páginas: SendaVaultLoginStorage + SendaPrompt.LoginSelect/LoginSave
                             Text(
                                 text = strings.dlg_passwords_info,
                                 fontSize = 12.sp,
@@ -218,7 +238,7 @@ fun SendaVaultDialog(
                                             credentials = SendaVaultManager.getCredentials(context)
                                             activeSubView = "list"
                                         } else {
-                                            Toast.makeText(context, "Autenticación requerida para abrir la bóveda", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, strings.vault_auth_required, Toast.LENGTH_SHORT).show()
                                         }
                                     }
                                 },
@@ -227,7 +247,7 @@ fun SendaVaultDialog(
                             ) {
                                 Icon(Icons.Default.VpnKey, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Ver Bóveda de Contraseñas (${credentials.size})", fontSize = 12.sp)
+                                Text(strings.vault_open.format(credentials.size), fontSize = 12.sp)
                             }
 
                             Spacer(modifier = Modifier.height(8.dp))
@@ -240,7 +260,7 @@ fun SendaVaultDialog(
                             ) {
                                 Icon(Icons.Default.Key, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Generador de Claves Seguras", fontSize = 12.sp)
+                                Text(strings.vault_title_generator, fontSize = 12.sp)
                             }
 
                             Spacer(modifier = Modifier.height(8.dp))
@@ -252,7 +272,7 @@ fun SendaVaultDialog(
                                     if (auditReport == null) {
                                         isRunningAudit = true
                                         coroutineScope.launch(Dispatchers.Default) {
-                                            val rep = SendaVaultAuditRunner.runFullAudit(context, stressCycles = 1000)
+                                            val rep = SendaVaultAuditRunner.runFullAudit(context, strings, stressCycles = 1000)
                                             withContext(Dispatchers.Main) {
                                                 auditReport = rep
                                                 isRunningAudit = false
@@ -266,7 +286,7 @@ fun SendaVaultDialog(
                             ) {
                                 Icon(Icons.Default.Speed, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Auditoría Criptográfica & Estrés", fontSize = 12.sp)
+                                Text(strings.vault_title_audit, fontSize = 12.sp)
                             }
 
                             Spacer(modifier = Modifier.height(8.dp))
@@ -291,7 +311,7 @@ fun SendaVaultDialog(
                             ) {
                                 Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(15.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Configurar Autocompletado del Sistema Android", fontSize = 11.sp)
+                                Text(strings.vault_autofill, fontSize = 11.sp)
                             }
                         }
                     }
@@ -302,7 +322,7 @@ fun SendaVaultDialog(
                             OutlinedTextField(
                                 value = searchQuery,
                                 onValueChange = { searchQuery = it },
-                                placeholder = { Text("Buscar dominio o usuario...", fontSize = 12.sp) },
+                                placeholder = { Text(strings.vault_search, fontSize = 12.sp) },
                                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp)) },
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true,
@@ -324,7 +344,7 @@ fun SendaVaultDialog(
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
-                                        text = if (credentials.isEmpty()) "No hay contraseñas guardadas aún." else "Sin coincidencias.",
+                                        text = if (credentials.isEmpty()) strings.vault_empty else strings.vault_no_match,
                                         fontSize = 12.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -342,9 +362,21 @@ fun SendaVaultDialog(
                                             onDelete = {
                                                 SendaVaultManager.deleteCredential(context, item.id)
                                                 credentials = SendaVaultManager.getCredentials(context)
-                                                Toast.makeText(context, "Credencial eliminada", Toast.LENGTH_SHORT).show()
+                                                Toast.makeText(context, strings.vault_deleted, Toast.LENGTH_SHORT).show()
                                             },
-                                            runSecure = { action -> secure(action) }
+                                            runSecure = { action -> secure(action) },
+                                            onEdit = {
+                                                secure {
+                                                    val chars = SendaVaultManager.decryptPassword(item.encryptedPasswordBase64, item.ivBase64)
+                                                    editPass = String(chars)
+                                                    SendaVaultManager.wipe(chars)
+                                                    editId = item.id
+                                                    editSite = item.originUrl.ifBlank { item.domain }
+                                                    editUser = item.username
+                                                    editPassVisible = false
+                                                    activeSubView = "edit"
+                                                }
+                                            }
                                         )
                                     }
                                 }
@@ -359,7 +391,7 @@ fun SendaVaultDialog(
                             ) {
                                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Añadir Nueva Cuenta", fontSize = 12.sp)
+                                Text(strings.vault_title_add, fontSize = 12.sp)
                             }
                         }
                     }
@@ -378,7 +410,7 @@ fun SendaVaultDialog(
                             OutlinedTextField(
                                 value = addDomain,
                                 onValueChange = { addDomain = it },
-                                label = { Text("Sitio web o Dominio (ej. github.com)", fontSize = 12.sp) },
+                                label = { Text(strings.vault_site, fontSize = 12.sp) },
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true
                             )
@@ -386,7 +418,7 @@ fun SendaVaultDialog(
                             OutlinedTextField(
                                 value = addUser,
                                 onValueChange = { addUser = it },
-                                label = { Text("Usuario o Correo", fontSize = 12.sp) },
+                                label = { Text(strings.vault_user, fontSize = 12.sp) },
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true
                             )
@@ -394,7 +426,7 @@ fun SendaVaultDialog(
                             OutlinedTextField(
                                 value = addPass,
                                 onValueChange = { addPass = it },
-                                label = { Text("Contraseña", fontSize = 12.sp) },
+                                label = { Text(strings.vault_password, fontSize = 12.sp) },
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true,
                                 trailingIcon = {
@@ -403,7 +435,7 @@ fun SendaVaultDialog(
                                         addPass = String(chars)
                                         SendaVaultManager.wipe(chars)
                                     }) {
-                                        Icon(Icons.Default.AutoFixHigh, contentDescription = "Generar", modifier = Modifier.size(18.dp))
+                                        Icon(Icons.Default.AutoFixHigh, contentDescription = strings.vault_generate, modifier = Modifier.size(18.dp))
                                     }
                                 }
                             )
@@ -412,7 +444,7 @@ fun SendaVaultDialog(
 
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                                 TextButton(onClick = { activeSubView = "list" }) {
-                                    Text("Cancelar")
+                                    Text(strings.general_cancel)
                                 }
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Button(
@@ -427,15 +459,104 @@ fun SendaVaultDialog(
                                                 }
                                                 credentials = SendaVaultManager.getCredentials(context)
                                                 activeSubView = "list"
-                                                Toast.makeText(context, "Credencial guardada de forma segura", Toast.LENGTH_SHORT).show()
+                                                Toast.makeText(context, strings.vault_saved, Toast.LENGTH_SHORT).show()
                                             }
                                         } else {
-                                            Toast.makeText(context, "Completa todos los campos", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, strings.vault_fill_all, Toast.LENGTH_SHORT).show()
                                         }
                                     },
                                     shape = RoundedCornerShape(8.dp)
                                 ) {
-                                    Text("Guardar Cifrado")
+                                    Text(strings.vault_save)
+                                }
+                            }
+                        }
+                    }
+
+                    "edit" -> {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            OutlinedTextField(
+                                value = editSite,
+                                onValueChange = { editSite = it },
+                                label = { Text(strings.vault_site, fontSize = 12.sp) },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = editUser,
+                                onValueChange = { editUser = it },
+                                label = { Text(strings.vault_user, fontSize = 12.sp) },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = editPass,
+                                onValueChange = { editPass = it },
+                                label = { Text(strings.vault_password, fontSize = 12.sp) },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                visualTransformation = if (editPassVisible) androidx.compose.ui.text.input.VisualTransformation.None
+                                    else androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                                trailingIcon = {
+                                    Row {
+                                        IconButton(onClick = { editPassVisible = !editPassVisible }) {
+                                            Icon(
+                                                if (editPassVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                                contentDescription = if (editPassVisible) strings.vault_hide else strings.vault_reveal,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                        IconButton(onClick = {
+                                            val (chars, _) = SendaVaultManager.generateStrongPassword(length = 18)
+                                            editPass = String(chars)
+                                            SendaVaultManager.wipe(chars)
+                                            editPassVisible = true
+                                        }) {
+                                            Icon(Icons.Default.AutoFixHigh, contentDescription = strings.vault_generate, modifier = Modifier.size(18.dp))
+                                        }
+                                    }
+                                }
+                            )
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                                TextButton(onClick = { closeEdit() }) {
+                                    Text(strings.general_cancel)
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Button(
+                                    onClick = {
+                                        val id = editId
+                                        if (id != null && editSite.isNotBlank() && editUser.isNotBlank() && editPass.isNotBlank()) {
+                                            secure {
+                                                val passChars = editPass.toCharArray()
+                                                val ok = try {
+                                                    SendaVaultManager.updateCredential(context, id, editSite, editUser, passChars)
+                                                } finally {
+                                                    SendaVaultManager.wipe(passChars)
+                                                }
+                                                if (ok) {
+                                                    credentials = SendaVaultManager.getCredentials(context)
+                                                    closeEdit()
+                                                    Toast.makeText(context, strings.vault_saved, Toast.LENGTH_SHORT).show()
+                                                } else {
+                                                    Toast.makeText(context, strings.vault_edit_duplicate, Toast.LENGTH_LONG).show()
+                                                }
+                                            }
+                                        } else {
+                                            Toast.makeText(context, strings.vault_fill_all, Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text(strings.vault_save)
                                 }
                             }
                         }
@@ -464,7 +585,7 @@ fun SendaVaultDialog(
                                     )
                                     Spacer(modifier = Modifier.height(6.dp))
                                     Text(
-                                        text = "Entropía de Shannon: ${String.format(java.util.Locale.ROOT, "%.1f", generatedEntropy)} bits (Grado Militar)",
+                                        text = strings.vault_entropy.format(String.format(java.util.Locale.ROOT, "%.0f", generatedEntropy)),
                                         fontSize = 10.sp,
                                         color = if (generatedEntropy >= 90) Color(0xFF2E7D32) else MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -478,9 +599,9 @@ fun SendaVaultDialog(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("Longitud: ${genLength.toInt()} caracteres", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                Text(strings.vault_length.format(genLength.toInt()), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                                 IconButton(onClick = { refreshGeneratedPassword() }) {
-                                    Icon(Icons.Default.Refresh, contentDescription = "Regenerar")
+                                    Icon(Icons.Default.Refresh, contentDescription = strings.vault_regenerate)
                                 }
                             }
 
@@ -496,10 +617,10 @@ fun SendaVaultDialog(
 
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Checkbox(checked = genSymbols, onCheckedChange = { genSymbols = it; refreshGeneratedPassword() })
-                                Text("Símbolos (!@#$)", fontSize = 11.sp)
+                                Text(strings.vault_symbols, fontSize = 11.sp)
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Checkbox(checked = genDigits, onCheckedChange = { genDigits = it; refreshGeneratedPassword() })
-                                Text("Números (0-9)", fontSize = 11.sp)
+                                Text(strings.vault_digits, fontSize = 11.sp)
                             }
 
                             Spacer(modifier = Modifier.height(12.dp))
@@ -509,14 +630,14 @@ fun SendaVaultDialog(
                                     val chars = generatedPassword.toCharArray()
                                     SendaVaultManager.copyToClipboardSecurely(context, "Senda Password", chars)
                                     SendaVaultManager.wipe(chars)
-                                    Toast.makeText(context, "Copiado al portapapeles (se borrará en 30s)", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, strings.vault_copied_30s, Toast.LENGTH_SHORT).show()
                                 },
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(8.dp)
                             ) {
                                 Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Copiar al Portapapeles Seguro")
+                                Text(strings.vault_copy)
                             }
                         }
                     }
@@ -533,8 +654,8 @@ fun SendaVaultDialog(
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     CircularProgressIndicator()
                                     Spacer(modifier = Modifier.height(12.dp))
-                                    Text("Ejecutando 1.000 ciclos de estrés criptográfico...", fontSize = 12.sp)
-                                    Text("Probando inviolabilidad de etiquetas y colisiones de Nonce", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(strings.vault_audit_running.format(1000), fontSize = 12.sp)
+                                    Text(strings.vault_audit_running_sub, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         } else {
@@ -569,7 +690,7 @@ fun SendaVaultDialog(
                                                 }
                                                 Spacer(modifier = Modifier.height(4.dp))
                                                 Text(
-                                                    text = "Pruebas: ${rep.passedTests}/${rep.totalTests} superadas | Estrés: ${rep.totalStressCycles} ciclos | Latencia media: ${String.format(java.util.Locale.ROOT, "%.3f", rep.avgLatencyMs)} ms (${String.format(java.util.Locale.ROOT, "%.0f", rep.throughputOpsPerSec)} ops/seg)",
+                                                    text = strings.vault_audit_summary.format(rep.passedTests, rep.totalTests, rep.totalStressCycles, String.format(java.util.Locale.ROOT, "%.3f", rep.avgLatencyMs), String.format(java.util.Locale.ROOT, "%.0f", rep.throughputOpsPerSec)),
                                                     fontSize = 10.sp,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                                 )
@@ -617,7 +738,7 @@ fun SendaVaultDialog(
                     if (activeSubView != "main") activeSubView = "main" else onDismiss()
                 }
             ) {
-                Text(if (activeSubView != "main") "Volver" else strings.general_done)
+                Text(if (activeSubView != "main") strings.back else strings.general_done)
             }
         }
     )
@@ -630,9 +751,11 @@ fun SendaVaultDialog(
 private fun CredentialItemCard(
     item: VaultCredential,
     onDelete: () -> Unit,
-    runSecure: (() -> Unit) -> Unit
+    runSecure: (() -> Unit) -> Unit,
+    onEdit: () -> Unit
 ) {
     val context = LocalContext.current
+    val strings = org.senda.browser.core.LocalSendaStrings.current
     var isRevealed by remember { mutableStateOf(false) }
     var revealedPassword by remember { mutableStateOf("") }
 
@@ -673,7 +796,7 @@ private fun CredentialItemCard(
                     ) {
                         Icon(
                             imageVector = if (isRevealed) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                            contentDescription = "Revelar",
+                            contentDescription = if (isRevealed) strings.vault_hide else strings.vault_reveal,
                             modifier = Modifier.size(16.dp)
                         )
                     }
@@ -685,12 +808,20 @@ private fun CredentialItemCard(
                                 val chars = SendaVaultManager.decryptPassword(item.encryptedPasswordBase64, item.ivBase64)
                                 SendaVaultManager.copyToClipboardSecurely(context, item.domain, chars)
                                 SendaVaultManager.wipe(chars)
-                                Toast.makeText(context, "Copiado. Se autodestruirá en 30 segundos.", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, strings.vault_copied_30s, Toast.LENGTH_SHORT).show()
                             }
                         },
                         modifier = Modifier.size(32.dp)
                     ) {
-                        Icon(Icons.Default.ContentCopy, contentDescription = "Copiar", modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.ContentCopy, contentDescription = strings.vault_copy_cd, modifier = Modifier.size(16.dp))
+                    }
+
+                    // Modificar
+                    IconButton(
+                        onClick = onEdit,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(Icons.Default.Edit, contentDescription = strings.vault_edit_cd, modifier = Modifier.size(16.dp))
                     }
 
                     // Borrar
@@ -698,7 +829,7 @@ private fun CredentialItemCard(
                         onClick = onDelete,
                         modifier = Modifier.size(32.dp)
                     ) {
-                        Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.Delete, contentDescription = strings.vault_delete_cd, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
                     }
                 }
             }

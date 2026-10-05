@@ -93,12 +93,325 @@ fun SendaPromptHost(
         is SendaPrompt.OpenInApp -> {
             OpenInAppDialog(request = prompt, onDismiss = onDismiss)
         }
+        is SendaPrompt.Auth -> AuthPromptDialog(request = prompt, onDismiss = onDismiss)
+        is SendaPrompt.LoginSelect -> LoginSelectDialog(request = prompt, onDismiss = onDismiss)
+        is SendaPrompt.LoginSave -> LoginSaveBar(request = prompt, onDismiss = onDismiss)
+        is SendaPrompt.SlowScript -> SlowScriptDialog(request = prompt, onDismiss = onDismiss)
+        is SendaPrompt.Download -> DownloadConfirmDialog(request = prompt, onDismiss = onDismiss)
         is SendaPrompt.ContextMenu -> {
             if (tab != null) {
                 ContextMenuSheet(element = prompt.element, tab = tab, onDismiss = onDismiss)
             }
         }
     }
+}
+
+@Composable
+private fun AuthPromptDialog(request: SendaPrompt.Auth, onDismiss: () -> Unit) {
+    val strings = LocalSendaStrings.current
+    val raw = request.prompt
+    val options = raw.authOptions
+    val onlyPassword = options.flags and GeckoSession.PromptDelegate.AuthPrompt.AuthOptions.Flags.ONLY_PASSWORD != 0
+    val insecure = options.level == GeckoSession.PromptDelegate.AuthPrompt.AuthOptions.Level.NONE
+    val host = remember(options.uri) {
+        try { java.net.URI(options.uri).host } catch (_: Exception) { null } ?: options.uri ?: ""
+    }
+    var user by remember { mutableStateOf(options.username ?: "") }
+    var password by remember { mutableStateOf("") }
+    fun finish(confirm: Boolean) {
+        if (!raw.isComplete) {
+            request.result.complete(
+                when {
+                    !confirm -> raw.dismiss()
+                    onlyPassword -> raw.confirm(password)
+                    else -> raw.confirm(user, password)
+                }
+            )
+        }
+        onDismiss()
+    }
+    AlertDialog(
+        onDismissRequest = { finish(false) },
+        icon = { Icon(Icons.Default.Lock, contentDescription = null) },
+        title = { Text(strings.auth_title, style = MaterialTheme.typography.titleMedium) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(strings.auth_message.format(host), style = MaterialTheme.typography.bodyMedium)
+                if (insecure) {
+                    Text(strings.auth_insecure, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
+                if (!onlyPassword) {
+                    OutlinedTextField(
+                        value = user, onValueChange = { user = it }, singleLine = true,
+                        label = { Text(strings.auth_user) }, modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                OutlinedTextField(
+                    value = password, onValueChange = { password = it }, singleLine = true,
+                    label = { Text(strings.auth_password) }, modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Password
+                    )
+                )
+            }
+        },
+        confirmButton = { Button(onClick = { finish(true) }) { Text(strings.auth_login) } },
+        dismissButton = { TextButton(onClick = { finish(false) }) { Text(strings.general_cancel) } }
+    )
+}
+
+/**
+ * Barra inferior (no un diálogo): un AlertDialog abre otra ventana y le quita el foco a la página, y GeckoView
+ * cancela entonces el selector, así que al elegir la cuenta ya no había nada que rellenar.
+ */
+@Composable
+private fun LoginSelectDialog(request: SendaPrompt.LoginSelect, onDismiss: () -> Unit) {
+    val strings = LocalSendaStrings.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val tag = org.senda.browser.core.security.SendaVaultLoginStorage.TAG
+    val raw = request.request
+    // Solo cuentas de la Bóveda: las contraseñas generadas por Gecko u otras opciones no se ofrecen
+    val options = remember(raw) { raw.options.filter { !it.value.guid.isNullOrBlank() } }
+    fun finish(response: GeckoSession.PromptDelegate.PromptResponse) {
+        if (!raw.isComplete) request.result.complete(response)
+        onDismiss()
+    }
+
+    // La contraseña se descifra solo aquí, después de que el usuario elige; si pasaron más de 30 s desde la
+    // última identificación, el chip rechaza la clave y se pide huella o PIN una vez
+    fun fill(option: org.mozilla.geckoview.Autocomplete.LoginSelectOption) {
+        fun fail() {
+            android.widget.Toast.makeText(context, strings.vault_login_fill_error, android.widget.Toast.LENGTH_LONG).show()
+            finish(raw.dismiss())
+        }
+        fun confirmOrDefer(filled: org.mozilla.geckoview.Autocomplete.LoginSelectOption) {
+            if (!raw.isComplete) {
+                android.util.Log.i(tag, "selector: cuenta confirmada")
+                request.result.complete(raw.confirm(filled))
+                onDismiss()
+            } else {
+                // GeckoView ya canceló el selector (p. ej. mientras se pedía la huella): queda pendiente
+                android.util.Log.i(tag, "selector: ya cancelado, relleno pendiente hasta tocar el campo")
+                org.senda.browser.core.security.SendaVaultLoginStorage.setPending(option.value.guid ?: "")
+                android.widget.Toast.makeText(context, strings.vault_login_tap_again, android.widget.Toast.LENGTH_LONG).show()
+                onDismiss()
+            }
+        }
+        try {
+            val filled = org.senda.browser.core.security.SendaVaultLoginStorage.filledOption(context, option)
+            if (filled != null) confirmOrDefer(filled) else fail()
+        } catch (_: org.senda.browser.core.security.VaultLockedException) {
+            android.util.Log.i(tag, "selector: Bóveda bloqueada, se pide huella o PIN")
+            org.senda.browser.core.security.SendaVaultAuth.request(context, strings.vault_login_pick_title) { ok ->
+                if (!ok) {
+                    finish(raw.dismiss())
+                    return@request
+                }
+                try {
+                    val filled = org.senda.browser.core.security.SendaVaultLoginStorage.filledOption(context, option)
+                    if (filled != null) confirmOrDefer(filled) else fail()
+                } catch (e: Exception) {
+                    android.util.Log.w(tag, "selector: error tras identificarse: ${e.javaClass.simpleName}")
+                    fail()
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.w(tag, "selector: error al descifrar: ${e.javaClass.simpleName}")
+            fail()
+        }
+    }
+
+    if (options.isEmpty()) {
+        LaunchedEffect(raw) { finish(raw.dismiss()) }
+        return
+    }
+    androidx.compose.ui.window.Popup(
+        alignment = Alignment.BottomCenter,
+        onDismissRequest = {},
+        properties = androidx.compose.ui.window.PopupProperties(focusable = false, dismissOnClickOutside = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .imePadding()
+                .padding(8.dp),
+            shape = RoundedCornerShape(16.dp),
+            tonalElevation = 6.dp,
+            shadowElevation = 8.dp
+        ) {
+            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Key, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        strings.vault_login_pick_title, style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(onClick = { finish(raw.dismiss()) }) { Text(strings.general_cancel) }
+                }
+                Text(strings.vault_login_pick_hint, style = MaterialTheme.typography.bodySmall)
+                options.forEach { option ->
+                    val host = remember(option) {
+                        try { java.net.URI(option.value.origin).host } catch (_: Exception) { null } ?: option.value.origin
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { fill(option) }
+                            .padding(vertical = 10.dp, horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.AccountCircle, contentDescription = null)
+                        Spacer(Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                option.value.username ?: "",
+                                style = MaterialTheme.typography.bodyLarge,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                host, style = MaterialTheme.typography.bodySmall,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Barra inferior para guardar en la Bóveda la cuenta con la que se acaba de iniciar sesión. */
+@Composable
+private fun LoginSaveBar(request: SendaPrompt.LoginSave, onDismiss: () -> Unit) {
+    val strings = LocalSendaStrings.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val tag = org.senda.browser.core.security.SendaVaultLoginStorage.TAG
+    val raw = request.request
+    val entry = raw.options.firstOrNull()?.value
+    fun finish() {
+        // Senda guarda en su propia Bóveda; a GeckoView solo se le cierra el aviso
+        if (!raw.isComplete) request.result.complete(raw.dismiss())
+        onDismiss()
+    }
+    if (entry == null) {
+        LaunchedEffect(raw) { finish() }
+        return
+    }
+    val host = remember(entry) { try { java.net.URI(entry.origin).host } catch (_: Exception) { null } ?: entry.origin }
+    // Algunos sitios piden el usuario y la contraseña en pantallas distintas: GeckoView solo ve la contraseña
+    // y la cuenta quedaba sin usuario. Se puede escribir o corregir aquí antes de guardar
+    var username by remember(entry) { mutableStateOf(entry.username ?: "") }
+
+    fun save() {
+        fun store() {
+            val chars = entry.password.toCharArray()
+            try {
+                org.senda.browser.core.security.SendaVaultManager.saveCredential(context, entry.origin, username.trim(), chars)
+            } finally {
+                org.senda.browser.core.security.SendaVaultManager.wipe(chars)
+            }
+            android.util.Log.i(tag, "guardar: cuenta guardada en la Bóveda")
+            android.widget.Toast.makeText(context, strings.vault_saved, android.widget.Toast.LENGTH_SHORT).show()
+            finish()
+        }
+        try {
+            store()
+        } catch (_: org.senda.browser.core.security.VaultLockedException) {
+            org.senda.browser.core.security.SendaVaultAuth.request(context, strings.vault_save_login_title) { ok ->
+                if (!ok) return@request
+                try {
+                    store()
+                } catch (e: Exception) {
+                    android.util.Log.w(tag, "guardar: error tras identificarse: ${e.javaClass.simpleName}")
+                    android.widget.Toast.makeText(context, strings.vault_err_generic.format(e.message ?: ""), android.widget.Toast.LENGTH_LONG).show()
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.w(tag, "guardar: error: ${e.javaClass.simpleName}")
+            android.widget.Toast.makeText(context, strings.vault_err_generic.format(e.message ?: ""), android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
+
+    androidx.compose.ui.window.Popup(
+        alignment = Alignment.BottomCenter,
+        onDismissRequest = {},
+        properties = androidx.compose.ui.window.PopupProperties(focusable = true, dismissOnClickOutside = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .imePadding()
+                .padding(8.dp),
+            shape = RoundedCornerShape(16.dp),
+            tonalElevation = 6.dp,
+            shadowElevation = 8.dp
+        ) {
+            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Key, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(strings.vault_save_login_title, style = MaterialTheme.typography.titleSmall)
+                }
+                Text(host, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.height(4.dp))
+                OutlinedTextField(
+                    value = username,
+                    onValueChange = { username = it },
+                    label = { Text(strings.vault_user) },
+                    singleLine = true,
+                    isError = username.isBlank(),
+                    supportingText = if (username.isBlank()) {
+                        { Text(strings.vault_save_login_user_missing) }
+                    } else null,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text(strings.vault_save_login_hint, style = MaterialTheme.typography.bodySmall)
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = { finish() }) { Text(strings.vault_save_login_not_now) }
+                    Spacer(Modifier.width(8.dp))
+                    Button(onClick = { save() }) { Text(strings.vault_save) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SlowScriptDialog(request: SendaPrompt.SlowScript, onDismiss: () -> Unit) {
+    val strings = LocalSendaStrings.current
+    fun decide(stop: Boolean) {
+        request.onDecision(stop)
+        onDismiss()
+    }
+    AlertDialog(
+        onDismissRequest = { decide(false) },
+        icon = { Icon(Icons.Default.HourglassTop, contentDescription = null) },
+        title = { Text(strings.slow_script_title, style = MaterialTheme.typography.titleMedium) },
+        text = { Text(strings.slow_script_message.format(request.host), style = MaterialTheme.typography.bodyMedium) },
+        confirmButton = { TextButton(onClick = { decide(true) }) { Text(strings.slow_script_stop) } },
+        dismissButton = { TextButton(onClick = { decide(false) }) { Text(strings.slow_script_wait) } }
+    )
+}
+
+@Composable
+private fun DownloadConfirmDialog(request: SendaPrompt.Download, onDismiss: () -> Unit) {
+    val strings = LocalSendaStrings.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    fun decide(accept: Boolean) {
+        request.onDecision(accept)
+        onDismiss()
+    }
+    val size = if (request.sizeBytes > 0) " (${android.text.format.Formatter.formatShortFileSize(context, request.sizeBytes)})" else ""
+    AlertDialog(
+        onDismissRequest = { decide(false) },
+        icon = { Icon(Icons.Default.Download, contentDescription = null) },
+        title = { Text(strings.dl_confirm_title, style = MaterialTheme.typography.titleMedium) },
+        text = { Text(strings.dl_confirm_message.format(request.host, request.fileName + size), style = MaterialTheme.typography.bodyMedium) },
+        confirmButton = { Button(onClick = { decide(true) }) { Text(strings.dl_confirm_yes) } },
+        dismissButton = { TextButton(onClick = { decide(false) }) { Text(strings.general_cancel) } }
+    )
 }
 
 @Composable

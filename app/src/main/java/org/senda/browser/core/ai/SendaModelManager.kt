@@ -35,6 +35,11 @@ object SendaModelManager {
      */
     fun cleanupInterruptedDownloads(context: Context) {
         File(context.filesDir, MODELS_DIR).listFiles { f -> f.name.endsWith(".tmp") }?.forEach { it.delete() }
+        // Modelos retirados del catálogo (no pasaron las pruebas de calidad): la app ya no puede usarlos
+        SendaAiModels.RETIRED_MODEL_FILES.forEach { name ->
+            val f = File(context.filesDir, "$MODELS_DIR/$name")
+            if (f.exists() && f.delete()) android.util.Log.i("SendaAI", "Borrado modelo retirado $name")
+        }
     }
 
     fun getModelsDirectory(context: Context): File {

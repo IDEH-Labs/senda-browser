@@ -198,10 +198,12 @@ object SendaUnifiedCast {
                     socket.receive(packet)
                     val text = String(packet.data, 0, packet.length, Charsets.UTF_8)
                     val location = headerValue(text, "LOCATION") ?: continue
+                    val responder = packet.address
+                    if (!isUrlOnResponder(location, responder)) continue
 
                     if (seen.add(location)) {
                         searchExecutor.execute {
-                            inspectSsdpDevice(location)
+                            inspectSsdpDevice(location, responder)
                         }
                     }
                 } catch (_: SocketTimeoutException) {}
@@ -209,7 +211,7 @@ object SendaUnifiedCast {
         }
     }
 
-    private fun inspectSsdpDevice(location: String) {
+    private fun inspectSsdpDevice(location: String, responder: java.net.InetAddress) {
         try {
             val conn = URL(location).openConnection() as HttpURLConnection
             conn.connectTimeout = 1800
@@ -226,7 +228,7 @@ object SendaUnifiedCast {
             // Check if it is a DLNA AVTransport TV / Renderer
             if (xml.contains("urn:schemas-upnp-org:service:AVTransport:1")) {
                 val controlUrl = extractControlUrl(xml, "urn:schemas-upnp-org:service:AVTransport:1", location)
-                if (controlUrl != null) {
+                if (controlUrl != null && isUrlOnResponder(controlUrl, responder)) {
                     val device = CastDevice(
                         id = location,
                         name = friendlyName,
@@ -241,7 +243,7 @@ object SendaUnifiedCast {
             }
 
             // Check if it is DIAL (YouTube)
-            if (appsUrl != null) {
+            if (appsUrl != null && isUrlOnResponder(appsUrl, responder)) {
                 val base = if (appsUrl.endsWith("/")) appsUrl else "$appsUrl/"
                 val device = CastDevice(
                     id = base,
@@ -462,4 +464,19 @@ object SendaUnifiedCast {
 
     private fun xmlTag(xml: String, tag: String): String? =
         Regex("<$tag>([^<]*)</$tag>").find(xml)?.groupValues?.get(1)?.trim()?.takeIf { it.isNotEmpty() }
+}
+
+/**
+ * Una respuesta SSDP la puede mandar cualquiera en la red y decide a qué URL se conecta Senda (y a dónde
+ * envía la página). Solo se acepta una URL http cuyo host sea, literalmente, la IP local que respondió.
+ */
+internal fun isUrlOnResponder(url: String?, responder: java.net.InetAddress): Boolean {
+    if (url == null) return false
+    if (!(responder.isSiteLocalAddress || responder.isLinkLocalAddress)) return false
+    return try {
+        val parsed = java.net.URL(url)
+        parsed.protocol == "http" && parsed.host.trim('[', ']') == responder.hostAddress?.substringBefore('%')
+    } catch (_: java.net.MalformedURLException) {
+        false
+    }
 }

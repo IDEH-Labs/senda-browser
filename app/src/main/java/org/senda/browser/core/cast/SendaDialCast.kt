@@ -188,8 +188,10 @@ object SendaDialCast {
                     val text = String(response.data, 0, response.length, Charsets.UTF_8)
                     if (!text.contains(DIAL_SERVICE, ignoreCase = true)) continue
                     val location = headerValue(text, "LOCATION") ?: continue
+                    val responder = response.address
+                    if (!isUrlOnResponder(location, responder)) continue
                     // Consultar cada TV en paralelo en cuanto responde
-                    if (seen.add(location)) searchExecutor.execute { describe(location)?.let(onFound) }
+                    if (seen.add(location)) searchExecutor.execute { describe(location, responder)?.let(onFound) }
                 } catch (_: SocketTimeoutException) {
                 }
             }
@@ -197,14 +199,14 @@ object SendaDialCast {
     }
 
     /** Lee la descripción del dispositivo y confirma que tiene la app de YouTube. */
-    private fun describe(location: String): DialDevice? = try {
+    private fun describe(location: String, responder: java.net.InetAddress): DialDevice? = try {
         val conn = URL(location).openConnection() as HttpURLConnection
         conn.connectTimeout = 1500
         conn.readTimeout = 2000
         val appsUrl = conn.getHeaderField("Application-URL")
         val xml = conn.inputStream.bufferedReader().use { it.readText() }
         conn.disconnect()
-        if (appsUrl == null) {
+        if (appsUrl == null || !isUrlOnResponder(appsUrl, responder)) {
             null
         } else {
             val base = if (appsUrl.endsWith("/")) appsUrl else "$appsUrl/"
@@ -247,7 +249,12 @@ object SendaDialCast {
 
     private fun decode(raw: String): DialDevice? {
         val parts = raw.split('\u001F')
-        return if (parts.size == 3) DialDevice(parts[0], parts[1], parts[2]) else null
+        if (parts.size != 3) return null
+        // Descartar TVs guardadas por versiones que no validaban la dirección (solo IP literal de la red local)
+        val host = try { java.net.URL(parts[2]).host } catch (_: java.net.MalformedURLException) { return null }
+        if (!Regex("^\\d{1,3}(\\.\\d{1,3}){3}$").matches(host)) return null
+        val address = java.net.InetAddress.getByName(host)
+        return if (isUrlOnResponder(parts[2], address)) DialDevice(parts[0], parts[1], parts[2]) else null
     }
 
     /** Extrae el identificador de video de cualquier enlace de YouTube (watch, youtu.be, shorts, live, embed). */

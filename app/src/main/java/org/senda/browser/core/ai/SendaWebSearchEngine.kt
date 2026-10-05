@@ -27,8 +27,22 @@ data class WebSearchResponse(
  */
 object SendaWebSearchEngine {
 
+    /**
+     * Quita de la pregunta las órdenes sobre las fuentes («usa Wikipedia y DuckDuckGo», «busca en internet»…):
+     * enviadas tal cual, la búsqueda devolvía artículos sobre Wikipedia o DuckDuckGo en vez del tema.
+     */
+    fun cleanQuery(query: String): String {
+        val sources = "(?:wikipedia|wiki|duck\\s*duck\\s*go|duck\\s*go|duckgo|ddg|internet|la web|la red|google)"
+        var q = " " + query.trim() + " "
+        q = q.replace(Regex("(?i)\\b(?:y\\s+)?(?:por favor\\s+)?(?:usa(?:ndo)?|utiliza(?:ndo)?|busca(?:ndo)?|investiga(?:ndo)?|consulta(?:ndo)?|revisa(?:ndo)?|mira(?:ndo)?)\\b[^.?!¿¡]*?\\b$sources\\b(?:\\s*(?:y|o|,)\\s*$sources\\b)*"), " ")
+        q = q.replace(Regex("(?i)\\b(?:en|de|con|según)\\s+(?:los\\s+recursos\\s+(?:disponibles\\s+)?(?:en|de)\\s+)?$sources\\b(?:\\s*(?:y|o|,)\\s*$sources\\b)*"), " ")
+        q = q.replace(Regex("(?i)\\b(?:aunque|aun si)\\b[^.?!¿¡]*$"), " ")
+        q = q.replace(Regex("\\s+"), " ").replace(Regex("\\s+([,.?!])"), "$1").trim().trim(',', ';', ':').trim()
+        return q.ifBlank { query.trim() }
+    }
+
     suspend fun searchAndSynthesize(query: String): WebSearchResponse? = withContext(Dispatchers.IO) {
-        val cleanQuery = query.trim()
+        val cleanQuery = cleanQuery(query)
         if (cleanQuery.isBlank()) return@withContext null
 
         try {

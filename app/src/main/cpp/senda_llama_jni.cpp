@@ -88,6 +88,10 @@ constexpr const char *ROLE_USER      = "user";
 constexpr const char *ROLE_ASSISTANT = "assistant";
 
 static std::vector<common_chat_msg> chat_msgs;
+// Tokens que hay ahora en la memoria del contexto (prompt + respuesta generada), para reutilizar el prefijo
+static llama_tokens g_cached_tokens;
+// Tokens del prompt que se leyeron de verdad en la última pregunta (sin contar los reutilizados)
+static int g_last_decoded_tokens = 0;
 static llama_pos system_prompt_position = 0;
 static llama_pos current_position = 0;
 static llama_pos stop_generation_position = 0;
@@ -99,8 +103,9 @@ static void reset_long_term_states(const bool clear_kv_cache = true) {
     system_prompt_position = 0;
     current_position = 0;
 
-    if (clear_kv_cache && g_context) {
-        llama_memory_clear(llama_get_memory(g_context), false);
+    if (clear_kv_cache) {
+        g_cached_tokens.clear();
+        if (g_context) llama_memory_clear(llama_get_memory(g_context), false);
     }
 }
 
@@ -118,16 +123,6 @@ static void shift_context() {
     llama_memory_seq_add(llama_get_memory(g_context), 0, system_prompt_position + n_discard, current_position, -n_discard);
     current_position -= n_discard;
     LOGI("%s: Context shifted. Current position: %d", __func__, current_position);
-}
-
-static std::string chat_add_and_format(const std::string &role, const std::string &content) {
-    common_chat_msg new_msg;
-    new_msg.role = role;
-    new_msg.content = content;
-    auto formatted = common_chat_format_single(
-            g_chat_templates.get(), chat_msgs, new_msg, role == ROLE_USER, /* use_jinja */ false);
-    chat_msgs.push_back(new_msg);
-    return formatted;
 }
 
 static int decode_tokens_in_batches(
@@ -205,11 +200,32 @@ Java_org_senda_browser_core_ai_llama_SendaLlamaBridge_nativeInit(JNIEnv *env, jo
 }
 
 JNIEXPORT jint JNICALL
-Java_org_senda_browser_core_ai_llama_SendaLlamaBridge_nativeLoadModel(JNIEnv *env, jobject /*thiz*/, jstring jmodel_path) {
+Java_org_senda_browser_core_ai_llama_SendaLlamaBridge_nativeLoadModel(JNIEnv *env, jobject /*thiz*/, jstring jmodel_path, jint jload_mode, jint jlazy_mode, jint jgpu_layers, jstring jgpu_device) {
     std::lock_guard<std::mutex> lock(g_llama_mutex);
     if (!jmodel_path) return -1;
 
     llama_model_params model_params = llama_model_default_params();
+    // Modo de carga elegido desde Kotlin (medido en el teléfono): con Q4_0 llama.cpp reordena los pesos para
+    // los núcleos dotprod (repack) y con el archivo mapeado entero el teléfono guardaba las dos copias
+    // (Gemma 4 E2B: 4,5 GB y Android cerraba otras apps)
+    model_params.load_mode = (enum llama_load_mode) jload_mode;
+    model_params.lazy_mode = (enum llama_lazy_mode) jlazy_mode;
+    // Explícito: si hay GPU, llama.cpp manda por defecto todas las capas a ella. En un Adreno 619 eso escribe
+    // 2,3 veces más lento; la calibración decide por teléfono (0 = todo en la CPU)
+    model_params.n_gpu_layers = jgpu_layers;
+    // Con varias GPU (p. ej. OpenCL y Vulkan sobre el mismo Adreno) se usa solo la elegida por la calibración
+    static ggml_backend_dev_t selected_devices[2] = { nullptr, nullptr };
+    if (jgpu_layers > 0 && jgpu_device) {
+        const char *wanted = env->GetStringUTFChars(jgpu_device, nullptr);
+        selected_devices[0] = ggml_backend_dev_by_name(wanted);
+        env->ReleaseStringUTFChars(jgpu_device, wanted);
+        if (!selected_devices[0]) {
+            LOGE("GPU device not found, loading on CPU");
+            model_params.n_gpu_layers = 0;
+        } else {
+            model_params.devices = selected_devices;
+        }
+    }
     const auto *model_path = env->GetStringUTFChars(jmodel_path, 0);
     LOGI("Loading GGUF model: %s", model_path);
 
@@ -240,7 +256,8 @@ Java_org_senda_browser_core_ai_llama_SendaLlamaBridge_nativePrepare(JNIEnv * /*e
     g_batch = common_batch(context);
     g_chat_templates = common_chat_templates_init(g_model, "");
     g_sampler = new_sampler(DEFAULT_SAMPLER_TEMP);
-    reset_long_term_states(false);
+    // Contexto nuevo: olvidar los tokens del modelo anterior para no reutilizar un prefijo que ya no existe
+    reset_long_term_states(true);
     reset_short_term_states();
     LOGI("Senda llama prepared: context and sampler ready");
     return 0;
@@ -298,70 +315,146 @@ Java_org_senda_browser_core_ai_llama_SendaLlamaBridge_nativeBenchModel(JNIEnv *e
     return env->NewStringUTF(ss.str().c_str());
 }
 
+/**
+ * Procesa la conversación completa (sistema + historial + pregunta) con la plantilla Jinja del propio GGUF.
+ * La plantilla heredada (sin Jinja) no reconoce Gemma 4 ni desactiva el razonamiento de Qwen 3.5, y antes
+ * solo llegaba la última pregunta: el modelo no veía el historial. No se usa shift_context: en modelos
+ * híbridos (Qwen 3.5, DeltaNet) no se puede borrar una parte de la memoria, así que Kotlin recorta el
+ * historial antes y aquí se rechaza lo que no cabe.
+ * Devuelve 0 si está listo para generar, 1 si no cabe en el contexto, 2 si falla la plantilla o el decode.
+ */
 JNIEXPORT jint JNICALL
-Java_org_senda_browser_core_ai_llama_SendaLlamaBridge_nativeProcessSystemPrompt(JNIEnv *env, jobject /*thiz*/, jstring jsystem_prompt) {
+Java_org_senda_browser_core_ai_llama_SendaLlamaBridge_nativeProcessConversation(
+        JNIEnv *env, jobject /*thiz*/, jobjectArray jroles, jobjectArray jcontents, jint n_predict, jboolean jthinking) {
     std::lock_guard<std::mutex> lock(g_llama_mutex);
-    if (!g_context || !g_model) return -1;
+    if (!g_context || !g_model || !g_sampler) return -1;
 
-    reset_long_term_states();
+    // Sin borrar la memoria: se reutiliza el prefijo común con la conversación anterior (sistema + historial)
+    reset_long_term_states(false);
     reset_short_term_states();
+    common_sampler_reset(g_sampler);
 
-    const auto *system_prompt = env->GetStringUTFChars(jsystem_prompt, nullptr);
-    std::string formatted_system_prompt(system_prompt);
-
-    const bool has_chat_template = common_chat_templates_was_explicit(g_chat_templates.get());
-    if (has_chat_template) {
-        formatted_system_prompt = chat_add_and_format(ROLE_SYSTEM, system_prompt);
+    common_chat_templates_inputs inputs;
+    const jsize n = env->GetArrayLength(jroles);
+    for (jsize i = 0; i < n; i++) {
+        auto jrole = (jstring) env->GetObjectArrayElement(jroles, i);
+        auto jcontent = (jstring) env->GetObjectArrayElement(jcontents, i);
+        const char *role = env->GetStringUTFChars(jrole, nullptr);
+        const char *content = env->GetStringUTFChars(jcontent, nullptr);
+        common_chat_msg msg;
+        msg.role = role;
+        msg.content = content;
+        inputs.messages.push_back(msg);
+        env->ReleaseStringUTFChars(jrole, role);
+        env->ReleaseStringUTFChars(jcontent, content);
+        env->DeleteLocalRef(jrole);
+        env->DeleteLocalRef(jcontent);
     }
-    env->ReleaseStringUTFChars(jsystem_prompt, system_prompt);
+    inputs.add_generation_prompt = true;
+    inputs.enable_thinking = jthinking;
+    inputs.use_jinja = true;
 
-    const auto system_tokens = common_tokenize(g_context, formatted_system_prompt, has_chat_template, has_chat_template);
-    const int max_batch_size = DEFAULT_CONTEXT_SIZE - OVERFLOW_HEADROOM;
-    if ((int) system_tokens.size() > max_batch_size) {
-        LOGE("System prompt too long for context!");
+    std::string prompt;
+    try {
+        prompt = common_chat_templates_apply(g_chat_templates.get(), inputs).prompt;
+    } catch (const std::exception &e) {
+        LOGW("Jinja template failed (%s), retrying with legacy template", e.what());
+        try {
+            inputs.use_jinja = false;
+            prompt = common_chat_templates_apply(g_chat_templates.get(), inputs).prompt;
+        } catch (const std::exception &e2) {
+            LOGE("Chat template failed: %s", e2.what());
+            return 2;
+        }
+    }
+
+    const auto tokens = common_tokenize(g_context, prompt, true, true);
+    if ((int) tokens.size() + n_predict > DEFAULT_CONTEXT_SIZE - OVERFLOW_HEADROOM) {
+        LOGE("Conversation too long: %d tokens + %d to predict", (int) tokens.size(), (int) n_predict);
         return 1;
     }
-
-    if (decode_tokens_in_batches(g_context, g_batch, system_tokens, current_position)) {
-        LOGE("Failed to decode system tokens!");
+    // Reutilizar lo ya leído: cada pregunta reenvía sistema + historial y, sin esto, el teléfono volvía a leer
+    // todo (~15-20 s con Gemma 4 E2B). Si la memoria no admite recortar desde ese punto (modelos híbridos
+    // como Qwen 3.5), se borra y se lee entero. Siempre queda al menos un token por leer para tener logits
+    size_t n_keep = 0;
+    while (n_keep < g_cached_tokens.size() && n_keep + 1 < tokens.size() && g_cached_tokens[n_keep] == tokens[n_keep]) {
+        n_keep++;
+    }
+    auto *mem = llama_get_memory(g_context);
+    // Atención de ventana deslizante (Gemma): en conversaciones largas la memoria ya descartó posiciones
+    // antiguas y reutilizar desde n_keep daría respuestas erróneas sin error. Misma regla que llama-server
+    if (n_keep > 0) {
+        const int n_swa = llama_model_n_swa(g_model);
+        const llama_pos pos_min = llama_memory_seq_pos_min(mem, 0);
+        if (pos_min < 0 || pos_min > std::max(0, (int) n_keep - n_swa)) n_keep = 0;
+    }
+    if (n_keep == 0 || !llama_memory_seq_rm(mem, 0, (llama_pos) n_keep, -1)) {
+        llama_memory_clear(mem, false);
+        n_keep = 0;
+    }
+    const llama_tokens pending(tokens.begin() + (long) n_keep, tokens.end());
+    g_last_decoded_tokens = (int) pending.size();
+    LOGI("Conversation: %d tokens, %d reused from cache", (int) tokens.size(), (int) n_keep);
+    g_cached_tokens.clear();
+    if (decode_tokens_in_batches(g_context, g_batch, pending, (llama_pos) n_keep, true)) {
+        LOGE("Failed to decode conversation!");
+        llama_memory_clear(mem, false);
         return 2;
     }
+    g_cached_tokens = tokens;
 
-    system_prompt_position = current_position = (int) system_tokens.size();
+    system_prompt_position = current_position = (int) tokens.size();
+    stop_generation_position = current_position + n_predict;
     return 0;
 }
 
-JNIEXPORT jint JNICALL
-Java_org_senda_browser_core_ai_llama_SendaLlamaBridge_nativeProcessUserPrompt(JNIEnv *env, jobject /*thiz*/, jstring juser_prompt, jint n_predict) {
+/**
+ * Dispositivos que ggml logró cargar en este teléfono, uno por línea: tipo|nombre|descripción|MB libres|MB totales.
+ * Cada módulo comprueba sus propios requisitos (variante de CPU, versión de OpenCL, fabricante de la GPU) y no
+ * se registra si no los cumple: la lista es lo que de verdad puede ejecutarse aquí.
+ */
+JNIEXPORT jstring JNICALL
+Java_org_senda_browser_core_ai_llama_SendaLlamaBridge_nativeListDevices(JNIEnv *env, jobject /*thiz*/) {
     std::lock_guard<std::mutex> lock(g_llama_mutex);
-    if (!g_context || !g_model) return -1;
-
-    reset_short_term_states();
-
-    const auto *user_prompt = env->GetStringUTFChars(juser_prompt, nullptr);
-    std::string formatted_user_prompt(user_prompt);
-
-    const bool has_chat_template = common_chat_templates_was_explicit(g_chat_templates.get());
-    if (has_chat_template) {
-        formatted_user_prompt = chat_add_and_format(ROLE_USER, user_prompt);
+    std::ostringstream out;
+    for (size_t i = 0; i < ggml_backend_dev_count(); i++) {
+        ggml_backend_dev_t dev = ggml_backend_dev_get(i);
+        size_t free_mem = 0, total_mem = 0;
+        ggml_backend_dev_memory(dev, &free_mem, &total_mem);
+        const char *type = "OTHER";
+        switch (ggml_backend_dev_type(dev)) {
+            case GGML_BACKEND_DEVICE_TYPE_CPU:   type = "CPU"; break;
+            case GGML_BACKEND_DEVICE_TYPE_GPU:   type = "GPU"; break;
+            case GGML_BACKEND_DEVICE_TYPE_IGPU:  type = "IGPU"; break;
+            case GGML_BACKEND_DEVICE_TYPE_ACCEL: type = "ACCEL"; break;
+            default: break;
+        }
+        std::string desc = ggml_backend_dev_description(dev);
+        for (auto &c : desc) if (c == '|' || c == '\n') c = ' ';
+        out << type << '|' << ggml_backend_dev_name(dev) << '|' << desc << '|'
+            << free_mem / (1024 * 1024) << '|' << total_mem / (1024 * 1024) << '\n';
     }
-    env->ReleaseStringUTFChars(juser_prompt, user_prompt);
+    return env->NewStringUTF(out.str().c_str());
+}
 
-    auto user_tokens = common_tokenize(g_context, formatted_user_prompt, has_chat_template, has_chat_template);
-    const int user_prompt_size = (int) user_tokens.size();
-    const int max_batch_size = DEFAULT_CONTEXT_SIZE - OVERFLOW_HEADROOM;
-    if (user_prompt_size > max_batch_size) {
-        user_tokens.resize(max_batch_size);
-    }
+/** Temperatura del muestreo; 0 = siempre el token más probable (lo usa la calibración para comparar CPU y GPU). */
+JNIEXPORT void JNICALL
+Java_org_senda_browser_core_ai_llama_SendaLlamaBridge_nativeSetTemperature(JNIEnv * /*env*/, jobject /*thiz*/, jfloat temp) {
+    std::lock_guard<std::mutex> lock(g_llama_mutex);
+    if (!g_model) return;
+    if (g_sampler) common_sampler_free(g_sampler);
+    g_sampler = new_sampler(temp);
+}
 
-    if (decode_tokens_in_batches(g_context, g_batch, user_tokens, current_position, true)) {
-        LOGE("Failed to decode user prompt!");
-        return 2;
-    }
+JNIEXPORT jint JNICALL
+Java_org_senda_browser_core_ai_llama_SendaLlamaBridge_nativeLastDecodedTokens(JNIEnv * /*env*/, jobject /*thiz*/) {
+    return g_last_decoded_tokens;
+}
 
-    current_position += user_prompt_size;
-    stop_generation_position = current_position + user_prompt_size + n_predict;
-    return 0;
+JNIEXPORT void JNICALL
+Java_org_senda_browser_core_ai_llama_SendaLlamaBridge_nativeSetThreads(JNIEnv * /*env*/, jobject /*thiz*/, jint n_gen, jint n_batch) {
+    std::lock_guard<std::mutex> lock(g_llama_mutex);
+    if (g_context) llama_set_n_threads(g_context, n_gen, n_batch);
 }
 
 JNIEXPORT jstring JNICALL
@@ -388,9 +481,15 @@ Java_org_senda_browser_core_ai_llama_SendaLlamaBridge_nativeGenerateNextToken(JN
     }
 
     current_position++;
+    g_cached_tokens.push_back(new_token_id);
 
     if (llama_vocab_is_eog(llama_model_get_vocab(g_model), new_token_id)) {
-        chat_add_and_format(ROLE_ASSISTANT, assistant_ss.str());
+        // Sin formatear: Kotlin manda la conversación completa en cada pregunta y la plantilla heredada
+        // no reconoce todos los modelos (Gemma 4)
+        common_chat_msg msg;
+        msg.role = ROLE_ASSISTANT;
+        msg.content = assistant_ss.str();
+        chat_msgs.push_back(msg);
         return nullptr;
     }
 

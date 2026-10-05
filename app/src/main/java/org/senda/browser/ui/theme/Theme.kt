@@ -5,6 +5,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -102,6 +103,18 @@ fun SendaTheme(
 
     val fontFamily = remember(fontFamilyKey, recomposeKey) { resolveFontFamily(fontFamilyKey) }
     val typography = remember(fontFamily, hinting, recomposeKey) { getSendaTypography(fontFamily, hinting) }
+
+    // La app dibuja detrás de las barras del sistema: sus iconos deben contrastar con el fondo del tema
+    val view = androidx.compose.ui.platform.LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (view.context as? android.app.Activity)?.window ?: return@SideEffect
+            androidx.core.view.WindowCompat.getInsetsController(window, view).apply {
+                isAppearanceLightStatusBars = !isDark
+                isAppearanceLightNavigationBars = !isDark
+            }
+        }
+    }
 
     val currentDensity = LocalDensity.current
     val scaleFactor = (fontScalePercent / 100f).coerceIn(0.75f, 1.8f)

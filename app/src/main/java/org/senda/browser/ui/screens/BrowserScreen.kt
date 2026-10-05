@@ -79,6 +79,51 @@ fun BrowserScreen(
     var showAiAssistantSheet by remember { mutableStateOf(false) }
     var isAddressBarEditing by remember { mutableStateOf(false) }
     var showFindBar by remember { mutableStateOf(false) }
+
+    // Miniaturas de la vista de pestañas: se capturan de la vista web visible, se reducen y quedan solo en memoria
+    var geckoView by remember { mutableStateOf<GeckoView?>(null) }
+    fun captureThumbnail() {
+        val view = geckoView ?: return
+        val tab = activeTab ?: return
+        if (tab.url.isBlank() || tab.url == "about:blank" || tab.isCrashed) {
+            tab.thumbnail = null
+            return
+        }
+        try {
+            view.capturePixels().accept({ bitmap ->
+                if (bitmap == null || bitmap.width == 0 || bitmap.height == 0) return@accept
+                // La vista ya puede mostrar otra pestaña cuando llega la captura
+                if (view.session !== tab.session) {
+                    bitmap.recycle()
+                    return@accept
+                }
+                val width = 360
+                val height = (bitmap.height * width / bitmap.width).coerceAtMost(width * 2)
+                val scaled = android.graphics.Bitmap.createScaledBitmap(bitmap, width, (bitmap.height * width / bitmap.width), true)
+                val cropped = if (scaled.height > height) android.graphics.Bitmap.createBitmap(scaled, 0, 0, width, height) else scaled
+                if (cropped !== scaled) scaled.recycle()
+                if (scaled !== bitmap) bitmap.recycle()
+                tab.thumbnail = cropped
+            }, { })
+        } catch (_: Exception) {}
+    }
+    val openTabsOverview = {
+        captureThumbnail()
+        showTabsSheet = true
+    }
+    // Fallo de la traducción (sin red para bajar el modelo, idioma no admitido…)
+    LaunchedEffect(activeTab?.translationError) {
+        if (activeTab?.translationError != null) {
+            android.widget.Toast.makeText(context, strings.translate_failed, android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
+    // Al terminar de cargar una página, actualizar su miniatura
+    LaunchedEffect(activeTab?.id, activeTab?.isLoading, activeTab?.url) {
+        if (activeTab != null && !activeTab.isLoading) {
+            kotlinx.coroutines.delay(800)
+            captureThumbnail()
+        }
+    }
     // Al cambiar de pestaña la búsqueda anterior ya no aplica
     LaunchedEffect(activeTab?.id) { showFindBar = false }
 
@@ -134,7 +179,7 @@ fun BrowserScreen(
                         onBack = { activeTab?.goBack() },
                         onForward = { activeTab?.goForward() },
                         onRefresh = { activeTab?.reload() },
-                        onOpenTabsOverview = { showTabsSheet = true },
+                        onOpenTabsOverview = openTabsOverview,
                         onOpenDevTools = { showDevToolsSheet = true },
                         onOpenSettings = onOpenSettings,
                         onOpenCast = { showCastDialog = true },
@@ -182,7 +227,7 @@ fun BrowserScreen(
                         onBack = { activeTab?.goBack() },
                         onForward = { activeTab?.goForward() },
                         onRefresh = { activeTab?.reload() },
-                        onOpenTabsOverview = { showTabsSheet = true },
+                        onOpenTabsOverview = openTabsOverview,
                         onOpenDevTools = { showDevToolsSheet = true },
                         onOpenSettings = onOpenSettings,
                         onOpenCast = { showCastDialog = true },
@@ -255,7 +300,7 @@ fun BrowserScreen(
                                             ViewGroup.LayoutParams.MATCH_PARENT
                                         )
                                         setSession(activeTab.session)
-                                    }
+                                    }.also { geckoView = it }
                                 },
                                 update = { view ->
                                     view.setSession(activeTab.session)

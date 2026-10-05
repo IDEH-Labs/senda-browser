@@ -22,6 +22,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -52,6 +56,11 @@ fun TabsOverview(
     val strings = LocalSendaStrings.current
 
     var showConfirmCloseAllDialog by remember { mutableStateOf(false) }
+    // Privadas y normales van por separado; se abre la sección de la pestaña activa
+    var showPrivate by remember { mutableStateOf(tabs.firstOrNull { it.id == activeTabId }?.isPrivate == true) }
+    val sectionTabs = tabs.filter { it.isPrivate == showPrivate }
+    val privateCount = tabs.count { it.isPrivate }
+    val newTabInSection = if (showPrivate) onNewPrivateTab else onNewTab
 
     Scaffold(
         topBar = {
@@ -72,7 +81,7 @@ fun TabsOverview(
                                 .padding(horizontal = 8.dp, vertical = 2.dp)
                         ) {
                             Text(
-                                text = "${tabs.size}",
+                                text = "${sectionTabs.size}",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -91,10 +100,10 @@ fun TabsOverview(
                 },
                 actions = {
                     // Botón + exactamente como en el ejemplo: limpio, elegante y bien posicionado
-                    IconButton(onClick = onNewTab) {
+                    IconButton(onClick = newTabInSection) {
                         Icon(
                             imageVector = Icons.Default.Add,
-                            contentDescription = strings.tb_new_tab,
+                            contentDescription = if (showPrivate) strings.tabs_new_private else strings.tb_new_tab,
                             tint = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.size(28.dp)
                         )
@@ -106,7 +115,7 @@ fun TabsOverview(
                         IconButton(onClick = { showMoreMenu = true }) {
                             Icon(
                                 imageVector = Icons.Default.MoreVert,
-                                contentDescription = "Más opciones",
+                                contentDescription = strings.tabs_more_options,
                                 tint = MaterialTheme.colorScheme.onSurface
                             )
                         }
@@ -130,10 +139,15 @@ fun TabsOverview(
                                 }
                             )
 
-                            if (tabs.isNotEmpty()) {
+                            if (sectionTabs.isNotEmpty()) {
                                 HorizontalDivider()
                                 DropdownMenuItem(
-                                    text = { Text(strings.tabs_close_all, color = MaterialTheme.colorScheme.error) },
+                                    text = {
+                                        Text(
+                                            if (showPrivate) strings.tabs_close_all_private else strings.tabs_close_all,
+                                            color = MaterialTheme.colorScheme.error
+                                        )
+                                    },
                                     leadingIcon = {
                                         Icon(
                                             imageVector = Icons.Default.DeleteSweep,
@@ -157,12 +171,30 @@ fun TabsOverview(
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            if (tabs.isEmpty()) {
+            PrimaryTabRow(
+                selectedTabIndex = if (showPrivate) 1 else 0,
+                containerColor = MaterialTheme.colorScheme.surface
+            ) {
+                Tab(
+                    selected = !showPrivate,
+                    onClick = { showPrivate = false },
+                    text = { Text("${strings.tabs_section_normal} (${tabs.size - privateCount})") },
+                    icon = { Icon(Icons.Default.Tab, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                )
+                Tab(
+                    selected = showPrivate,
+                    onClick = { showPrivate = true },
+                    text = { Text("${strings.tabs_section_private} ($privateCount)") },
+                    icon = { Icon(Icons.Default.Security, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                )
+            }
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (sectionTabs.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
@@ -178,17 +210,23 @@ fun TabsOverview(
                             modifier = Modifier.size(64.dp)
                         )
                         Text(
-                            text = strings.tabs_empty,
+                            text = if (showPrivate) strings.tabs_private_empty else strings.tabs_empty,
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Button(
-                            onClick = onNewTab,
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                        ) {
-                            Icon(imageVector = Icons.Default.Add, contentDescription = null, tint = Color.Black)
+                        if (showPrivate) {
+                            Text(
+                                text = strings.tabs_private_explainer,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                modifier = Modifier.padding(horizontal = 32.dp)
+                            )
+                        }
+                        Button(onClick = newTabInSection) {
+                            Icon(imageVector = Icons.Default.Add, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text(strings.tb_new_tab, color = Color.Black)
+                            Text(if (showPrivate) strings.tabs_new_private else strings.tb_new_tab)
                         }
                     }
                 }
@@ -197,11 +235,15 @@ fun TabsOverview(
                 val columns = if (isGrid) GridCells.Fixed(2) else GridCells.Fixed(1)
                 val gridState = rememberLazyGridState()
 
-                // Desplazar suavemente a la nueva pestaña creada para apreciar la animación
-                LaunchedEffect(tabs.size) {
-                    if (tabs.isNotEmpty()) {
-                        gridState.animateScrollToItem(tabs.size - 1)
-                    }
+                // Al abrir, mostrar la pestaña activa; al crear una nueva, ir hasta ella
+                LaunchedEffect(showPrivate) {
+                    val index = sectionTabs.indexOfFirst { it.id == activeTabId }
+                    if (index >= 0) gridState.scrollToItem(index)
+                }
+                var previousCount by remember(showPrivate) { mutableIntStateOf(sectionTabs.size) }
+                LaunchedEffect(sectionTabs.size) {
+                    if (sectionTabs.size > previousCount) gridState.animateScrollToItem(sectionTabs.size - 1)
+                    previousCount = sectionTabs.size
                 }
 
                 LazyVerticalGrid(
@@ -212,35 +254,57 @@ fun TabsOverview(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    items(tabs, key = { it.id }) { tab ->
+                    items(sectionTabs, key = { it.id }) { tab ->
                         val isSelected = tab.id == activeTabId
-                        TabCardItem(
-                            modifier = Modifier.animateItem(),
-                            tab = tab,
-                            isSelected = isSelected,
-                            isGrid = isGrid,
-                            onSelect = { onSelectTab(tab) },
-                            onClose = { onCloseTab(tab) }
+                        // Deslizar a un lado cierra la pestaña (el botón ✕ sigue disponible)
+                        val dismissState = rememberSwipeToDismissBoxState(
+                            confirmValueChange = { value ->
+                                if (value != SwipeToDismissBoxValue.Settled) {
+                                    onCloseTab(tab)
+                                    true
+                                } else false
+                            },
+                            positionalThreshold = { distance -> distance * 0.4f }
                         )
+                        SwipeToDismissBox(
+                            state = dismissState,
+                            modifier = Modifier.animateItem(),
+                            backgroundContent = {}
+                        ) {
+                            TabCardItem(
+                                modifier = Modifier.graphicsLayer {
+                                    alpha = 1f - (kotlin.math.abs(dismissState.progress.takeIf {
+                                        dismissState.targetValue != SwipeToDismissBoxValue.Settled
+                                    } ?: 0f) * 0.6f)
+                                },
+                                tab = tab,
+                                isSelected = isSelected,
+                                isGrid = isGrid,
+                                onSelect = { onSelectTab(tab) },
+                                onClose = { onCloseTab(tab) }
+                            )
+                        }
                     }
                 }
             }
+        }
         }
     }
 
     if (showConfirmCloseAllDialog) {
         AlertDialog(
             onDismissRequest = { showConfirmCloseAllDialog = false },
-            title = { Text(strings.tabs_close_all) },
-            text = { Text(strings.dlg_tabs_close_all_confirm_text) },
+            title = { Text(if (showPrivate) strings.tabs_close_all_private else strings.tabs_close_all) },
+            text = { Text(if (showPrivate) strings.dlg_tabs_close_private_confirm_text else strings.dlg_tabs_close_all_confirm_text) },
             confirmButton = {
                 TextButton(
                     onClick = {
                         showConfirmCloseAllDialog = false
-                        onCloseAll()
+                        // Si son todas las pestañas, el cierre completo; si no, solo las de esta sección
+                        if (sectionTabs.size == tabs.size) onCloseAll() else sectionTabs.toList().forEach(onCloseTab)
                     }
                 ) {
-                    Text(strings.tabs_close_all, color = MaterialTheme.colorScheme.error)
+                    Text(if (showPrivate) strings.tabs_close_all_private else strings.tabs_close_all, color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
@@ -262,7 +326,7 @@ private fun TabCardItem(
     onClose: () -> Unit
 ) {
     val strings = LocalSendaStrings.current
-    val cardHeight = if (isGrid) 136.dp else 72.dp
+    val cardHeight = if (isGrid) 210.dp else 72.dp
 
     Card(
         modifier = modifier
@@ -311,7 +375,7 @@ private fun TabCardItem(
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = if (tab.url == "about:blank" || tab.url.isBlank()) strings.tabs_new else tab.title.ifBlank { strings.tb_tabs },
-                        maxLines = if (isGrid) 2 else 1,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
@@ -332,6 +396,37 @@ private fun TabCardItem(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(14.dp)
                     )
+                }
+            }
+
+            // Miniatura de la página (solo en memoria; nunca se guarda en disco)
+            if (isGrid) {
+                val thumbnail = tab.thumbnail
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(vertical = 4.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (thumbnail != null) {
+                        Image(
+                            bitmap = remember(thumbnail) { thumbnail.asImageBitmap() },
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            alignment = Alignment.TopCenter,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        Icon(
+                            imageVector = if (tab.isPrivate) Icons.Default.Security else if (tab.url == "about:blank" || tab.url.isBlank()) Icons.Default.Home else Icons.Default.Language,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
                 }
             }
 

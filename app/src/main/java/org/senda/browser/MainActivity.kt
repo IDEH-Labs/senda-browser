@@ -11,7 +11,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.biometric.BiometricPrompt
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -91,16 +96,16 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Desde Android 15 (targetSdk 35+) la ventana siempre ocupa también la zona de las barras del sistema.
+        // Se activa igual en todas las versiones y la interfaz reserva ese espacio con WindowInsets.safeDrawing
+        enableEdgeToEdge()
         prefs = PreferencesManager(this)
         SendaLocaleManager.applyLocale(this, prefs.appLanguage)
         // Protección contra espionaje en vista multitarea (FLAG_SECURE) si el usuario la activó
         updateAntiSnoopingFlag()
 
         // Verificar si se abrió mediante un enlace externo o texto compartido
-        val initialUrl = intent?.dataString
-            ?: intent?.getStringExtra("url")
-            ?: intent?.getStringExtra(Intent.EXTRA_TEXT)
-            ?: "about:blank"
+        val initialUrl = externalUrlFrom(intent) ?: "about:blank"
 
         setContent {
             var isUnlocked by remember { mutableStateOf(!prefs.requireBiometrics) }
@@ -119,8 +124,9 @@ class MainActivity : FragmentActivity() {
             // Inicializar con la primera pestaña
             LaunchedEffect(Unit) {
                 if (tabs.isEmpty()) {
+                    val startupMode = prefs.startupMode
                     // Reabrir las pestañas de la sesión anterior (las privadas nunca se guardan)
-                    if (!prefs.alwaysPrivateMode) {
+                    if (!prefs.alwaysPrivateMode && startupMode != "CLEAN") {
                         val (saved, activeIndex) = prefs.loadOpenTabs()
                         saved.forEach { savedTab ->
                             tabs.add(
@@ -137,8 +143,15 @@ class MainActivity : FragmentActivity() {
                         }
                         tabs.getOrNull(activeIndex)?.let { activeTabId = it.id }
                     }
+                    // «Página de inicio limpia»: se arranca en una pestaña vacía; si ya había una (la última
+                    // usada o cualquier otra), se reutiliza para no acumular pestañas vacías en cada inicio
+                    val reusableHome = if (startupMode == "HOME" && initialUrl == "about:blank") {
+                        tabs.firstOrNull { it.id == activeTabId && it.url == "about:blank" }
+                            ?: tabs.firstOrNull { it.url == "about:blank" }
+                    } else null
+                    if (reusableHome != null) activeTabId = reusableHome.id
                     // Un enlace abierto desde otra app va en una pestaña nueva y al frente
-                    if (tabs.isEmpty() || initialUrl != "about:blank") {
+                    if (tabs.isEmpty() || initialUrl != "about:blank" || (startupMode == "HOME" && reusableHome == null)) {
                         val firstTab = BrowserTab(
                             initialUrl = initialUrl,
                             isPrivate = prefs.alwaysPrivateMode,
@@ -180,10 +193,12 @@ class MainActivity : FragmentActivity() {
                     requestAndroidPermissions(permissions, onResult)
                 }
                 org.senda.browser.core.SendaDownloadManager.locationPicker = ::askSaveLocation
+                BrowserTab.printer = { pdf, title -> org.senda.browser.core.SendaPageActions.print(this@MainActivity, pdf, title) }
                 onDispose {
                     BrowserTab.tabOpener = null
                     BrowserTab.androidPermissionRequester = null
                     org.senda.browser.core.SendaDownloadManager.locationPicker = null
+                    BrowserTab.printer = null
                     onNewIntentCallback = null
                 }
             }
@@ -200,9 +215,7 @@ class MainActivity : FragmentActivity() {
             // Modo inmersivo total para reproducción de video en pantalla completa solicitada por el usuario
             LaunchedEffect(isFullScreen, keepPortrait) {
                 val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
-                // En pantalla completa la ventana se dibuja bajo las barras y la cámara: si no, Android
-                // sigue reservando su espacio aunque estén ocultas y el video queda con márgenes
-                WindowCompat.setDecorFitsSystemWindows(window, !isFullScreen)
+                // El espacio de las barras lo reserva la interfaz (safeDrawing), salvo en pantalla completa
                 if (isFullScreen) {
                     windowInsetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
                     windowInsetsController.hide(WindowInsetsCompat.Type.systemBars())
@@ -295,6 +308,16 @@ class MainActivity : FragmentActivity() {
                     recomposeKey = themeRecomposeKey
                 ) {
                     Surface(modifier = Modifier.fillMaxSize()) {
+                    // Fuera de pantalla completa, el contenido no se mete bajo las barras, la cámara ni el teclado;
+                    // el fondo del Surface sí se extiende detrás de las barras
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .then(
+                                if (isFullScreen) Modifier
+                                else Modifier.windowInsetsPadding(WindowInsets.safeDrawing)
+                            )
+                    ) {
                         SendaGeckoEngine.pendingExtensionInstall?.let { request ->
                             org.senda.browser.ui.components.ExtensionInstallDialog(request)
                         }
@@ -416,6 +439,7 @@ class MainActivity : FragmentActivity() {
                             }
                         }
                     }
+                    }
                 }
             }
         }
@@ -509,12 +533,36 @@ class MainActivity : FragmentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        val incoming = intent.dataString
-            ?: intent.getStringExtra("url")
-            ?: intent.getStringExtra(Intent.EXTRA_TEXT)
-        incoming?.let { url ->
+        externalUrlFrom(intent)?.let { url ->
             onNewIntentCallback?.invoke(url)
         }
+    }
+
+    /**
+     * Lo que llega de otras apps no es de fiar: javascript:, data:, about:, resource: o un file:// hacia la
+     * carpeta privada de Senda se ejecutaban o se listaban como si el usuario los hubiera escrito.
+     */
+    private fun externalUrlFrom(intent: Intent?): String? {
+        val raw = (intent?.dataString ?: intent?.getStringExtra("url") ?: intent?.getStringExtra(Intent.EXTRA_TEXT))
+            ?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        val scheme = Regex("^([a-zA-Z][a-zA-Z0-9+.-]*):").find(raw)?.groupValues?.get(1)?.lowercase()
+            ?: return raw // Texto compartido sin esquema: la barra lo trata como dirección o búsqueda
+        return when (scheme) {
+            "http", "https", "content" -> raw
+            "file" -> raw.takeIf { isPublicFile(it) }
+            else -> {
+                android.util.Log.w("Senda", "Enlace externo rechazado (esquema $scheme)")
+                null
+            }
+        }
+    }
+
+    private fun isPublicFile(fileUrl: String): Boolean {
+        val path = android.net.Uri.parse(fileUrl).path ?: return false
+        val canonical = try { java.io.File(path).canonicalPath } catch (_: java.io.IOException) { return false }
+        val privateRoots = listOfNotNull(applicationInfo.dataDir, filesDir.parent, "/data/data", "/data/user", "/data/user_de")
+            .map { java.io.File(it).canonicalPath }
+        return privateRoots.none { canonical == it || canonical.startsWith("$it/") }
     }
 
     private fun showBiometricAuth(onResult: (Boolean) -> Unit) {

@@ -14,7 +14,7 @@ class VaultAuditInstrumentedTest {
     @Test
     fun executeForensicAuditAndStressTest() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        val report = SendaVaultAuditRunner.runFullAudit(context, stressCycles = 1000)
+        val report = SendaVaultAuditRunner.runFullAudit(context, org.senda.browser.core.SendaStrings.get("ES", context), stressCycles = 1000)
 
         println("=================================================================")
         println("         SENDA SOBERANA - REPORTE DE AUDITORÍA FORENSE           ")

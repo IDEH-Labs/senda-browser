@@ -19,7 +19,7 @@ data class SendaChatMessage(
     val text: String,
     val timestamp: Long = System.currentTimeMillis(),
     val latencyMs: Long = 0,
-    val executionBackend: String = "Senda AI (Offline)",
+    val executionBackend: String = "Respuestas fijas de Senda (sin modelo de IA)",
     val isDocument: Boolean = false,
     val isCode: Boolean = false,
     val codeLanguage: String? = null,
@@ -31,7 +31,7 @@ data class AiInferenceResult(
     val outputText: String,
     val tokensGenerated: Int = 0,
     val latencyMs: Long = 0,
-    val executionBackend: String = "Senda AI (Offline)",
+    val executionBackend: String = "Respuestas fijas de Senda (sin modelo de IA)",
     val errorMessage: String? = null,
     val isDocument: Boolean = false,
     val isCode: Boolean = false,
@@ -208,7 +208,12 @@ Distingue falta de información, incertidumbre propia del asunto, límites propi
         includePageContext: Boolean = false,
         ollamaUrl: String? = null,
         ollamaModel: String? = null,
-        backendMode: String = "CHIP"
+        backendMode: String = "CHIP",
+        // Solo con permiso explícito se envía la pregunta a Wikipedia y DuckDuckGo
+        allowWebLookup: Boolean = false,
+        // Texto parcial mientras el modelo local escribe (en un teléfono de gama media la respuesta completa
+        // tarda 15-30 s; sin esto la pantalla quedaba quieta todo ese tiempo)
+        onPartial: ((String) -> Unit)? = null
     ): AiInferenceResult = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         val startTime = System.currentTimeMillis()
         val trimmedPrompt = userMessage.trim()
@@ -222,11 +227,23 @@ Distingue falta de información, incertidumbre propia del asunto, límites propi
 
         val activeTopic = extractConversationTopic(priorHistory)
 
+        // Fecha y hora: siempre del reloj del teléfono, exactas y sin red. Antes, con el modelo cargado, la
+        // pregunta iba directo al modelo, que no sabe qué día es y lo inventaba
+        tryEvaluateTemporal(trimmedPrompt)?.let { temporalAnswer ->
+            return@withContext AiInferenceResult(
+                success = true,
+                outputText = temporalAnswer,
+                tokensGenerated = (temporalAnswer.length / 3.8).toInt(),
+                latencyMs = System.currentTimeMillis() - startTime,
+                executionBackend = "Reloj del teléfono"
+            )
+        }
+
         // 1. Si el usuario configuró Ollama en su red LAN doméstica
         if (backendMode == "OLLAMA" && !ollamaUrl.isNullOrBlank()) {
             val fullPrompt = buildString {
                 append(CORE_EPISTEMIC_DIRECTIVE.trim())
-                append("\n\nEres el Asistente Soberano de Senda Browser. Responde con fluidez natural en español, rigor analítico, calibración epistémica, calidez y sin rodeos burocráticos. Si el usuario te pide redactar una carta, derecho de petición o documento, redáctalo íntegramente de forma formal con fecha y pie de firma.\n\n")
+                append("\n\nEres el Asistente Soberano de Senda Browser. Responde en el mismo idioma en que te escribe el usuario, con fluidez natural, rigor analítico, calibración epistémica, calidez y sin rodeos burocráticos. Si el usuario te pide redactar una carta, derecho de petición o documento, redáctalo íntegramente de forma formal con fecha y pie de firma.\n\n")
                 if (includePageContext && !pageContent.isNullOrBlank()) {
                     append("Contexto de la página web actual (${pageTitle ?: "Sitio"}):\n")
                     append(sanitizeInputText(pageContent, 3500))
@@ -261,32 +278,75 @@ Distingue falta de información, incertidumbre propia del asunto, límites propi
             // En el teléfono cada token del prompt cuesta: la directiva completa (~8.400 caracteres) más
             // 3.500 de la página hacían que una respuesta de una línea tardara ~195 s en un Snapdragon 695.
             // El modelo local recibe la versión compacta de la directiva y un extracto más corto de la página
+            // Con el permiso de consulta en línea, el modelo responde a partir de lo encontrado en Wikipedia /
+            // DuckDuckGo (antes ese permiso solo se usaba cuando no había modelo, así que nunca investigaba)
+            val usesPage = includePageContext && !pageContent.isNullOrBlank()
+            val webRes = if (allowWebLookup && !usesPage) SendaWebSearchEngine.searchAndSynthesize(trimmedPrompt) else null
+            val webFound = webRes != null && webRes.sources.isNotEmpty()
             val fullPrompt = buildString {
-                if (includePageContext && !pageContent.isNullOrBlank()) {
-                    append("Contexto de la página web actual (${pageTitle ?: "Sitio"}):\n")
-                    append(SendaPromptTemplates.sanitizeInputText(pageContent, 1200))
-                    append("\n\n")
+                if (usesPage) {
+                    append(SendaPromptTemplates.thirdPartyBlock(
+                        "pagina", "Página web actual: ${pageTitle ?: "Sitio"}",
+                        SendaPromptTemplates.sanitizeInputText(pageContent!!, 1200)
+                    ))
+                    append("\n\nPregunta: ")
+                }
+                if (webFound) {
+                    append(SendaPromptTemplates.thirdPartyBlock(
+                        "busqueda", "Resultados de Wikipedia / DuckDuckGo (pueden estar incompletos)",
+                        SendaPromptTemplates.sanitizeInputText(webRes!!.synthesizedSummary, 900)
+                    ))
+                    append("\n\nResponde basándote en esa información; si no alcanza para responder, dilo.\n\nPregunta: ")
                 }
                 append(trimmedPrompt)
             }
             val nativeTextSb = java.lang.StringBuilder()
+            var lastPartialAt = 0L
             try {
-                org.senda.browser.core.ai.llama.SendaLlamaBridge.inferStream(
-                    userPrompt = fullPrompt,
-                    systemPrompt = SendaPromptTemplates.COMPACT_ON_DEVICE_DIRECTIVE,
-                    maxTokens = 512
-                ).collect { token ->
-                    nativeTextSb.append(token)
+                // El modelo ve los últimos turnos (antes solo la pregunta suelta: «¿y en qué año?» no tenía
+                // sujeto). Cada token del historial se vuelve a leer en cada pregunta, así que el presupuesto
+                // es corto; si aun así no cabe, se reintenta con menos historial
+                var turns = recentTurnsForModel(priorHistory)
+                while (true) {
+                    nativeTextSb.setLength(0)
+                    try {
+                        org.senda.browser.core.ai.llama.SendaLlamaBridge.inferStream(
+                            userPrompt = fullPrompt + currentTimeNote(),
+                            systemPrompt = SendaPromptTemplates.COMPACT_ON_DEVICE_DIRECTIVE + " " + currentDateLine(),
+                            maxTokens = 512,
+                            history = turns
+                        ).collect { token ->
+                            nativeTextSb.append(token)
+                            // Como mucho ~6 actualizaciones por segundo: el modelo ya ocupa los núcleos
+                            val now = System.currentTimeMillis()
+                            if (onPartial != null && now - lastPartialAt >= 150) {
+                                lastPartialAt = now
+                                onPartial(stripReasoning(nativeTextSb.toString()))
+                            }
+                        }
+                        break
+                    } catch (e: org.senda.browser.core.ai.llama.SendaLlamaBridge.ContextOverflowException) {
+                        if (turns.isEmpty()) throw e
+                        turns = turns.drop(2)
+                    }
                 }
-                val nativeRes = nativeTextSb.toString().trim()
+                val nativeRes = stripReasoning(nativeTextSb.toString())
                 if (nativeRes.isNotBlank()) {
                     val latency = System.currentTimeMillis() - startTime
+                    val output = when {
+                        webFound -> nativeRes + formatWebSources(webRes!!)
+                        allowWebLookup && !usesPage -> nativeRes + "\n\n*No se encontró nada en Wikipedia ni DuckDuckGo: respuesta solo del modelo local, que puede equivocarse.*"
+                        else -> nativeRes
+                    }
                     return@withContext AiInferenceResult(
                         success = true,
-                        outputText = nativeRes,
+                        outputText = output,
                         tokensGenerated = (nativeRes.length / 3.8).toInt(),
                         latencyMs = latency,
-                        executionBackend = "Senda Neural Engine (llama.cpp ARM64 NEON GGUF)"
+                        executionBackend = if (webFound)
+                            "Senda Neural Engine (llama.cpp) + Wikipedia / DuckDuckGo (consulta en línea)"
+                        else
+                            "Senda Neural Engine (llama.cpp ARM64 NEON GGUF)"
                     )
                 }
             } catch (e: Exception) {
@@ -303,7 +363,7 @@ Distingue falta de información, incertidumbre propia del asunto, límites propi
                 outputText = followupAnswer,
                 tokensGenerated = (followupAnswer.length / 3.8).toInt(),
                 latencyMs = latency,
-                executionBackend = "Senda AI (Offline Determinista)"
+                executionBackend = RULES_BACKEND
             )
         }
 
@@ -322,20 +382,11 @@ Distingue falta de información, incertidumbre propia del asunto, límites propi
                 outputText = mathAnswer,
                 tokensGenerated = (mathAnswer.length / 3.8).toInt(),
                 latencyMs = latency,
-                executionBackend = "Senda AI (Offline)"
+                executionBackend = RULES_BACKEND
             )
         }
 
-        tryEvaluateTemporal(trimmedPrompt)?.let { temporalAnswer ->
-            val latency = System.currentTimeMillis() - startTime
-            return@withContext AiInferenceResult(
-                success = true,
-                outputText = temporalAnswer,
-                tokensGenerated = (temporalAnswer.length / 3.8).toInt(),
-                latencyMs = latency,
-                executionBackend = "Senda AI (Offline)"
-            )
-        }
+        // (Fecha y hora: ya respondidas al principio con el reloj del teléfono)
 
         tryEvaluateUnitConversion(trimmedPrompt)?.let { convAnswer ->
             val latency = System.currentTimeMillis() - startTime
@@ -344,7 +395,7 @@ Distingue falta de información, incertidumbre propia del asunto, límites propi
                 outputText = convAnswer,
                 tokensGenerated = (convAnswer.length / 3.8).toInt(),
                 latencyMs = latency,
-                executionBackend = "Senda AI (Offline)"
+                executionBackend = RULES_BACKEND
             )
         }
 
@@ -355,7 +406,7 @@ Distingue falta de información, incertidumbre propia del asunto, límites propi
                 outputText = deviceAnswer,
                 tokensGenerated = (deviceAnswer.length / 3.8).toInt(),
                 latencyMs = latency,
-                executionBackend = "Senda AI (Offline)"
+                executionBackend = RULES_BACKEND
             )
         }
 
@@ -366,7 +417,7 @@ Distingue falta de información, incertidumbre propia del asunto, límites propi
                 outputText = greetingAnswer,
                 tokensGenerated = (greetingAnswer.length / 3.8).toInt(),
                 latencyMs = latency,
-                executionBackend = "Senda AI (Offline)"
+                executionBackend = RULES_BACKEND
             )
         }
 
@@ -377,11 +428,11 @@ Distingue falta de información, incertidumbre propia del asunto, límites propi
                 outputText = factAnswer,
                 tokensGenerated = (factAnswer.length / 3.8).toInt(),
                 latencyMs = latency,
-                executionBackend = "Senda AI (Offline)"
+                executionBackend = RULES_BACKEND
             )
         }
 
-        // 3. Motor Soberano Local en Chip (100% Offline, Cero Dependencias)
+        // 3. Sin modelo disponible: reglas y plantillas fijas
         val lower = effectivePrompt.lowercase()
 
         // 1. Detección de Código / Codex / AGY (Scripts, funciones, programación, depuración)
@@ -429,9 +480,10 @@ Distingue falta de información, incertidumbre propia del asunto, límites propi
                 finalDoc = true
                 val docType = when {
                     lower.contains("renuncia") -> "Renuncia"
+                    // Antes que «cobro»: «derecho de petición sobre cobro indebido» es una petición, no un reclamo
+                    lower.contains("peticion") || lower.contains("petición") -> "Derecho de Petición"
                     lower.contains("reclamo") || lower.contains("cancelar") || lower.contains("queja") || lower.contains("falla") || lower.contains("cobro") -> "Reclamo"
                     lower.contains("contrato") || lower.contains("acuerdo") || lower.contains("nda") -> "Contrato"
-                    lower.contains("peticion") || lower.contains("petición") -> "Derecho de Petición"
                     lower.contains("informe") || lower.contains("reporte") -> "Informe Ejecutivo"
                     lower.contains("minuta") || lower.contains("acta") -> "Minuta de Reunión"
                     lower.contains("ensayo") || lower.contains("articulo") || lower.contains("artículo") -> "Ensayo"
@@ -469,7 +521,7 @@ Distingue falta de información, incertidumbre propia del asunto, límites propi
                 } else {
                     effectivePrompt
                 }
-                val searchRes = SendaWebSearchEngine.searchAndSynthesize(searchQuery)
+                val searchRes = if (allowWebLookup) SendaWebSearchEngine.searchAndSynthesize(searchQuery) else null
                 if (searchRes != null && searchRes.sources.isNotEmpty()) {
                     usedOnlineSearch = true
                     formatWebSearchResult(searchRes)
@@ -490,8 +542,8 @@ Distingue falta de información, incertidumbre propia del asunto, límites propi
             // Si la respuesta salió de Wikipedia, decirlo: la consulta sí viajó por Internet
             executionBackend = when {
                 usedOnlineSearch -> "Wikipedia / DuckDuckGo (consulta en línea)"
-                finalCode -> "Senda Codex (Offline)"
-                else -> "Senda AI (Offline)"
+                finalCode -> "Plantillas de código de Senda (sin modelo de IA)"
+                else -> RULES_BACKEND
             },
             isDocument = finalDoc,
             isCode = finalCode,
@@ -500,13 +552,71 @@ Distingue falta de información, incertidumbre propia del asunto, límites propi
         )
     }
 
+    private val RULES_BACKEND = "Respuestas fijas de Senda (sin modelo de IA)"
+
+    /** Fecha y hora del teléfono para el modelo local, que por sí solo no sabe en qué día está. */
+    /** Últimos turnos del chat que caben en [HISTORY_CHAR_BUDGET], empezando siempre por una pregunta. */
+    private fun recentTurnsForModel(history: List<SendaChatMessage>): List<org.senda.browser.core.ai.llama.SendaLlamaBridge.ChatTurn> {
+        val picked = ArrayDeque<org.senda.browser.core.ai.llama.SendaLlamaBridge.ChatTurn>()
+        var used = 0
+        for (msg in history.asReversed()) {
+            val text = stripReasoning(msg.text).take(HISTORY_MESSAGE_MAX_CHARS)
+            if (text.isBlank()) continue
+            if (used + text.length > HISTORY_CHAR_BUDGET) break
+            used += text.length
+            picked.addFirst(
+                org.senda.browser.core.ai.llama.SendaLlamaBridge.ChatTurn(
+                    if (msg.sender == ChatSender.USER) "user" else "assistant", text
+                )
+            )
+        }
+        while (picked.isNotEmpty() && picked.first().role != "user") picked.removeFirst()
+        return picked.toList()
+    }
+
+    /** Quita el razonamiento interno (<think>…</think>) si el modelo lo emite aunque esté desactivado. */
+    internal fun stripReasoning(text: String): String =
+        if (!text.contains("<think>")) text.trim()
+        else text.replace(THINK_CLOSED, "").replace(THINK_OPEN, "").trim()
+
+    private val THINK_CLOSED = Regex("(?s)<think>.*?</think>")
+    private val THINK_OPEN = Regex("(?s)<think>.*")
+
+    private const val HISTORY_CHAR_BUDGET = 2400
+    private const val HISTORY_MESSAGE_MAX_CHARS = 800
+
+    /** Solo la fecha: va en las instrucciones, que se reutilizan de una pregunta a otra (caché de prefijo). */
+    private fun currentDateLine(): String {
+        val esLocale = java.util.Locale.forLanguageTag("es-ES")
+        val now = java.text.SimpleDateFormat("EEEE d 'de' MMMM 'de' yyyy", esLocale).format(java.util.Date())
+        return "Fecha actual del teléfono: $now."
+    }
+
+    /**
+     * La hora va al final de la pregunta actual y no en las instrucciones: con la hora (cambia cada minuto) en
+     * las instrucciones, cada pregunta invalidaba la caché y el teléfono volvía a leer todo el historial
+     */
+    private fun currentTimeNote(): String {
+        val now = java.text.SimpleDateFormat("HH:mm", java.util.Locale.ROOT).format(java.util.Date())
+        val zone = java.util.TimeZone.getDefault().getDisplayName(false, java.util.TimeZone.SHORT, java.util.Locale.ROOT)
+        return "\n\n(Hora local del teléfono: $now $zone)"
+    }
+
+    private fun formatWebSources(searchRes: WebSearchResponse): String {
+        val sb = StringBuilder("\n\n---\n**Fuentes consultadas en línea** (tu pregunta se envió a esos servicios; Senda no comprueba su contenido):\n")
+        searchRes.sources.forEachIndexed { idx, src ->
+            sb.append("${idx + 1}. [${src.title}](${src.url})\n")
+        }
+        return sb.toString().trimEnd()
+    }
+
     private fun formatWebSearchResult(searchRes: WebSearchResponse): String {
         val sb = StringBuilder()
         val mainTitle = searchRes.sources.firstOrNull()?.title ?: searchRes.query
         sb.append("### 🌐 $mainTitle\n\n")
         sb.append(searchRes.synthesizedSummary.trim())
         sb.append("\n\n---\n")
-        sb.append("#### 📚 Fuentes verificadas en la red:\n")
+        sb.append("#### 📚 Fuentes consultadas (Senda no comprueba su contenido):\n")
         searchRes.sources.forEachIndexed { idx, src ->
             sb.append("${idx + 1}. [**${src.title}**](${src.url})")
             if (src.snippet.isNotBlank() && src.snippet != searchRes.synthesizedSummary) {
@@ -514,7 +624,7 @@ Distingue falta de información, incertidumbre propia del asunto, límites propi
             }
             sb.append("\n")
         }
-        sb.append("\n🔒 *Senda AI: Búsqueda soberana sin rastreo ni telemetría comercial.*")
+        sb.append("\n*Extracto de Wikipedia / DuckDuckGo: tu pregunta se envió a esos servicios.*")
         return sb.toString()
     }
 
@@ -604,7 +714,7 @@ Distingue falta de información, incertidumbre propia del asunto, límites propi
             }
         }
 
-        // 2. Motor Soberano Local en Chip (100% Offline, Cero Dependencias)
+        // 2. Sin modelo disponible: reglas y plantillas fijas
         val generatedText = when (task) {
             AiTaskType.DOCUMENT_DRAFT -> generateDocumentDraft(docType ?: "Carta Formal", trimmedPrompt)
             AiTaskType.GENERAL_ASSISTANT -> generateGeneralAnswer(trimmedPrompt, pageTitle, pageContent)
@@ -621,7 +731,7 @@ Distingue falta de información, incertidumbre propia del asunto, límites propi
             outputText = generatedText,
             tokensGenerated = tokenCount,
             latencyMs = latency,
-            executionBackend = "Local Chip Engine (ARM NEON / Snapdragon)"
+            executionBackend = RULES_BACKEND
         )
     }
 
@@ -694,75 +804,84 @@ Distingue falta de información, incertidumbre propia del asunto, límites propi
 
     private fun generatePageAnswer(query: String, pageTitle: String?, pageContent: String?): String {
         if (pageContent.isNullOrBlank()) {
-            return "No hay contenido textual activo de la página para analizar. Navega a un artículo o sitio web para realizar preguntas contextuales."
+            return "No hay texto de la página para buscar. Abre un artículo o sitio web y vuelve a preguntar."
         }
-        val safeContext = sanitizeInputText(pageContent, 3000)
+        val queryWords = significantWords(query)
+        val matches = splitSentences(sanitizeInputText(pageContent, 3000))
+            .map { it to significantWords(it).count { w -> w in queryWords } }
+            .filter { it.second > 0 }
+            .sortedByDescending { it.second }
+            .take(3)
+            .map { it.first }
+        val body = if (matches.isEmpty()) {
+            "No encontré frases de la página que contengan las palabras de tu pregunta."
+        } else {
+            matches.joinToString("\n\n") { "> $it" }
+        }
         return """
-            ### 📌 Respuesta Basada en el Artículo Abierto
-            **Página:** ${pageTitle ?: "Sitio Web Activo"}  
-            **Pregunta:** "$query"
-
-            #### Información Extraída del Texto:
-            Analizando el contenido de la página cargada en tu navegador:
-            * El texto aborda específicamente los puntos vinculados a la temática consultada.
-            * **Dato Verificado:** La información responde a los hechos reportados en el documento sin incorporar alucinaciones externas.
-
-            #### Extracto Relevante:
-            > ${safeContext.take(450).replace("\n", " ")}...
-
-            ---
-            🔒 *Garantía Senda: Las respuestas a artículos están estrictamente fundamentadas en el texto de la página.*
-        """.trimIndent()
+            |### 📌 Frases de la página relacionadas con tu pregunta
+            |**Página:** ${pageTitle ?: "Sitio web activo"}
+            |
+            |$body
+            |
+            |---
+            |*Sin un modelo de IA, Senda solo busca frases que compartan palabras con tu pregunta; no las interpreta ni comprueba que respondan a lo que preguntaste.*
+        """.trimMargin()
     }
 
     private fun generateSummary(pageTitle: String?, pageContent: String?, userPrompt: String): String {
-        val title = pageTitle ?: "Documento Activo"
         val content = pageContent ?: userPrompt
-        val safe = sanitizeInputText(content, 2048)
-        val wordCount = safe.split(Regex("\\s+")).size
-
+        val sentences = splitSentences(sanitizeInputText(content, 2048))
+        val body = if (sentences.isEmpty()) {
+            "No hay texto suficiente para extraer frases."
+        } else {
+            sentences.take(5).joinToString("\n") { "* $it" }
+        }
         return """
-            # ⚡ SÍNTESIS EJECUTIVA SOBERANA
-            **Título:** $title  
-            **Extensión:** ~$wordCount palabras analizadas localmente  
-
-            ---
-
-            ### 🎯 Idea Central
-            El documento examina de manera sustantiva los factores clave, antecedentes y desenlace de los hechos expuestos, enfocándose en la resolución práctica de la situación y la relevancia de sus conclusiones.
-
-            ### 📊 Puntos Clave Destacados
-            * **Punto 1:** Exposición contextual de los antecedentes y justificación de los hechos.
-            * **Punto 2:** Desarrollo de las variables operativas y técnicas más representativas.
-            * **Punto 3:** Conclusiones, acuerdos y recomendaciones de cierre para los interesados.
-
-            ---
-            *Síntesis generada en el chip en 45ms sin enviar un solo byte a la nube.*
-        """.trimIndent()
+            |### 📄 Primeras frases de la página
+            |**Título:** ${pageTitle ?: "Documento activo"}
+            |
+            |$body
+            |
+            |---
+            |*Esto no es un resumen: sin un modelo de IA, Senda solo copia las primeras frases del texto.*
+        """.trimMargin()
     }
 
+    private fun splitSentences(text: String): List<String> =
+        text.replace(Regex("\\s+"), " ")
+            .split(Regex("(?<=[.!?¿¡])\\s+"))
+            .map { it.trim() }
+            .filter { it.length in 20..400 }
+
+    private fun significantWords(text: String): Set<String> =
+        normalizePrompt(text).split(" ").filter { it.length > 3 }.toSet()
+
     private fun generatePrivacyAudit(pageTitle: String?, pageContent: String?): String {
-        val content = (pageContent ?: "").lowercase()
-        val hasTrackers = content.contains("cookie") || content.contains("analytics") || content.contains("pixel") || content.contains("third party")
-        val hasSharing = content.contains("share") || content.contains("partners") || content.contains("terceros") || content.contains("publicidad")
-
-        val riskLevel = if (hasTrackers && hasSharing) "RIESGO MODERADO" else if (hasSharing) "ATENCIÓN REQUERIDA" else "BAJO RIESGO"
-
+        val content = normalizePrompt(pageContent ?: "")
+        val signals = listOf(
+            "Rastreo o analítica" to listOf("cookie", "analytics", "analitica", "pixel", "rastre", "tracking", "identificador"),
+            "Venta o cesión de datos" to listOf("vend", "sell", "terceros", "third part", "partners", "socios", "afiliad", "comparti", "share"),
+            "Publicidad" to listOf("publicidad", "anunciante", "advertis", "marketing"),
+            "Datos sensibles" to listOf("ubicacion", "location", "contactos", "contacts", "biometr", "salud", "health", "asegurador")
+        ).mapNotNull { (label, words) ->
+            val found = words.filter { content.contains(it) }
+            if (found.isEmpty()) null else "* **$label:** aparece «${found.joinToString("», «")}»."
+        }
+        val body = if (signals.isEmpty()) {
+            "No encontré ninguna de las palabras de alerta que busco. Eso **no** significa que la página sea segura."
+        } else {
+            signals.joinToString("\n")
+        }
         return """
-            # 🛡️ AUDITORÍA DE PRIVACIDAD SOBERANA
-            **Sitio:** ${pageTitle ?: "Página Web"}  
-            **Veredicto Preliminar:** [$riskLevel]  
-
-            ---
-
-            ### Hallazgos de Telemetría y Rastreo:
-            * **Recolección de Datos:** ${if (hasTrackers) "Se detectan menciones a cookies, identificadores o analítica de comportamiento." else "No se detectan menciones agresivas a rastreo intrusivo en el texto analizado."}
-            * **Cesión a Terceros:** ${if (hasSharing) "El texto hace referencia a compartir datos con socios, afiliados o redes de publicidad." else "No se evidencian cláusulas explícitas de venta o comercialización de datos."}
-            * **Protección de Senda:** El motor de aislamiento de cookies y el bloqueador uBlock Origin de Senda mantienen bloqueados estos rastreadores por defecto.
-
-            ---
-            🔒 *Senda Browser protege activamente tu navegación de cualquier perfilamiento.*
-        """.trimIndent()
+            |# 🛡️ Revisión rápida del texto de privacidad
+            |**Sitio:** ${pageTitle ?: "Página web"}
+            |
+            |$body
+            |
+            |---
+            |*Revisión por palabras clave del texto visible. No entiende el sentido de las frases ni analiza las peticiones reales que hace la página.*
+        """.trimMargin()
     }
 }
 

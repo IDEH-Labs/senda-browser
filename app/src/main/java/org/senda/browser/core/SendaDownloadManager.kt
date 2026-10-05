@@ -38,6 +38,9 @@ object SendaDownloadManager {
     @Volatile
     var locationPicker: ((fileName: String, mime: String, onResult: (Uri?) -> Unit) -> Unit)? = null
 
+    fun suggestedFileName(response: WebResponse): String =
+        sanitizeFileName(fileNameFromDisposition(response.headers["Content-Disposition"]) ?: fileNameFromUrl(response.uri))
+
     /** Guarda la respuesta que Gecko no puede mostrar (onExternalResponse). */
     fun saveResponse(context: Context, prefs: PreferencesManager, response: WebResponse, isPrivate: Boolean) {
         val mime = response.headers["Content-Type"]?.substringBefore(";")?.trim()?.ifBlank { null }
