@@ -70,6 +70,14 @@ class PreferencesManager(context: Context) {
                 }
             }.apply()
         }
+        // Modelo y consentimiento de la IA en uso, ahora guardados por IA
+        val activeAi = prefs.getString("assistant_provider", null)
+        if (activeAi != null && prefs.contains("assistant_model") && !prefs.contains("assistant_model_$activeAi")) {
+            prefs.edit()
+                .putString("assistant_model_$activeAi", prefs.getString("assistant_model", "") ?: "")
+                .putBoolean("assistant_consent_$activeAi", prefs.getBoolean("assistant_privacy_accepted", false))
+                .apply()
+        }
         // Versiones anteriores simulaban Firefox Sync: borrar la «cuenta conectada» que nunca existió.
         if (prefs.contains("fxa_is_connected") || prefs.contains("sync_type")) {
             prefs.edit()
@@ -568,10 +576,6 @@ class PreferencesManager(context: Context) {
         get() = prefs.getString("assistant_provider", null)
         set(value) = prefs.edit().putString("assistant_provider", value).apply()
 
-    var assistantModel: String
-        get() = prefs.getString("assistant_model", "") ?: ""
-        set(value) = prefs.edit().putString("assistant_model", value).apply()
-
     /** «Sign in with ChatGPT»: identificador estable de esta instalación (ext_agent_host_id) y cliente emitido. */
     var assistantChatGptHostId: String
         get() = prefs.getString("assistant_chatgpt_host_id", "") ?: ""
@@ -586,10 +590,13 @@ class PreferencesManager(context: Context) {
         get() = prefs.getBoolean("assistant_chatgpt_welcome_seen", false)
         set(value) = prefs.edit().putBoolean("assistant_chatgpt_welcome_seen", value).apply()
 
-    /** Confirmó el aviso de que el texto y las páginas que envíe salen hacia el proveedor. */
-    var assistantPrivacyAccepted: Boolean
-        get() = prefs.getBoolean("assistant_privacy_accepted", false)
-        set(value) = prefs.edit().putBoolean("assistant_privacy_accepted", value).apply()
+    // «Mis IA»: cada IA conectada guarda su modelo y su consentimiento, para cambiar de una a otra sin desconfigurar
+    // nada. assistant_provider es la que está en uso; assistant_model y assistant_privacy_accepted, de versiones
+    // anteriores, se pasaron a la IA que estaba en uso (ver init)
+    fun assistantModelFor(id: String): String = prefs.getString("assistant_model_$id", "") ?: ""
+    fun setAssistantModelFor(id: String, model: String) = prefs.edit().putString("assistant_model_$id", model).apply()
+    fun assistantConsentFor(id: String): Boolean = prefs.getBoolean("assistant_consent_$id", false)
+    fun setAssistantConsentFor(id: String, accepted: Boolean) = prefs.edit().putBoolean("assistant_consent_$id", accepted).apply()
 
     /** Credenciales del asistente (sesión de ChatGPT o clave de API), cifradas con el almacén de claves del teléfono. */
     fun getAssistantKey(providerId: String): String {

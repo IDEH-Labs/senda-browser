@@ -92,7 +92,7 @@ class SendaGeminiCapabilitiesTest {
         } finally { conn.disconnect() }
         log("modelos (${ids.size}): ${ids.joinToString(", ")}".take(3000))
         val model = InstrumentationRegistry.getArguments().getString("model")
-            ?: prefs.assistantModel.takeIf { prefs.assistantProvider == "gemini" && it.isNotBlank() } ?: "gemini-2.5-flash"
+            ?: prefs.assistantModelFor("gemini").takeIf { it.isNotBlank() } ?: "gemini-2.5-flash"
         log("modelo probado: $model")
 
         compat("texto", key, model, "Responde solo: OK")

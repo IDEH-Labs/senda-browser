@@ -94,7 +94,7 @@ class SendaChatGptCapabilitiesTest {
         val prefs = PreferencesManager(context)
         assumeTrue("Sin sesión de ChatGPT", ChatGptPlanAuth.isSignedIn(prefs))
         val token = ChatGptPlanAuth.accessToken(prefs)
-        val model = prefs.assistantModel.ifBlank { "gpt-5" }
+        val model = prefs.assistantModelFor("chatgpt_plan").ifBlank { "gpt-5.6-terra" }
         log("modelo configurado: $model")
 
         val only = InstrumentationRegistry.getArguments().getString("only")
@@ -133,25 +133,26 @@ class SendaChatGptCapabilitiesTest {
     fun sendaClientEndToEnd() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val prefs = PreferencesManager(context)
-        assumeTrue("Asistente sin configurar", org.senda.browser.core.assistant.SendaAssistant.isConfigured(prefs))
-        val client = org.senda.browser.core.assistant.SendaAssistant.client(prefs)
+        assumeTrue("Sin sesión de ChatGPT", ChatGptPlanAuth.isSignedIn(prefs))
+        val client = org.senda.browser.core.assistant.SendaAssistant.backendFor("chatgpt_plan", prefs)
+        val model = prefs.assistantModelFor("chatgpt_plan").ifBlank { "gpt-5.6-terra" }
         val system = org.senda.browser.core.assistant.SendaAssistant.systemPrompt("es")
         val t = org.senda.browser.core.assistant.ChatTurn.Role.USER
 
-        val web = client.chat(prefs.assistantModel, system, listOf(org.senda.browser.core.assistant.ChatTurn(t,
+        val web = client.chat(model, system, listOf(org.senda.browser.core.assistant.ChatTurn(t,
             "¿Qué tiempo hace hoy en Barranquilla? Una frase.")), deep = false) {}
         log("cliente búsqueda → ${web.text.take(160).replace('\n', ' ')} | fuentes=${web.sources.map { it.url.ifBlank { "api:" + it.title }.take(60) }}")
-        val news = client.chat(prefs.assistantModel, system, listOf(org.senda.browser.core.assistant.ChatTurn(t,
+        val news = client.chat(model, system, listOf(org.senda.browser.core.assistant.ChatTurn(t,
             "¿Cuál fue el último resultado de la selección Colombia de fútbol? Una frase.")), deep = false) {}
         log("cliente noticias → ${news.text.take(160).replace('\n', ' ')} | fuentes=${news.sources.map { it.url.ifBlank { "api:" + it.title }.take(60) }}")
 
-        val photo = client.chat(prefs.assistantModel, system, listOf(org.senda.browser.core.assistant.ChatTurn(t,
+        val photo = client.chat(model, system, listOf(org.senda.browser.core.assistant.ChatTurn(t,
             "¿Qué palabra está escrita y de qué color es el fondo?",
             listOf(org.senda.browser.core.assistant.Attachment("prueba.png", "image/png", redPng)))), deep = false) {}
         log("cliente foto → ${photo.text.take(120).replace('\n', ' ')}")
 
         val start = System.currentTimeMillis()
-        val deepReply = client.chat(prefs.assistantModel, system, listOf(org.senda.browser.core.assistant.ChatTurn(t,
+        val deepReply = client.chat(model, system, listOf(org.senda.browser.core.assistant.ChatTurn(t,
             "Si 3 máquinas hacen 3 piezas en 3 minutos, ¿cuántos minutos tardan 100 máquinas en hacer 100 piezas? Solo el número.")), deep = true) {}
         log("cliente pensar a fondo → ${deepReply.text.take(80)} en ${(System.currentTimeMillis() - start) / 1000} s")
         Unit

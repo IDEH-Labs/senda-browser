@@ -184,14 +184,7 @@ fun buildSettingsList(
             icon = Icons.Default.AutoAwesome,
             onClick = { onOpenDialog("assistant") }
         ),
-        SettingItemData(
-            id = "assistant_api",
-            title = strings.as_api_title,
-            subtitle = strings.as_api_sub,
-            category = strings.cat_nav,
-            icon = Icons.Default.Key,
-            onClick = { onOpenDialog("assistant_api") }
-        ),
+
         SettingItemData(
             id = "default_browser",
             title = strings.st_default_browser_title,

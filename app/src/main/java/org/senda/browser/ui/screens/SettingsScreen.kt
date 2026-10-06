@@ -461,13 +461,9 @@ fun SettingsScreen(
         )
     }
 
-    // DIÁLOGO: ASISTENTE CON CHATGPT
+    // DIÁLOGO: MIS IA (ChatGPT y, para avanzados, otras IA con clave)
     if (activeDialog == "assistant") {
-        org.senda.browser.ui.components.SendaAssistantSettingsDialog(prefs = prefs, onDismiss = { activeDialog = null })
-    }
-    // Avanzado: el asistente con otra IA mediante clave de API (aparte, para no confundir con ChatGPT)
-    if (activeDialog == "assistant_api") {
-        org.senda.browser.ui.components.AssistantApiSettingsDialog(prefs = prefs, onDismiss = { activeDialog = null })
+        org.senda.browser.ui.components.AssistantHubDialog(prefs = prefs, onDismiss = { activeDialog = null })
     }
 
     // DIÁLOGO: ENRUTAMIENTO TOR & PROXY SOCKS5
