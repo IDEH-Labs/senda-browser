@@ -104,8 +104,11 @@ class MainActivity : FragmentActivity() {
         // Protección contra espionaje en vista multitarea (FLAG_SECURE) si el usuario la activó
         updateAntiSnoopingFlag()
 
+        // Recreada por Android (no debería: configChanges cubre los cambios de pantalla del modo TV): se reabren las
+        // pestañas tal como estaban, sin repetir el enlace con el que se abrió ni poner una pestaña de inicio delante
+        val recreated = savedInstanceState != null
         // Verificar si se abrió mediante un enlace externo o texto compartido
-        val initialUrl = externalUrlFrom(intent) ?: "about:blank"
+        val initialUrl = (if (recreated) null else externalUrlFrom(intent)) ?: "about:blank"
 
         setContent {
             var isUnlocked by remember { mutableStateOf(!prefs.requireBiometrics) }
@@ -124,7 +127,7 @@ class MainActivity : FragmentActivity() {
             // Inicializar con la primera pestaña
             LaunchedEffect(Unit) {
                 if (tabs.isEmpty()) {
-                    val startupMode = prefs.startupMode
+                    val startupMode = if (recreated) "RESUME" else prefs.startupMode
                     // Reabrir las pestañas de la sesión anterior (las privadas nunca se guardan)
                     if (!prefs.alwaysPrivateMode && startupMode != "CLEAN") {
                         val (saved, activeIndex) = prefs.loadOpenTabs()

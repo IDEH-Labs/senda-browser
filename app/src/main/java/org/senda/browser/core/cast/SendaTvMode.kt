@@ -288,38 +288,30 @@ object SendaTvMode {
             val tvShort = minOf(tv.mode.physicalWidth, tv.mode.physicalHeight)
             if (tvShort <= 0) return
             // Proporción de la TV con el lado corto del móvil (720×1600 → 720×1280): medido el 2026-10-06 en un
-            // moto g34 duplicando en un LG, 0 imágenes perdidas de 943. Con «Máxima nitidez» se dibuja a la
-            // resolución de la TV (1080×1920; Android siempre envía 1920×1080 y así no llega 720p estirado), pero
-            // reducirlo a la pantalla del móvil a la vez cuesta: 6 % de imágenes perdidas (810 px: 4 %, 900 px: 3 %).
-            // En par para el codificador. La densidad cambia en la misma proporción: todo queda del mismo tamaño
+            // moto g34 duplicando en un LG, 0 imágenes perdidas de 943. Solo cambia el tamaño, nunca la densidad:
+            // a la resolución de la TV (1080×1920, densidad 459) el teléfono perdía el 6 % de las imágenes y, al
+            // cambiar la densidad, Android reiniciaba Telegram y Senda por dentro al girar (video que no deja
+            // adelantar, pestaña que «se cierra»). En par para el codificador
             val phoneShort = minOf(initial.x, initial.y)
             val phoneLong = maxOf(initial.x, initial.y)
-            val sharp = PreferencesManager(appContext).tvModeSharp
-            val shortSide = (if (sharp) tvShort else phoneShort) and 1.inv()
-            val longSide = (if (sharp) tvLong else (phoneShort.toLong() * tvLong / tvShort).toInt().coerceAtMost(phoneLong)) and 1.inv()
-            if (!sharp && longSide >= phoneLong - 8) {
+            val shortSide = phoneShort and 1.inv()
+            val longSide = (phoneShort.toLong() * tvLong / tvShort).toInt().coerceAtMost(phoneLong) and 1.inv()
+            if (longSide >= phoneLong - 8) {
                 // El móvil ya tiene la proporción de la TV: si quedó un tamaño forzado de antes, se quita
                 restoreDisplaySize()
                 return
             }
             val (w, h) = if (initial.x < initial.y) shortSide to longSide else longSide to shortSide
             if (base.x == w && base.y == h) return
-            val baseDensity = iface.getMethod("getBaseDisplayDensity", Int::class.java).invoke(wms, Display.DEFAULT_DISPLAY) as Int
-            val initialDensity = iface.getMethod("getInitialDisplayDensity", Int::class.java).invoke(wms, Display.DEFAULT_DISPLAY) as Int
-            val density = (baseDensity * shortSide.toFloat() / minOf(base.x, base.y)).toInt()
-
             val state = appContext.getSharedPreferences(STATE_PREFS, Context.MODE_PRIVATE)
             if (!state.getBoolean(KEY_FORCED, false)) {
-                // Guardar el tamaño y la escala que tenía el usuario (puede tener una propia) para devolverlos tal cual
+                // Guardar el tamaño que tenía el usuario (normalmente el de fábrica) para devolverlo tal cual
                 state.edit()
                     .putBoolean(KEY_FORCED, true)
                     .putInt(KEY_ORIGINAL_W, if (base == initial) 0 else base.x)
                     .putInt(KEY_ORIGINAL_H, if (base == initial) 0 else base.y)
-                    .putInt(KEY_ORIGINAL_DENSITY, if (baseDensity == initialDensity) 0 else baseDensity)
                     .commit()
             }
-            iface.getMethod("setForcedDisplayDensityForUser", Int::class.java, Int::class.java, Int::class.java)
-                .invoke(wms, Display.DEFAULT_DISPLAY, density, userId)
             iface.getMethod("setForcedDisplaySize", Int::class.java, Int::class.java, Int::class.java)
                 .invoke(wms, Display.DEFAULT_DISPLAY, w, h)
             Log.i(TAG, "Pantalla adaptada a la TV: ${w}x$h (TV ${tv.mode.physicalWidth}x${tv.mode.physicalHeight})")
@@ -342,7 +334,7 @@ object SendaTvMode {
             } else {
                 iface.getMethod("clearForcedDisplaySize", Int::class.java).invoke(wms, Display.DEFAULT_DISPLAY)
             }
-            // Versiones anteriores no cambiaban la escala ni la guardaban: entonces no se toca
+            // Solo una versión del 2026-10-06 cambiaba la escala (y la guardaba): las demás no la tocan
             if (state.contains(KEY_ORIGINAL_DENSITY)) {
                 val density = state.getInt(KEY_ORIGINAL_DENSITY, 0)
                 if (density > 0) {
