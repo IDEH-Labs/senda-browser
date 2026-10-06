@@ -88,6 +88,10 @@ fun AssistantApiSettingsDialog(prefs: PreferencesManager, onDismiss: () -> Unit)
                     Text(strings.as_get_key.format(java.net.URL(provider.keysPage).host), fontSize = 12.sp)
                 }
                 Text(strings.as_key_encrypted.format(provider.host), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (provider == ApiProvider.GEMINI) {
+                    // Condiciones de Google para el nivel gratuito de la API de Gemini
+                    Text(strings.as_api_gemini_free_note, fontSize = 11.sp, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 4.dp))
+                }
                 Spacer(Modifier.height(8.dp))
                 FilledTonalButton(enabled = !loading && apiKey.isNotBlank(), onClick = { loadModels() }, modifier = Modifier.fillMaxWidth()) {
                     Text(strings.as_load_models)
@@ -128,15 +132,33 @@ fun AssistantApiSettingsDialog(prefs: PreferencesManager, onDismiss: () -> Unit)
             Button(
                 enabled = !loading && accepted && apiKey.isNotBlank() && model.isNotBlank(),
                 onClick = {
-                    if (!prefs.setAssistantKey(provider.id, apiKey)) {
-                        Toast.makeText(context, strings.as_key_not_saved, Toast.LENGTH_LONG).show()
-                        return@Button
+                    // Se prueba el modelo antes de guardarlo: la lista de la empresa incluye modelos que esa clave no
+                    // puede usar (retirados para usuarios nuevos o especiales), y fallarían en el chat sin explicación
+                    val current = provider
+                    loading = true; status = strings.as_api_checking
+                    scope.launch {
+                        try {
+                            current.client(apiKey).chat(model, "Reply with: OK", listOf(org.senda.browser.core.assistant.ChatTurn(
+                                org.senda.browser.core.assistant.ChatTurn.Role.USER, "OK")), deep = false) {}
+                            if (!prefs.setAssistantKey(current.id, apiKey)) {
+                                Toast.makeText(context, strings.as_key_not_saved, Toast.LENGTH_LONG).show()
+                                return@launch
+                            }
+                            prefs.assistantProvider = current.id
+                            prefs.assistantModel = model
+                            prefs.assistantPrivacyAccepted = true
+                            Toast.makeText(context, strings.as_saved, Toast.LENGTH_SHORT).show()
+                            onDismiss()
+                        } catch (e: org.senda.browser.core.assistant.RemoteAiException) {
+                            status = if (e.kind == org.senda.browser.core.assistant.RemoteAiException.Kind.BAD_RESPONSE &&
+                                (e.message.orEmpty().startsWith("HTTP 404") || e.message.orEmpty().startsWith("HTTP 400"))) strings.as_api_model_unusable
+                            else assistantErrorText(e, strings, current.host)
+                        } catch (e: Exception) {
+                            status = assistantErrorText(e, strings, current.host)
+                        } finally {
+                            loading = false
+                        }
                     }
-                    prefs.assistantProvider = provider.id
-                    prefs.assistantModel = model
-                    prefs.assistantPrivacyAccepted = true
-                    Toast.makeText(context, strings.as_saved, Toast.LENGTH_SHORT).show()
-                    onDismiss()
                 }
             ) { Text(strings.as_api_use) }
         },
