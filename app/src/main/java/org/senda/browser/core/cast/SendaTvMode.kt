@@ -64,12 +64,7 @@ object SendaTvMode {
     /** true mientras el teléfono está adaptado a la TV (horizontal, 16:9). */
     var active by mutableStateOf(false)
         private set
-    // El usuario pidió la pantalla normal desde la notificación: no se vuelve a adaptar hasta la próxima conexión
-    private var restoredByUser = false
 
-    /** true mientras el teléfono está realmente adaptado (girado, en 16:9): solo entonces sirve «Pantalla normal». */
-    var adapted by mutableStateOf(false)
-        private set
 
     /** true mientras la pantalla del teléfono se duplica en una TV (Miracast, «Enviar pantalla» o HDMI). */
     var tvConnected by mutableStateOf(false)
@@ -108,22 +103,10 @@ object SendaTvMode {
         val tv = mirroringDisplay()
         tvConnected = tv != null
         tvName = tv?.name?.replace(Regex("\\[R\\d+]$"), "")?.trim()
-        if (tv == null) restoredByUser = false
         val enabled = PreferencesManager(appContext).tvModeEnabled
-        if (tv != null && enabled && !restoredByUser) activate(tv) else deactivate()
+        if (tv != null && enabled) activate(tv) else deactivate()
     }
 
-    /**
-     * Devuelve el teléfono a la normalidad aunque la duplicación siga conectada: si la TV se apaga o cambia de
-     * entrada, Android puede mantener la conexión y el teléfono se quedaba en horizontal y 16:9 sin motivo visible.
-     */
-    fun restoreNow() {
-        if (!::appContext.isInitialized) return
-        restoredByUser = true
-        mainHandler.removeCallbacks(stopWaiting)
-        deactivate()
-        appContext.stopService(Intent(appContext, SendaTvModeService::class.java))
-    }
 
     private val stopWaiting = Runnable {
         if (!active) appContext.stopService(Intent(appContext, SendaTvModeService::class.java))
@@ -306,10 +289,7 @@ object SendaTvMode {
                 return
             }
             val (w, h) = if (initial.x < initial.y) shortSide to longSide else longSide to shortSide
-            if (base.x == w && base.y == h) {
-                adapted = true
-                return
-            }
+            if (base.x == w && base.y == h) return
             val state = appContext.getSharedPreferences(STATE_PREFS, Context.MODE_PRIVATE)
             if (!state.getBoolean(KEY_FORCED, false)) {
                 // Guardar el tamaño que tenía el usuario (normalmente el de fábrica) para devolverlo tal cual
@@ -321,7 +301,6 @@ object SendaTvMode {
             }
             iface.getMethod("setForcedDisplaySize", Int::class.java, Int::class.java, Int::class.java)
                 .invoke(wms, Display.DEFAULT_DISPLAY, w, h)
-            adapted = true
             Log.i(TAG, "Pantalla adaptada a la TV: ${w}x$h (TV ${tv.mode.physicalWidth}x${tv.mode.physicalHeight})")
         } catch (e: Exception) {
             Log.w(TAG, "No se pudo adaptar la proporción a la TV: ${e.cause?.message ?: e.message}")
@@ -354,7 +333,6 @@ object SendaTvMode {
                 }
             }
             state.edit().putBoolean(KEY_FORCED, false).remove(KEY_ORIGINAL_DENSITY).commit()
-            adapted = false
             Log.i(TAG, "Pantalla del móvil restaurada")
         } catch (e: Exception) {
             Log.w(TAG, "No se pudo restaurar la pantalla: ${e.cause?.message ?: e.message}")
@@ -374,8 +352,8 @@ class SendaTvModeService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_RESTORE) {
-            SendaTvMode.restoreNow()
+        if (intent?.action == ACTION_STOP) {
+            SendaTvMode.disconnect(applicationContext)
             return START_NOT_STICKY
         }
         val isSpanish = resources.configuration.locales[0].language == "es"
@@ -397,9 +375,9 @@ class SendaTvModeService : Service() {
             .addAction(
                 Notification.Action.Builder(
                     android.graphics.drawable.Icon.createWithResource(this, R.drawable.ic_senda_monochrome),
-                    if (isSpanish) "Pantalla normal" else "Normal screen",
+                    if (isSpanish) "Detener transmisión" else "Stop casting",
                     PendingIntent.getService(
-                        this, 1, Intent(this, SendaTvModeService::class.java).setAction(ACTION_RESTORE),
+                        this, 1, Intent(this, SendaTvModeService::class.java).setAction(ACTION_STOP),
                         PendingIntent.FLAG_IMMUTABLE
                     )
                 ).build()
@@ -416,7 +394,7 @@ class SendaTvModeService : Service() {
 
     private companion object {
         const val CHANNEL = "senda_tv_mode"
-        const val ACTION_RESTORE = "org.senda.browser.TV_MODE_RESTORE"
+        const val ACTION_STOP = "org.senda.browser.TV_STOP"
         const val NOTIFICATION_ID = 4210
     }
 }
