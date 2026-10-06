@@ -237,8 +237,8 @@ class PreferencesManager(context: Context) {
         set(value) = prefs.edit().putBoolean("show_cast_button", value).apply()
 
     /**
-     * Modo TV: mientras se duplica la pantalla en una TV, el teléfono se adapta a la TV (horizontal, 16:9) y la TV
-     * muestra lo mismo a pantalla completa y en tiempo real, en cualquier app. Al desconectar todo vuelve a como
+     * Modo TV: mientras se duplica la pantalla en una TV, en vertical el teléfono no cambia; al girarlo (video a
+     * pantalla completa en cualquier app) la imagen pasa a 16:9 y la TV se llena. Al desconectar todo vuelve a como
      * estaba. Activado por defecto (2026-10-06, a pedido del usuario); clave nueva porque la anterior quedó en false.
      * Desactivado: la TV muestra el teléfono tal cual y solo los videos de Senda pasan a la TV en formato TV.
      */
