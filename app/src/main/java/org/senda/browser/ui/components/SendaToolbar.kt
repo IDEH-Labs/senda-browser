@@ -1075,8 +1075,10 @@ fun SendaToolbar(
                             }
                         }
 
-                        // Botón Transmitir (Chromecast) - Ubicado al lado derecho del selector de pestañas
-                        if (showCastButton && prefs?.showCastButton == true) {
+                        // Botón Transmitir - Ubicado al lado derecho del selector de pestañas. Con una TV conectada
+                        // aparece siempre y en color: es la señal del modo TV y la entrada a sus controles
+                        val tvConnected = org.senda.browser.core.cast.SendaTvMode.tvConnected
+                        if (tvConnected || (showCastButton && prefs?.showCastButton == true)) {
                             IconButton(
                                 onClick = onOpenCast,
                                 modifier = Modifier
@@ -1084,9 +1086,9 @@ fun SendaToolbar(
                                     .clip(CircleShape)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Cast,
+                                    imageVector = if (tvConnected) Icons.Default.CastConnected else Icons.Default.Cast,
                                     contentDescription = strings.st_chromecast_title,
-                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    tint = if (tvConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.size(iconSize)
                                 )
                             }
@@ -1236,7 +1238,7 @@ fun SendaToolbar(
                             )
 
                             // Transmitir por Chromecast (accesible aquí solo si el usuario ocultó el botón de la barra de navegación, evitando duplicados innecesarios)
-                            if (!showCastButton) {
+                            if (!showCastButton && !org.senda.browser.core.cast.SendaTvMode.tvConnected) {
                                 DropdownMenuItem(
                                     text = { Text(strings.st_chromecast_title) },
                                     leadingIcon = {

@@ -54,6 +54,25 @@ object SendaTvMode {
         tvName = tv?.name?.replace(Regex("\\[R\\d+]$"), "")?.trim()
     }
 
+    /**
+     * Desconecta la TV sin pasar por los ajustes de Android. Conectar y desconectar Miracast es de las apps del
+     * sistema (CONFIGURE_WIFI_DISPLAY); la vía pública es volver a la salida de video del propio teléfono con
+     * MediaRouter. Si el teléfono no lo permite, se abre el panel «Enviar pantalla», donde basta tocar «Desconectar».
+     */
+    fun disconnect(context: Context) {
+        SendaTvPlayer.requestReturn?.invoke()
+        try {
+            val router = context.getSystemService(android.media.MediaRouter::class.java)
+            router?.selectRoute(android.media.MediaRouter.ROUTE_TYPE_LIVE_VIDEO, router.defaultRoute)
+        } catch (e: Exception) {
+            android.util.Log.w("SendaTvMode", "MediaRouter no pudo desconectar: ${e.message}")
+        }
+        Handler(Looper.getMainLooper()).postDelayed({
+            evaluate()
+            if (tvConnected) org.senda.browser.ui.components.CastHelper.openSystemCast(context)
+        }, 2500)
+    }
+
     /** Pantalla de la TV en la que Senda puede mostrar contenido propio (null si no hay TV conectada). */
     fun tvDisplay(): Display? =
         if (!::appContext.isInitialized) null

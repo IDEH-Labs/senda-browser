@@ -621,9 +621,9 @@ interface SendaStringPack {
     val sync_tab_webdav: String
     val sync_tab_html: String
     val cast_title: String
+    val cast_disconnect_tv: String
     val cast_connected_to: String
     val cast_videos_go_to_tv: String
-    val cast_on_tv: String
     val cast_back_to_phone: String
     val dlg_tv_mode: String
     val dlg_tv_mode_sub: String
@@ -1428,9 +1428,9 @@ object SendaStringsDe : SendaStringPack {
     override val sync_tab_webdav = "WebDAV-Cloud"
     override val sync_tab_html = "HTML-Backup"
     override val cast_title = "An den Fernseher übertragen"
+    override val cast_disconnect_tv = "Fernseher trennen"
     override val cast_connected_to = "Verbunden mit {tv}"
     override val cast_videos_go_to_tv = "Videos, die du öffnest, laufen auf dem Fernseher"
-    override val cast_on_tv = "Auf {tv}"
     override val cast_back_to_phone = "Auf dem Handy ansehen"
     override val dlg_tv_mode = "Videos im TV-Format beim Spiegeln"
     override val dlg_tv_mode_sub = "Beim Spiegeln erscheint das Video aus Senda im Vollbild und in 16:9 auf dem Fernseher. Das Handy ändert sich nicht und du kannst es weiter nutzen"
@@ -2234,9 +2234,9 @@ object SendaStringsEn : SendaStringPack {
     override val sync_tab_webdav = "WebDAV Cloud"
     override val sync_tab_html = "HTML Backup"
     override val cast_title = "Cast to the TV"
+    override val cast_disconnect_tv = "Disconnect TV"
     override val cast_connected_to = "Connected to {tv}"
     override val cast_videos_go_to_tv = "Videos you open will play on the TV"
-    override val cast_on_tv = "On {tv}"
     override val cast_back_to_phone = "Watch on the phone"
     override val dlg_tv_mode = "TV-format videos when mirroring"
     override val dlg_tv_mode_sub = "While mirroring, the video playing in Senda shows full screen and 16:9 on the TV. The phone does not change and you can keep using it"
@@ -3040,9 +3040,9 @@ object SendaStringsEs : SendaStringPack {
     override val sync_tab_webdav = "Nube WebDAV"
     override val sync_tab_html = "Respaldo HTML"
     override val cast_title = "Transmitir a la TV"
+    override val cast_disconnect_tv = "Desconectar TV"
     override val cast_connected_to = "Conectado a {tv}"
     override val cast_videos_go_to_tv = "Los videos que abras se verán en la TV"
-    override val cast_on_tv = "En {tv}"
     override val cast_back_to_phone = "Ver en el teléfono"
     override val dlg_tv_mode = "Videos en formato TV al duplicar"
     override val dlg_tv_mode_sub = "Mientras duplicas, el video que suena en Senda se ve en la TV a pantalla completa y en 16:9. El teléfono no cambia y puedes seguir usándolo"
@@ -3846,9 +3846,9 @@ object SendaStringsFr : SendaStringPack {
     override val sync_tab_webdav = "Cloud WebDAV"
     override val sync_tab_html = "Sauvegarde HTML"
     override val cast_title = "Diffuser sur la TV"
+    override val cast_disconnect_tv = "Déconnecter la TV"
     override val cast_connected_to = "Connecté à {tv}"
     override val cast_videos_go_to_tv = "Les vidéos que vous ouvrez s’afficheront sur la TV"
-    override val cast_on_tv = "Sur {tv}"
     override val cast_back_to_phone = "Regarder sur le téléphone"
     override val dlg_tv_mode = "Vidéos au format TV en duplication"
     override val dlg_tv_mode_sub = "Pendant la duplication, la vidéo lue dans Senda s’affiche en plein écran et en 16:9 sur la TV. Le téléphone ne change pas et reste utilisable"
@@ -4652,9 +4652,9 @@ object SendaStringsPt : SendaStringPack {
     override val sync_tab_webdav = "Nuvem WebDAV"
     override val sync_tab_html = "Backup HTML"
     override val cast_title = "Transmitir para a TV"
+    override val cast_disconnect_tv = "Desconectar TV"
     override val cast_connected_to = "Conectado a {tv}"
     override val cast_videos_go_to_tv = "Os vídeos que você abrir aparecerão na TV"
-    override val cast_on_tv = "Em {tv}"
     override val cast_back_to_phone = "Ver no telefone"
     override val dlg_tv_mode = "Vídeos em formato de TV ao espelhar"
     override val dlg_tv_mode_sub = "Ao espelhar, o vídeo que toca no Senda aparece na TV em tela cheia e em 16:9. O telefone não muda e você pode continuar usando"
@@ -5458,9 +5458,9 @@ object SendaStringsIt : SendaStringPack {
     override val sync_tab_webdav = "Cloud WebDAV"
     override val sync_tab_html = "Backup HTML"
     override val cast_title = "Trasmetti alla TV"
+    override val cast_disconnect_tv = "Disconnetti TV"
     override val cast_connected_to = "Connesso a {tv}"
     override val cast_videos_go_to_tv = "I video che apri verranno mostrati sulla TV"
-    override val cast_on_tv = "Su {tv}"
     override val cast_back_to_phone = "Guarda sul telefono"
     override val dlg_tv_mode = "Video in formato TV durante la duplicazione"
     override val dlg_tv_mode_sub = "Durante la duplicazione, il video in riproduzione in Senda appare sulla TV a schermo intero e in 16:9. Il telefono non cambia e puoi continuare a usarlo"
@@ -6264,9 +6264,9 @@ object SendaStringsJa : SendaStringPack {
     override val sync_tab_webdav = "WebDAV クラウド"
     override val sync_tab_html = "HTML バックアップ"
     override val cast_title = "テレビにキャスト"
+    override val cast_disconnect_tv = "テレビを切断"
     override val cast_connected_to = "{tv} に接続中"
     override val cast_videos_go_to_tv = "開いた動画はテレビで再生されます"
-    override val cast_on_tv = "{tv} で再生中"
     override val cast_back_to_phone = "スマホで見る"
     override val dlg_tv_mode = "ミラーリング時に動画をテレビ形式で表示"
     override val dlg_tv_mode_sub = "ミラーリング中、Senda で再生中の動画はテレビに全画面・16:9 で表示されます。スマホは変わらず、そのまま使えます"
@@ -7070,9 +7070,9 @@ object SendaStringsZh : SendaStringPack {
     override val sync_tab_webdav = "WebDAV 私有云"
     override val sync_tab_html = "HTML 书签备份"
     override val cast_title = "投屏到电视"
+    override val cast_disconnect_tv = "断开电视"
     override val cast_connected_to = "已连接到 {tv}"
     override val cast_videos_go_to_tv = "你打开的视频将在电视上播放"
-    override val cast_on_tv = "正在 {tv} 上播放"
     override val cast_back_to_phone = "在手机上观看"
     override val dlg_tv_mode = "镜像时以电视格式播放视频"
     override val dlg_tv_mode_sub = "镜像时，Senda 中播放的视频会在电视上全屏、16:9 显示。手机不会改变，你可以继续使用"
