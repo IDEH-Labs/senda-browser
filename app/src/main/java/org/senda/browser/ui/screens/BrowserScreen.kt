@@ -449,8 +449,7 @@ fun BrowserScreen(
             org.senda.browser.core.cast.SendaMediaCatalog.version,
             foregroundCount
         ) {
-            // Con el modo TV la TV ya muestra el teléfono en formato TV: los videos se ven ahí como en el teléfono
-            org.senda.browser.core.cast.SendaTvPlayer.autoStart(activeTab, enabled = !prefs.tvModeEnabled)
+            org.senda.browser.core.cast.SendaTvPlayer.autoStart(activeTab, enabled = true)
         }
         val tvPlayback = org.senda.browser.core.cast.SendaTvPlayer.playback
         if (tvPlayback != null) {

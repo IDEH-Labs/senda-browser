@@ -74,7 +74,10 @@ object SendaTvMode {
     private val displayListener = object : DisplayManager.DisplayListener {
         override fun onDisplayAdded(displayId: Int) = evaluate()
         override fun onDisplayRemoved(displayId: Int) = evaluate()
-        override fun onDisplayChanged(displayId: Int) {}
+        // El teléfono giró (o cambió de tamaño): 16:9 solo en horizontal
+        override fun onDisplayChanged(displayId: Int) {
+            if (displayId == Display.DEFAULT_DISPLAY && active) applyForRotation()
+        }
     }
 
     /** Se llama una vez al arrancar el proceso principal. */
@@ -171,17 +174,17 @@ object SendaTvMode {
             ?.firstOrNull { it.displayId != Display.DEFAULT_DISPLAY }
 
     private fun activate(tv: Display) {
-        val prefs = PreferencesManager(appContext)
         if (active) {
-            // Ya activo: reaplicar orientación y resolución por si el usuario cambió los ajustes
-            updateOverlay(landscape = true)
-            forceTvAspect(tv)
+            // Ya activo: reaplicar por si el usuario cambió los ajustes
+            applyForRotation()
             return
         }
         active = true
         Log.i(TAG, "TV conectada (${tv.name} ${tv.mode.physicalWidth}x${tv.mode.physicalHeight}): activando modo TV")
-        updateOverlay(landscape = true)
-        forceTvAspect(tv)
+        // Nunca se gira el teléfono: la ventana invisible solo fija 60 Hz (la TV no muestra más y se duplica con
+        // menos retraso)
+        updateOverlay(landscape = false)
+        applyForRotation()
         try {
             appContext.startForegroundService(Intent(appContext, SendaTvModeService::class.java))
         } catch (e: Exception) {
@@ -189,6 +192,19 @@ object SendaTvMode {
             // mientras el proceso viva, y se restaura igual al cortar la transmisión
             Log.w(TAG, "No se pudo iniciar el servicio del modo TV: ${e.message}")
         }
+    }
+
+    /**
+     * En vertical el teléfono queda exactamente como está (la TV lo muestra tal cual: una imagen vertical no puede
+     * llenar una TV sin cambiar la del teléfono). Cuando el usuario gira el teléfono —un video a pantalla completa en
+     * cualquier app— la imagen pasa a 16:9 y la TV se llena; en el teléfono quedan dos franjas finas en los extremos.
+     */
+    private fun applyForRotation() {
+        val tv = mirroringDisplay() ?: return
+        val rotation = appContext.getSystemService(DisplayManager::class.java)
+            ?.getDisplay(Display.DEFAULT_DISPLAY)?.rotation ?: return
+        val landscape = rotation == android.view.Surface.ROTATION_90 || rotation == android.view.Surface.ROTATION_270
+        if (landscape) forceTvAspect(tv) else restoreDisplaySize()
     }
 
     private fun deactivate() {
