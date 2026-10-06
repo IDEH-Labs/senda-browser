@@ -246,11 +246,6 @@ class PreferencesManager(context: Context) {
         get() = prefs.getBoolean("tv_mode_enabled_v3", true)
         set(value) = prefs.edit().putBoolean("tv_mode_enabled_v3", value).apply()
 
-    /** Modo TV a la resolución de la TV (1080p): más nítido, pero el teléfono pierde imágenes al dibujarlo. */
-    var tvModeSharp: Boolean
-        get() = prefs.getBoolean("tv_mode_sharp", false)
-        set(value) = prefs.edit().putBoolean("tv_mode_sharp", value).apply()
-
     var toolbarFullWidth: Boolean
         get() = prefs.getBoolean("toolbar_full_width", true)
         set(value) = prefs.edit().putBoolean("toolbar_full_width", value).apply()

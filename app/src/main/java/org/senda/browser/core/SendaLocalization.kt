@@ -621,8 +621,6 @@ interface SendaStringPack {
     val sync_tab_webdav: String
     val sync_tab_html: String
     val cast_title: String
-    val dlg_tv_sharp: String
-    val dlg_tv_sharp_sub: String
     val cast_normal_screen: String
     val cast_disconnect_tv: String
     val cast_connected_to: String
@@ -1406,8 +1404,6 @@ object SendaStringsDe : SendaStringPack {
     override val sync_tab_webdav = "WebDAV-Cloud"
     override val sync_tab_html = "HTML-Backup"
     override val cast_title = "An den Fernseher übertragen"
-    override val dlg_tv_sharp = "Maximale Schärfe im TV-Modus"
-    override val dlg_tv_sharp_sub = "Zeichnet in der Auflösung des Fernsehers (1080p). Schärfer, aber auf einfachen Handys laufen Bewegungen weniger flüssig"
     override val cast_normal_screen = "Normaler Bildschirm"
     override val cast_disconnect_tv = "Fernseher trennen"
     override val cast_connected_to = "Verbunden mit {tv}"
@@ -2190,8 +2186,6 @@ object SendaStringsEn : SendaStringPack {
     override val sync_tab_webdav = "WebDAV Cloud"
     override val sync_tab_html = "HTML Backup"
     override val cast_title = "Cast to the TV"
-    override val dlg_tv_sharp = "Maximum sharpness in TV mode"
-    override val dlg_tv_sharp_sub = "Draws at the TV's resolution (1080p). Sharper, but on modest phones motion is less smooth"
     override val cast_normal_screen = "Normal screen"
     override val cast_disconnect_tv = "Disconnect TV"
     override val cast_connected_to = "Connected to {tv}"
@@ -2974,8 +2968,6 @@ object SendaStringsEs : SendaStringPack {
     override val sync_tab_webdav = "Nube WebDAV"
     override val sync_tab_html = "Respaldo HTML"
     override val cast_title = "Transmitir a la TV"
-    override val dlg_tv_sharp = "Máxima nitidez en modo TV"
-    override val dlg_tv_sharp_sub = "Dibuja a la resolución de la TV (1080p). Se ve más definido, pero en teléfonos modestos el movimiento va menos fluido"
     override val cast_normal_screen = "Pantalla normal"
     override val cast_disconnect_tv = "Desconectar TV"
     override val cast_connected_to = "Conectado a {tv}"
@@ -3758,8 +3750,6 @@ object SendaStringsFr : SendaStringPack {
     override val sync_tab_webdav = "Cloud WebDAV"
     override val sync_tab_html = "Sauvegarde HTML"
     override val cast_title = "Diffuser sur la TV"
-    override val dlg_tv_sharp = "Netteté maximale en mode TV"
-    override val dlg_tv_sharp_sub = "Dessine à la résolution de la TV (1080p). Plus net, mais sur les téléphones modestes le mouvement est moins fluide"
     override val cast_normal_screen = "Écran normal"
     override val cast_disconnect_tv = "Déconnecter la TV"
     override val cast_connected_to = "Connecté à {tv}"
@@ -4542,8 +4532,6 @@ object SendaStringsPt : SendaStringPack {
     override val sync_tab_webdav = "Nuvem WebDAV"
     override val sync_tab_html = "Backup HTML"
     override val cast_title = "Transmitir para a TV"
-    override val dlg_tv_sharp = "Nitidez máxima no modo TV"
-    override val dlg_tv_sharp_sub = "Desenha na resolução da TV (1080p). Fica mais nítido, mas em telefones modestos o movimento fica menos fluido"
     override val cast_normal_screen = "Tela normal"
     override val cast_disconnect_tv = "Desconectar TV"
     override val cast_connected_to = "Conectado a {tv}"
@@ -5326,8 +5314,6 @@ object SendaStringsIt : SendaStringPack {
     override val sync_tab_webdav = "Cloud WebDAV"
     override val sync_tab_html = "Backup HTML"
     override val cast_title = "Trasmetti alla TV"
-    override val dlg_tv_sharp = "Nitidezza massima in modalità TV"
-    override val dlg_tv_sharp_sub = "Disegna alla risoluzione della TV (1080p). Più nitido, ma sui telefoni modesti il movimento è meno fluido"
     override val cast_normal_screen = "Schermo normale"
     override val cast_disconnect_tv = "Disconnetti TV"
     override val cast_connected_to = "Connesso a {tv}"
@@ -6110,8 +6096,6 @@ object SendaStringsJa : SendaStringPack {
     override val sync_tab_webdav = "WebDAV クラウド"
     override val sync_tab_html = "HTML バックアップ"
     override val cast_title = "テレビにキャスト"
-    override val dlg_tv_sharp = "テレビモードの最高画質"
-    override val dlg_tv_sharp_sub = "テレビの解像度（1080p）で描画します。より鮮明になりますが、性能の低いスマホでは動きが滑らかでなくなります"
     override val cast_normal_screen = "通常の画面"
     override val cast_disconnect_tv = "テレビを切断"
     override val cast_connected_to = "{tv} に接続中"
@@ -6894,8 +6878,6 @@ object SendaStringsZh : SendaStringPack {
     override val sync_tab_webdav = "WebDAV 私有云"
     override val sync_tab_html = "HTML 书签备份"
     override val cast_title = "投屏到电视"
-    override val dlg_tv_sharp = "电视模式最高清晰度"
-    override val dlg_tv_sharp_sub = "以电视的分辨率（1080p）绘制。画面更清晰，但在性能一般的手机上动态画面不够流畅"
     override val cast_normal_screen = "正常屏幕"
     override val cast_disconnect_tv = "断开电视"
     override val cast_connected_to = "已连接到 {tv}"
