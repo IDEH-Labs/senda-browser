@@ -416,23 +416,27 @@ fun BrowserScreen(
         }
 
         // Duplicando en una TV: el video que suena pasa a la TV como pantalla secundaria (el teléfono no cambia)
+        // Cada vuelta de Senda a primer plano: el video que se retiró al salir vuelve a la TV desde donde iba
+        val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+        var foregroundCount by remember { mutableIntStateOf(0) }
+        DisposableEffect(lifecycleOwner) {
+            val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                if (event == androidx.lifecycle.Lifecycle.Event.ON_START) foregroundCount++
+            }
+            lifecycleOwner.lifecycle.addObserver(observer)
+            onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        }
         LaunchedEffect(
             org.senda.browser.core.cast.SendaTvMode.tvConnected,
             activeTab?.url,
-            org.senda.browser.core.cast.SendaMediaCatalog.version
+            org.senda.browser.core.cast.SendaMediaCatalog.version,
+            foregroundCount
         ) {
             org.senda.browser.core.cast.SendaTvPlayer.autoStart(activeTab, prefs.tvVideoOnTv)
         }
         val tvPlayback = org.senda.browser.core.cast.SendaTvPlayer.playback
         if (tvPlayback != null) {
             org.senda.browser.ui.components.TvPresentationHost(tvPlayback)
-        } else if (org.senda.browser.core.cast.SendaTvMode.tvConnected && prefs.tvVideoOnTv) {
-            // Sin video: la página que se ve en el teléfono, en formato TV
-            // Las pestañas privadas no se muestran: Senda las protege también al duplicar la pantalla (FLAG_SECURE)
-            org.senda.browser.ui.components.TvPageHost(
-                url = activeTab?.url?.takeIf { activeTab.isPrivate != true },
-                isPrivate = activeTab?.isPrivate == true
-            )
         }
 
         // Transmitir con la TV ya conectada: el video de la TV y «Desconectar TV»

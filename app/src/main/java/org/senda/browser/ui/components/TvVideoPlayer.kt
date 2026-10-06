@@ -25,6 +25,8 @@ import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -49,6 +51,7 @@ private const val START_TIMEOUT_MS = 15_000L
 @Composable
 fun TvPresentationHost(playback: SendaTvPlayer.Playback) {
     val context = LocalContext.current
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(playback) {
         val display = SendaTvMode.tvDisplay()
         val presentation = display?.let {
@@ -61,7 +64,18 @@ fun TvPresentationHost(playback: SendaTvPlayer.Playback) {
             }
         }
         if (presentation == null) SendaTvPlayer.finish(null, null, userExit = false)
-        onDispose { presentation?.close() }
+        // Al salir de Senda la TV vuelve a mostrar el teléfono. Desde el ciclo de vida: en segundo plano Senda no se
+        // redibuja y la composición no se enteraría
+        // Con la pantalla del teléfono apagada (dejarlo a un lado o bloquearlo) el video sigue en la TV
+        val power = context.getSystemService(android.os.PowerManager::class.java)
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP && power?.isInteractive != false) SendaTvPlayer.requestLeave?.invoke()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            presentation?.close()
+        }
     }
 }
 
@@ -200,6 +214,10 @@ private class TvVideoPresentation(
             is SendaTvPlayer.Playback.File -> showFile(root, playback)
         }
         SendaTvPlayer.requestReturn = { finish(userExit = true) }
+        SendaTvPlayer.requestLeave = {
+            SendaTvPlayer.rememberResume(playback.key, positionSeconds())
+            finish(userExit = false, resumeOnPhone = false)
+        }
         handler.postDelayed(startTimeout, START_TIMEOUT_MS)
     }
 
@@ -297,12 +315,13 @@ private class TvVideoPresentation(
         }
     }
 
-    private fun finish(userExit: Boolean) {
+    private fun finish(userExit: Boolean, resumeOnPhone: Boolean = true) {
         if (finished) return
         finished = true
         handler.removeCallbacks(startTimeout)
         SendaTvPlayer.requestReturn = null
-        SendaTvPlayer.finish(positionSeconds(), clock.duration.takeIf { it > 0.0 }, userExit)
+        SendaTvPlayer.requestLeave = null
+        SendaTvPlayer.finish(positionSeconds(), clock.duration.takeIf { it > 0.0 }, userExit, resumeOnPhone)
         // Se cierra sola: con Senda en segundo plano su interfaz no se redibuja y la TV seguía mostrando el video
         handler.post { close() }
     }
