@@ -18,29 +18,83 @@ object SendaAssistant {
     /** Identificador guardado en assistant_provider para ChatGPT con el plan. */
     const val PROVIDER_ID = "chatgpt_plan"
 
-    /** IA con clave de API elegida, o null si se usa ChatGPT (o nada). */
+    /** Capacidades comprobadas con una cuenta real (solo estas se ofrecen). */
+    data class Capabilities(val searchWeb: Boolean, val attach: Boolean, val thinkDeep: Boolean)
+
+    /** IA con clave de API en uso, o null si se usa ChatGPT (o nada). */
     fun apiProvider(prefs: PreferencesManager): ApiProvider? = ApiProvider.byId(prefs.assistantProvider)
 
-    /** IA elegida, con su credencial, modelo y aviso de privacidad aceptado. */
-    fun isConfigured(prefs: PreferencesManager): Boolean {
-        if (prefs.assistantModel.isBlank() || !prefs.assistantPrivacyAccepted) return false
-        val api = apiProvider(prefs)
-        return when {
-            api != null -> prefs.getAssistantKey(api.id).isNotBlank()
-            prefs.assistantProvider == PROVIDER_ID -> ChatGptPlanAuth.isSignedIn(prefs)
-            else -> false
-        }
+    /** IA conectadas: ChatGPT con sesión iniciada y las que tienen clave guardada, en ese orden. */
+    fun connected(prefs: PreferencesManager): List<String> =
+        listOfNotNull(PROVIDER_ID.takeIf { ChatGptPlanAuth.isSignedIn(prefs) }) +
+            ApiProvider.entries.filter { prefs.getAssistantKey(it.id).isNotBlank() }.map { it.id }
+
+    fun displayName(id: String): String = ApiProvider.byId(id)?.displayName ?: "ChatGPT"
+
+    fun destinationOf(id: String): String = ApiProvider.byId(id)?.host ?: CHATGPT_DESTINATION
+
+    /** Sin red: lo medido con cada empresa (ChatGptPlanClient, ApiProvider.clientAt). */
+    fun capabilities(id: String): Capabilities = when (id) {
+        PROVIDER_ID -> Capabilities(searchWeb = true, attach = true, thinkDeep = true)
+        ApiProvider.GEMINI.id -> Capabilities(searchWeb = false, attach = true, thinkDeep = true)
+        else -> Capabilities(searchWeb = false, attach = false, thinkDeep = false)
     }
 
-    /** Adónde viajan los datos. */
-    fun destination(prefs: PreferencesManager): String = apiProvider(prefs)?.host ?: CHATGPT_DESTINATION
+    /** Modelo de la IA en uso. */
+    fun model(prefs: PreferencesManager): String = prefs.assistantProvider?.let { prefs.assistantModelFor(it) }.orEmpty()
+
+    /** IA en uso conectada, con modelo y consentimiento. */
+    fun isConfigured(prefs: PreferencesManager): Boolean {
+        val id = prefs.assistantProvider ?: return false
+        return id in connected(prefs) && prefs.assistantModelFor(id).isNotBlank() && prefs.assistantConsentFor(id)
+    }
+
+    /** Adónde viajan los datos de la IA en uso. */
+    fun destination(prefs: PreferencesManager): String = destinationOf(prefs.assistantProvider ?: PROVIDER_ID)
 
     const val CHATGPT_DESTINATION = "api.openai.com"
 
+    fun backendFor(id: String, prefs: PreferencesManager, apiKey: String? = null): AssistantBackend =
+        ApiProvider.byId(id)?.client(apiKey ?: prefs.getAssistantKey(id)) ?: ChatGptPlanClient(prefs)
+
     fun client(prefs: PreferencesManager): AssistantBackend {
         if (!isConfigured(prefs)) throw RemoteAiException(RemoteAiException.Kind.NOT_CONFIGURED)
-        val api = apiProvider(prefs)
-        return api?.client(prefs.getAssistantKey(api.id)) ?: ChatGptPlanClient(prefs)
+        return backendFor(prefs.assistantProvider!!, prefs)
+    }
+
+    /**
+     * Modelo automático: los de la lista de la empresa en su orden recomendado, probados con un mensaje corto hasta
+     * que uno responde (la lista incluye modelos que esa cuenta no puede usar). Como mucho [MAX_TRIES] pruebas, para
+     * no gastar la cuota. Clave inválida, sesión caducada o cuota agotada cortan la búsqueda y se informan.
+     */
+    suspend fun autoSelectModel(backend: AssistantBackend): String {
+        val candidates = backend.listModels()
+        var last: Exception = RemoteAiException(RemoteAiException.Kind.BAD_RESPONSE, "no_models")
+        for (model in candidates.take(MAX_TRIES)) {
+            try {
+                backend.chat(model, "Reply with: OK", listOf(ChatTurn(ChatTurn.Role.USER, "OK")), deep = false) {}
+                return model
+            } catch (e: RemoteAiException) {
+                if (e.kind != RemoteAiException.Kind.BAD_RESPONSE) throw e
+                last = e
+            }
+        }
+        throw last
+    }
+
+    private const val MAX_TRIES = 3
+
+    /** Pone en uso una IA conectada (ya con modelo y consentimiento). */
+    fun use(prefs: PreferencesManager, id: String) {
+        prefs.assistantProvider = id
+    }
+
+    /** Desconecta una IA: cierra la sesión o borra la clave, su modelo y su consentimiento. */
+    fun disconnect(prefs: PreferencesManager, id: String) {
+        if (id == PROVIDER_ID) ChatGptPlanAuth.signOut(prefs) else prefs.setAssistantKey(id, "")
+        prefs.setAssistantModelFor(id, "")
+        prefs.setAssistantConsentFor(id, false)
+        if (prefs.assistantProvider == id) prefs.assistantProvider = connected(prefs).firstOrNull { prefs.assistantConsentFor(it) }
     }
 
     /** Instrucciones en el idioma de la interfaz; el modelo responde en el idioma del usuario. */

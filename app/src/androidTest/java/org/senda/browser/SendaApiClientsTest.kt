@@ -47,8 +47,11 @@ class SendaApiClientsTest {
                     val body = CharArray(len).also { if (len > 0) input.read(it, 0, len) }.concatToString()
                     synchronized(requests) { requests += head.toString() + body }
                     val path = head.lineSequence().first().split(' ')[1]
+                    val retired = body.contains("\"model\":\"gemini-9-flash\"")
                     val (type, text) = when {
                         nextStatus != 200 -> "application/json" to """{"error":{"message":"bad key"}}"""
+                        retired -> "application/json" to """{"error":{"code":404,"message":"This model models/gemini-9-flash is no longer available to new users."}}"""
+                        path.contains("/models") && path.contains("auto") -> "application/json" to """{"data":[{"id":"models/gemini-9-flash"},{"id":"models/gemini-8-flash"}]}"""
                         path.contains("/models") && path.contains("anthropic") ->
                             "application/json" to """{"data":[{"id":"claude-opus-5-5","type":"model"},{"id":"claude-sonnet-5-5","type":"model"}]}"""
                         path.contains("/models") -> "application/json" to """{"data":[{"id":"models/gemini-3-pro"},{"id":"grok-5"}]}"""
@@ -66,7 +69,7 @@ class SendaApiClientsTest {
                         ).joinToString("\n\n", postfix = "\n\n")
                     }
                     val bytes = text.toByteArray()
-                    val status = if (nextStatus == 200) "200 OK" else "$nextStatus Error"
+                    val status = if (retired) "404 Not Found" else if (nextStatus == 200) "200 OK" else "$nextStatus Error"
                     sock.getOutputStream().write("HTTP/1.1 $status\r\nContent-Type: $type\r\nContent-Length: ${bytes.size}\r\nConnection: close\r\n\r\n".toByteArray() + bytes)
                 }
             }
@@ -116,5 +119,14 @@ class SendaApiClientsTest {
             assertEquals(RemoteAiException.Kind.AUTH, e.kind)
         }
         Unit
+    }
+
+    /** Modelo automático: se salta el retirado (404) y se queda con el primero que responde. */
+    @Test
+    fun autoModelSkipsRetired() = runBlocking {
+        val client = ApiProvider.GEMINI.clientAt("$base/auto", "clave-de-prueba")
+        // Primero el flash de versión más alta (gemini-9-flash, retirado en el simulador)
+        assertEquals(listOf("gemini-9-flash", "gemini-8-flash"), client.listModels())
+        assertEquals("gemini-8-flash", org.senda.browser.core.assistant.SendaAssistant.autoSelectModel(client))
     }
 }

@@ -122,7 +122,7 @@ fun ChatGptUsageLimitDialog(onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun ChatGptLogo(sizeDp: Int) {
+internal fun ChatGptLogo(sizeDp: Int) {
     Icon(
         painter = androidx.compose.ui.res.painterResource(org.senda.browser.R.drawable.ic_chatgpt_logo),
         contentDescription = "ChatGPT",
@@ -132,147 +132,6 @@ private fun ChatGptLogo(sizeDp: Int) {
 }
 
 /** Configuración del asistente: proveedor, clave cifrada, prueba de conexión, modelo y aviso de privacidad. */
-@Composable
-fun SendaAssistantSettingsDialog(
-    prefs: PreferencesManager,
-    onDismiss: () -> Unit,
-    // Al iniciar sesión con ChatGPT se abre la página de OpenAI en una pestaña: hay que quitar de encima lo que la
-    // tape (este cuadro y, si viene del chat, la hoja del asistente). Al volver, el cuadro retoma el resultado
-    onLeaveForSignIn: () -> Unit = onDismiss
-) {
-    val context = LocalContext.current
-    val strings = LocalSendaStrings.current
-    val scope = rememberCoroutineScope()
-
-    var models by remember { mutableStateOf<List<String>>(emptyList()) }
-    var model by remember { mutableStateOf(prefs.assistantModel) }
-    var status by remember { mutableStateOf<String?>(null) }
-    var loading by remember { mutableStateOf(false) }
-    var accepted by remember { mutableStateOf(prefs.assistantPrivacyAccepted) }
-    var planEmail by remember { mutableStateOf(org.senda.browser.core.assistant.ChatGptPlanAuth.email(prefs)) }
-    var planSignedIn by remember { mutableStateOf(org.senda.browser.core.assistant.ChatGptPlanAuth.isSignedIn(prefs)) }
-    var showWelcome by remember { mutableStateOf(false) }
-
-    fun loadModels() {
-        loading = true; status = strings.as_loading
-        scope.launch {
-            try {
-                val list = ChatGptPlanClient(prefs).listModels()
-                models = list
-                if (model !in list) model = list.firstOrNull().orEmpty()
-                status = strings.as_models_loaded.format(list.size)
-            } catch (e: Exception) {
-                status = assistantErrorText(e, strings, SendaAssistant.CHATGPT_DESTINATION)
-            } finally {
-                loading = false
-            }
-        }
-    }
-
-    // Con sesión iniciada los modelos se cargan solos: nada que buscar ni probar a mano
-    LaunchedEffect(Unit) { if (planSignedIn) loadModels() }
-
-    if (showWelcome) ChatGptWelcomeDialog { prefs.assistantChatGptWelcomeSeen = true; showWelcome = false }
-
-    // Resultado del inicio de sesión con ChatGPT, aunque la pantalla se haya cerrado y vuelto a abrir mientras tanto
-    val signIn by org.senda.browser.core.assistant.ChatGptPlanAuth.signInState.collectAsState()
-    LaunchedEffect(signIn) {
-        when (val st = signIn) {
-            is org.senda.browser.core.assistant.ChatGptPlanAuth.SignInState.Waiting -> status = strings.as_chatgpt_waiting
-            is org.senda.browser.core.assistant.ChatGptPlanAuth.SignInState.Done -> {
-                planSignedIn = true; planEmail = st.email
-                if (!prefs.assistantChatGptWelcomeSeen) showWelcome = true
-                org.senda.browser.core.assistant.ChatGptPlanAuth.acknowledge()
-                loadModels()
-            }
-            is org.senda.browser.core.assistant.ChatGptPlanAuth.SignInState.Failed -> {
-                status = strings.as_chatgpt_signin_failed.format(st.code)
-                org.senda.browser.core.assistant.ChatGptPlanAuth.acknowledge()
-            }
-            else -> {}
-        }
-    }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(strings.as_settings_title) },
-        text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                Text(strings.as_settings_intro, fontSize = 13.sp)
-                SendaAssistant.apiProvider(prefs)?.let { api ->
-                    Text(strings.as_api_in_use.format(api.displayName), fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 6.dp))
-                }
-                Spacer(Modifier.height(12.dp))
-                if (planSignedIn) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        ChatGptLogo(18)
-                        Spacer(Modifier.width(8.dp))
-                        Text(strings.as_chatgpt_signed_in.format(planEmail ?: "ChatGPT"), fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                    }
-                } else {
-                    // Botón «Continue with ChatGPT» con el logo, como piden las pautas de OpenAI
-                    Button(
-                        enabled = !loading && signIn !is org.senda.browser.core.assistant.ChatGptPlanAuth.SignInState.Waiting,
-                        onClick = {
-                            org.senda.browser.core.assistant.ChatGptPlanAuth.startSignIn(context, prefs) { url -> openSignInBrowser(context, url) }
-                            onLeaveForSignIn()
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        ChatGptLogo(18)
-                        Spacer(Modifier.width(8.dp))
-                        Text(strings.as_chatgpt_continue)
-                    }
-                    Text(strings.as_chatgpt_plan_note, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                status?.let { Text(it, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp)) }
-                if (models.isNotEmpty()) {
-                    Spacer(Modifier.height(8.dp))
-                    Text(strings.as_model, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                    Column(modifier = Modifier.heightIn(max = 200.dp).verticalScroll(rememberScrollState())) {
-                        models.forEach { m ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth().selectable(selected = m == model, onClick = { model = m }),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                RadioButton(selected = m == model, onClick = { model = m })
-                                Text(m, fontSize = 13.sp)
-                            }
-                        }
-                    }
-                }
-                if (planSignedIn) {
-                    Spacer(Modifier.height(8.dp))
-                    Row(verticalAlignment = Alignment.Top, modifier = Modifier.clickable { accepted = !accepted }) {
-                        Checkbox(checked = accepted, onCheckedChange = { accepted = it })
-                        Text(strings.as_privacy_ack.format(SendaAssistant.CHATGPT_DESTINATION), fontSize = 12.sp, modifier = Modifier.padding(top = 12.dp))
-                    }
-                    TextButton(onClick = {
-                        org.senda.browser.core.assistant.ChatGptPlanAuth.signOut(prefs)
-                        prefs.assistantProvider = null
-                        prefs.assistantModel = ""
-                        prefs.assistantPrivacyAccepted = false
-                        onDismiss()
-                    }) { Text(strings.as_chatgpt_sign_out, color = MaterialTheme.colorScheme.error) }
-                }
-            }
-        },
-        confirmButton = {
-            if (planSignedIn) Button(
-                enabled = !loading && accepted && model.isNotBlank(),
-                onClick = {
-                    prefs.assistantProvider = SendaAssistant.PROVIDER_ID
-                    prefs.assistantModel = model
-                    prefs.assistantPrivacyAccepted = true
-                    Toast.makeText(context, strings.as_saved, Toast.LENGTH_SHORT).show()
-                    onDismiss()
-                }
-            ) { Text(strings.as_save) }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(strings.general_cancel) } }
-    )
-}
-
 private data class AssistantMessage(
     val role: ChatTurn.Role,
     val shown: String,
@@ -399,14 +258,22 @@ fun SendaAssistantSheet(prefs: PreferencesManager, activeTab: BrowserTab?, onDis
             includePage = false
             try {
                 val turns = messages.map { ChatTurn(it.role, it.sent, it.attachments) }
-                val reply = SendaAssistant.client(prefs).chat(prefs.assistantModel, SendaAssistant.systemPrompt(language), turns, deep && backend?.canThinkDeep == true) { partial = it }
+                val reply = SendaAssistant.client(prefs).chat(SendaAssistant.model(prefs), SendaAssistant.systemPrompt(language), turns, deep && backend?.canThinkDeep == true) { partial = it }
                 messages += AssistantMessage(ChatTurn.Role.ASSISTANT, reply.text, reply.text, sources = reply.sources)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
                 // El error no entra en el historial que se envía: solo se muestra
                 messages.removeAt(messages.lastIndex)
-                if (e is RemoteAiException && e.kind == RemoteAiException.Kind.USAGE_LIMIT) showLimit = true
+                // La empresa retiró el modelo o no sirve para conversar (pasa: Google retira modelos con frecuencia):
+                // se olvida y, al volver a usar esa IA en «Mis IA», Senda elige otro que funcione
+                val modelGone = e is RemoteAiException && e.kind == RemoteAiException.Kind.BAD_RESPONSE &&
+                    Regex("HTTP 40[04]").containsMatchIn(e.message.orEmpty()) && e.message.orEmpty().contains("model", ignoreCase = true)
+                if (modelGone) {
+                    prefs.assistantProvider?.let { prefs.setAssistantModelFor(it, "") }
+                    configured = false
+                    Toast.makeText(context, strings.as_model_gone, Toast.LENGTH_LONG).show()
+                } else if (e is RemoteAiException && e.kind == RemoteAiException.Kind.USAGE_LIMIT) showLimit = true
                 else Toast.makeText(context, assistantErrorText(e, strings, destination), Toast.LENGTH_LONG).show()
                 input = question
                 pending.addAll(files)
@@ -422,7 +289,7 @@ fun SendaAssistantSheet(prefs: PreferencesManager, activeTab: BrowserTab?, onDis
     }
 
     if (showSettings) {
-        SendaAssistantSettingsDialog(
+        AssistantHubDialog(
             prefs,
             onDismiss = {
                 showSettings = false
@@ -439,7 +306,7 @@ fun SendaAssistantSheet(prefs: PreferencesManager, activeTab: BrowserTab?, onDis
                 Column(modifier = Modifier.weight(1f)) {
                     Text(strings.as_menu_title, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     if (configured) {
-                        Text(strings.as_sending_to.format(destination, prefs.assistantModel), fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
+                        Text(strings.as_sending_to.format(destination, SendaAssistant.model(prefs)), fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
                     }
                 }
                 if (messages.isNotEmpty() && busy == null) {
