@@ -428,7 +428,11 @@ fun BrowserScreen(
             org.senda.browser.ui.components.TvPresentationHost(tvPlayback)
         } else if (org.senda.browser.core.cast.SendaTvMode.tvConnected && prefs.tvVideoOnTv) {
             // Sin video: la página que se ve en el teléfono, en formato TV
-            org.senda.browser.ui.components.TvPageHost(url = activeTab?.url, isPrivate = activeTab?.isPrivate == true)
+            // Las pestañas privadas no se muestran: Senda las protege también al duplicar la pantalla (FLAG_SECURE)
+            org.senda.browser.ui.components.TvPageHost(
+                url = activeTab?.url?.takeIf { activeTab.isPrivate != true },
+                isPrivate = activeTab?.isPrivate == true
+            )
         }
 
         // Transmitir con la TV ya conectada: el video de la TV y «Desconectar TV»

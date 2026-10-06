@@ -79,6 +79,28 @@ fun TvPageHost(url: String?, isPrivate: Boolean) {
     }
 }
 
+/**
+ * La TV vuelve a pedir la dirección que muestra el teléfono. No se hace con las que pueden tener efecto al pedirse
+ * dos veces o que no son de internet: enlaces de un solo uso (confirmar, restablecer, códigos de inicio de sesión),
+ * y direcciones locales (127.0.0.1 —el inicio de sesión con ChatGPT de Senda usa una—, el router, aparatos de casa).
+ * En esos casos la TV muestra solo «Senda».
+ */
+private fun isSafeToReload(url: String): Boolean {
+    val uri = try { android.net.Uri.parse(url) } catch (_: Exception) { return false }
+    if (uri.scheme != "https" && uri.scheme != "http") return false
+    val host = uri.host?.lowercase()?.trim('[', ']') ?: return false
+    if (host == "localhost" || host.endsWith(".local") || host.endsWith(".localhost") || host.endsWith(".lan")) return false
+    if (Regex("^[0-9.]+$").matches(host) || host.contains(':')) {
+        val address = try { java.net.InetAddress.getByName(host) } catch (_: Exception) { return false }
+        if (address.isLoopbackAddress || address.isSiteLocalAddress || address.isLinkLocalAddress || address.isAnyLocalAddress) return false
+    }
+    val oneTime = Regex("(^|[_-])(token|code|otp|key|secret|signature|sig|nonce|state|ticket|magic|reset|verify|verification|confirm|confirmation|auth|session|password|pwd)([_-]|$)")
+    if (uri.queryParameterNames.any { oneTime.containsMatchIn(it.lowercase()) }) return false
+    val path = uri.path?.lowercase() ?: ""
+    if (Regex("/(reset|verify|confirm|activate|unsubscribe|callback|oauth|login/token|magic)").containsMatchIn(path)) return false
+    return true
+}
+
 private class TvPagePresentation(
     context: Context,
     display: Display,
@@ -140,7 +162,7 @@ private class TvPagePresentation(
 
     fun showUrl(url: String?) {
         if (closed) return
-        val page = url?.takeIf { it.startsWith("http://") || it.startsWith("https://") }
+        val page = url?.takeIf { isSafeToReload(it) }
         geckoView?.visibility = if (page != null) View.VISIBLE else View.GONE
         idleView?.visibility = if (page != null) View.GONE else View.VISIBLE
         if (page == null || page == currentUrl) return

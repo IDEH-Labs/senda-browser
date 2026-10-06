@@ -85,7 +85,8 @@ object SendaTvPlayer {
             skippedKey = null
             return
         }
-        if (!enabled || tab == null) return
+        // Las pestañas privadas no pasan solas a la TV: Senda también las oculta al duplicar la pantalla
+        if (!enabled || tab == null || tab.isPrivate) return
         val key = SendaYouTube.youTubeVideoId(tab.url) ?: SendaMediaCatalog.bestFor(tab.url)?.url ?: return
         if (key == skippedKey || key == playback?.key) return
         // Otro video mientras la TV muestra uno: el nuevo lo reemplaza
