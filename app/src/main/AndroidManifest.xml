@@ -18,18 +18,6 @@
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
     <uses-feature android:name="android.hardware.location" android:required="false" />
 
-    <!-- Modo TV: adaptar el teléfono mientras se duplica la pantalla en una TV (ver SendaTvMode) -->
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
-    <!-- Solo para la notificación del modo TV, con su botón «Pantalla normal»; se pide al duplicar la pantalla -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- Si el móvil se reinicia o Senda se actualiza en plena transmisión, devolver la pantalla a la normalidad -->
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <!-- Solo se concede por ADB (pm grant); sin él la TV conserva la proporción del móvil -->
-    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"
-        tools:ignore="ProtectedPermissions" />
-
     <!-- Solo los navegadores (apps que abren enlaces https): para ofrecer otro navegador al iniciar sesión con
          ChatGPT. Desde Android 11 las demás apps no son visibles sin declararlo -->
     <queries>
@@ -76,24 +64,6 @@
                 <data android:scheme="content" />
             </intent-filter>
         </activity>
-
-        <service
-            android:name=".core.cast.SendaTvModeService"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Adapta la pantalla del teléfono (60 Hz, horizontal, 16:9) mientras se duplica en una TV y la restaura al terminar" />
-        </service>
-
-        <receiver
-            android:name=".core.cast.SendaTvModeRestoreReceiver"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
-            </intent-filter>
-        </receiver>
 
         <provider
             android:name="androidx.core.content.FileProvider"

@@ -1,5 +1,8 @@
 package org.senda.browser.core.cast
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import org.json.JSONObject
 import org.mozilla.geckoview.GeckoResult
 import org.mozilla.geckoview.WebExtension
@@ -49,6 +52,10 @@ object SendaMediaCatalog {
 
     private fun pageKey(url: String) = url.substringBefore('#')
 
+    /** Cambia con cada video nuevo: la interfaz lo lee para enterarse (el catálogo en sí no es estado de Compose). */
+    var version by mutableIntStateOf(0)
+        private set
+
     @Synchronized
     fun add(page: String, media: Media) {
         if (!media.url.startsWith("http://") && !media.url.startsWith("https://")) return
@@ -57,6 +64,7 @@ object SendaMediaCatalog {
         list.add(media)
         while (list.size > MAX_PER_PAGE) list.removeAt(0)
         while (byPage.size > MAX_PAGES) byPage.remove(byPage.keys.first())
+        version++
     }
 
     /**

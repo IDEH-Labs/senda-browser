@@ -206,11 +206,8 @@ class MainActivity : FragmentActivity() {
             val activeTab = tabs.find { it.id == activeTabId } ?: tabs.firstOrNull()
             val isBrowsingExternalSite = activeTab != null && activeTab.url != "about:blank" && activeTab.url.isNotBlank()
             // Pantalla completa inmersiva solo cuando el usuario lo solicita explícitamente en la pestaña
-            // El reproductor de TV también ocupa toda la pantalla, igual que un video a pantalla completa
-            val tvPlayerActive = org.senda.browser.core.cast.SendaTvPlayer.playback != null &&
-                prefs.tvModeEnabled && prefs.tvModeLandscape
-            val isFullScreen = activeTab?.isFullScreen == true || tvPlayerActive
-            val keepPortrait = !tvPlayerActive && activeTab?.isFullScreenVideoPortrait == true
+            val isFullScreen = activeTab?.isFullScreen == true
+            val keepPortrait = activeTab?.isFullScreenVideoPortrait == true
 
             // Modo inmersivo total para reproducción de video en pantalla completa solicitada por el usuario
             LaunchedEffect(isFullScreen, keepPortrait) {

@@ -8,12 +8,14 @@ import androidx.compose.runtime.setValue
 import org.senda.browser.ui.model.BrowserTab
 
 /**
- * Reproductor de TV: mientras la pantalla se duplica en una TV, el video de YouTube que suena en Senda pasa
- * solo a su reproductor a pantalla completa, desde el mismo segundo. En la TV se ve como en la app de
- * YouTube (sin cabecera, sin barras, 16:9) y sin pulsar nada.
+ * Video en la TV como pantalla secundaria: mientras el teléfono se duplica en una TV (Miracast), el video que
+ * suena en Senda pasa a la TV a pantalla completa, en 16:9 y a la resolución de la TV, desde el mismo segundo.
+ * El teléfono no cambia (sigue en vertical y se puede seguir navegando): Android muestra en la TV lo que Senda
+ * dibuja para ella ([org.senda.browser.ui.components.TvPresentationHost]) en vez del espejo del teléfono.
  *
- * No inyecta código en las páginas: carga el reproductor oficial de YouTube (youtube-nocookie.com) en una
- * sesión propia. Al cortar la transmisión o pulsar Atrás, el video sigue en la pestaña en el punto alcanzado.
+ * YouTube no entrega un archivo: se usa su reproductor oficial (youtube-nocookie.com) en una sesión propia, sin
+ * inyectar nada en las páginas. Los demás videos (MP4, HLS…) se reproducen con el reproductor de Android a partir
+ * del archivo que detectó [SendaMediaCatalog]. Al terminar, el video sigue en la pestaña donde quedó.
  */
 object SendaTvPlayer {
 
@@ -25,36 +27,81 @@ object SendaTvPlayer {
      */
     const val REFERRER = "https://org.senda.browser"
 
-    data class Playback(
-        val tab: BrowserTab,
-        val videoId: String,
-        val startSeconds: Int,
-        val playlistId: String?,
-        val tabDurationSeconds: Double
-    ) {
-        val embedUrl: String
-            get() = buildString {
-                append("https://www.youtube-nocookie.com/embed/").append(Uri.encode(videoId))
-                append("?autoplay=1&playsinline=1&rel=0&start=").append(startSeconds.coerceAtLeast(0))
-                playlistId?.let { append("&list=").append(Uri.encode(it)) }
-            }
+    sealed class Playback {
+        abstract val tab: BrowserTab
+        abstract val startSeconds: Int
+        abstract val tabDurationSeconds: Double
+        abstract val key: String
+
+        data class YouTube(
+            override val tab: BrowserTab,
+            val videoId: String,
+            override val startSeconds: Int,
+            val playlistId: String?,
+            override val tabDurationSeconds: Double
+        ) : Playback() {
+            override val key: String get() = videoId
+            val embedUrl: String
+                get() = buildString {
+                    append("https://www.youtube-nocookie.com/embed/").append(Uri.encode(videoId))
+                    append("?autoplay=1&playsinline=1&rel=0&start=").append(startSeconds.coerceAtLeast(0))
+                    playlistId?.let { append("&list=").append(Uri.encode(it)) }
+                }
+        }
+
+        data class File(
+            override val tab: BrowserTab,
+            val media: SendaMediaCatalog.Media,
+            override val startSeconds: Int,
+            override val tabDurationSeconds: Double
+        ) : Playback() {
+            override val key: String get() = media.url
+        }
+    }
+
+    /** Lo que el teléfono puede pedirle al reproductor de la TV (lo registra el reproductor que se muestra). */
+    interface Controls {
+        fun play()
+        fun pause()
     }
 
     var playback by mutableStateOf<Playback?>(null)
         private set
+    var paused by mutableStateOf(false)
+    var controls: Controls? = null
 
-    // Video que el usuario sacó del reproductor de TV (Atrás) o que YouTube no deja mostrar: no reabrirlo
-    private var skippedVideoId: String? = null
+    // Video que el usuario devolvió al teléfono o que la TV no pudo mostrar: no volver a pasarlo solo
+    private var skippedKey: String? = null
+    private var starting = false
 
-    /** Pasa al reproductor de TV si hay TV conectada y la pestaña reproduce un video de YouTube. */
-    fun maybeStart(tab: BrowserTab?) {
+    /**
+     * Duplicando en una TV, el video de la página pasa solo a la TV en cuanto existe (al abrir un video de YouTube o
+     * cuando la página carga su archivo), sin botones: para eso se conectó la TV. No espera a que suene en el
+     * teléfono porque Gecko no siempre lo informa (MediaSession). No vuelve a pasar un video que el usuario
+     * devolvió al teléfono.
+     */
+    fun autoStart(tab: BrowserTab?, enabled: Boolean) {
         if (!SendaTvMode.tvConnected) {
-            skippedVideoId = null
+            skippedKey = null
             return
         }
-        if (tab == null || playback != null || starting || !tab.isMediaPlaying) return
-        val videoId = SendaYouTube.youTubeVideoId(tab.url) ?: return
-        if (videoId == skippedVideoId) return
+        if (!enabled || tab == null) return
+        val key = SendaYouTube.youTubeVideoId(tab.url) ?: SendaMediaCatalog.bestFor(tab.url)?.url ?: return
+        if (key == skippedKey || key == playback?.key) return
+        // Otro video mientras la TV muestra uno: el nuevo lo reemplaza
+        if (playback != null) {
+            requestReturn?.invoke()
+            if (playback != null) return
+        }
+        start(tab)
+    }
+
+    /** Muestra en la TV el video de [tab] desde donde va (lo pidió el usuario o empezó a sonar). */
+    fun start(tab: BrowserTab) {
+        if (!SendaTvMode.tvConnected || playback != null || starting) return
+        val videoId = SendaYouTube.youTubeVideoId(tab.url)
+        val media = if (videoId == null) SendaMediaCatalog.bestFor(tab.url) else null
+        val key = videoId ?: media?.url ?: return
         starting = true
         // Pausar y tomar la posición exacta en la que quedó: la TV sigue justo desde ahí
         tab.pauseMediaAndGetPosition { start ->
@@ -63,26 +110,30 @@ object SendaTvPlayer {
                 tab.resumeMedia()
                 return@pauseMediaAndGetPosition
             }
-            val playlist = try { Uri.parse(tab.url).getQueryParameter("list") } catch (_: Exception) { null }
-            Log.i(TAG, "Reproductor de TV: v=$videoId t=$start list=$playlist")
-            playback = Playback(tab, videoId, start, playlist?.takeIf { it.isNotBlank() }, tab.mediaDurationSeconds)
+            paused = false
+            playback = if (videoId != null) {
+                val playlist = try { Uri.parse(tab.url).getQueryParameter("list") } catch (_: Exception) { null }
+                Playback.YouTube(tab, videoId, start, playlist?.takeIf { it.isNotBlank() }, tab.mediaDurationSeconds)
+            } else {
+                Playback.File(tab, media!!, start, tab.mediaDurationSeconds)
+            }
+            Log.i(TAG, "Video a la TV: $key desde ${start}s")
         }
     }
 
-    private var starting = false
-
     /**
-     * Cierra el reproductor de TV y devuelve el video a la pestaña.
-     * [positionSeconds] y [durationSeconds] son los del reproductor de TV (null si nunca llegó a reproducir).
+     * Cierra el video de la TV y lo devuelve a la pestaña. [positionSeconds] y [durationSeconds] son los del
+     * reproductor de la TV (null si nunca llegó a reproducir). [userExit]: el usuario lo pidió; no se vuelve a pasar.
      */
     fun finish(positionSeconds: Double?, durationSeconds: Double?, userExit: Boolean) {
         val current = playback ?: return
         playback = null
-        if (userExit || positionSeconds == null) skippedVideoId = current.videoId
+        controls = null
+        paused = false
+        if (userExit || positionSeconds == null) skippedKey = current.key
         val tab = current.tab
         if (positionSeconds == null) {
-            // YouTube no permitió mostrar este video en su reproductor: sigue en la página como estaba
-            Log.w(TAG, "El reproductor de TV no arrancó v=${current.videoId}: vuelve a la pestaña")
+            Log.w(TAG, "La TV no pudo reproducir ${current.key}: vuelve a la pestaña")
             tab.resumeMedia()
             return
         }
@@ -91,6 +142,9 @@ object SendaTvPlayer {
             kotlin.math.abs(durationSeconds - current.tabDurationSeconds) < 1.5
         if (sameVideo) tab.seekMedia(positionSeconds)
         tab.resumeMedia()
-        Log.i(TAG, "Reproductor de TV cerrado en ${positionSeconds.toInt()}s (mismo video: $sameVideo)")
+        Log.i(TAG, "Video de vuelta al teléfono en ${positionSeconds.toInt()}s (mismo video: $sameVideo)")
     }
+
+    /** Pide al reproductor de la TV que devuelva el video al teléfono (con su posición). */
+    var requestReturn: (() -> Unit)? = null
 }
