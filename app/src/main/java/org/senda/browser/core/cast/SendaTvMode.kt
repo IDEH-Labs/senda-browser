@@ -67,6 +67,10 @@ object SendaTvMode {
     // El usuario pidió la pantalla normal desde la notificación: no se vuelve a adaptar hasta la próxima conexión
     private var restoredByUser = false
 
+    /** true mientras el teléfono está realmente adaptado (girado, en 16:9): solo entonces sirve «Pantalla normal». */
+    var adapted by mutableStateOf(false)
+        private set
+
     /** true mientras la pantalla del teléfono se duplica en una TV (Miracast, «Enviar pantalla» o HDMI). */
     var tvConnected by mutableStateOf(false)
         private set
@@ -302,7 +306,10 @@ object SendaTvMode {
                 return
             }
             val (w, h) = if (initial.x < initial.y) shortSide to longSide else longSide to shortSide
-            if (base.x == w && base.y == h) return
+            if (base.x == w && base.y == h) {
+                adapted = true
+                return
+            }
             val state = appContext.getSharedPreferences(STATE_PREFS, Context.MODE_PRIVATE)
             if (!state.getBoolean(KEY_FORCED, false)) {
                 // Guardar el tamaño que tenía el usuario (normalmente el de fábrica) para devolverlo tal cual
@@ -314,6 +321,7 @@ object SendaTvMode {
             }
             iface.getMethod("setForcedDisplaySize", Int::class.java, Int::class.java, Int::class.java)
                 .invoke(wms, Display.DEFAULT_DISPLAY, w, h)
+            adapted = true
             Log.i(TAG, "Pantalla adaptada a la TV: ${w}x$h (TV ${tv.mode.physicalWidth}x${tv.mode.physicalHeight})")
         } catch (e: Exception) {
             Log.w(TAG, "No se pudo adaptar la proporción a la TV: ${e.cause?.message ?: e.message}")
@@ -346,6 +354,7 @@ object SendaTvMode {
                 }
             }
             state.edit().putBoolean(KEY_FORCED, false).remove(KEY_ORIGINAL_DENSITY).commit()
+            adapted = false
             Log.i(TAG, "Pantalla del móvil restaurada")
         } catch (e: Exception) {
             Log.w(TAG, "No se pudo restaurar la pantalla: ${e.cause?.message ?: e.message}")
@@ -381,8 +390,8 @@ class SendaTvModeService : Service() {
             .setSmallIcon(R.drawable.ic_senda_monochrome)
             .setContentTitle(if (isSpanish) "Modo TV activo" else "TV mode on")
             .setContentText(
-                if (isSpanish) "La pantalla se adapta a la TV. Vuelve a la normalidad al dejar de transmitir o con «Pantalla normal»."
-                else "The screen is adapted to the TV. It returns to normal when you stop casting or with «Normal screen»."
+                if (isSpanish) "Al girar el teléfono la imagen se adapta a la TV. Todo vuelve a la normalidad al desconectar."
+                else "When you rotate the phone the picture adapts to the TV. Everything returns to normal when you disconnect."
             )
             .setContentIntent(openSenda)
             .addAction(

@@ -109,7 +109,9 @@ fun TvControlsCard(onDone: () -> Unit) {
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                     Text(
-                        text = playback?.tab?.title ?: strings.cast_videos_go_to_tv,
+                        text = playback?.tab?.title
+                            ?: if (org.senda.browser.core.PreferencesManager(context).tvModeEnabled) strings.cast_videos_go_to_tv
+                            else strings.cast_tv_mode_off_hint,
                         style = MaterialTheme.typography.bodySmall,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
@@ -147,7 +149,7 @@ fun TvControlsCard(onDone: () -> Unit) {
                 }
                 Spacer(Modifier.weight(1f))
                 // Modo TV aplicado: devolver el teléfono a la normalidad aunque la TV siga conectada
-                if (SendaTvMode.active) {
+                if (SendaTvMode.adapted) {
                     TextButton(onClick = {
                         SendaTvMode.restoreNow()
                         onDone()
