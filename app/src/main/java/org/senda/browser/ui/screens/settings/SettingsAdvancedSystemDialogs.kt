@@ -392,7 +392,8 @@ fun SettingsChromecastDialog(
     onDismiss: () -> Unit
 ) {
     var showCast by remember { mutableStateOf(prefs.showCastButton) }
-    var tvVideo by remember { mutableStateOf(prefs.tvVideoOnTv) }
+    var tvMode by remember { mutableStateOf(prefs.tvModeEnabled) }
+    var tvSharp by remember { mutableStateOf(prefs.tvModeSharp) }
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = {
@@ -441,13 +442,36 @@ fun SettingsChromecastDialog(
                         Text(text = strings.dlg_tv_mode_sub, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Switch(
-                        checked = tvVideo,
+                        checked = tvMode,
                         onCheckedChange = {
-                            tvVideo = it
-                            prefs.tvVideoOnTv = it
+                            tvMode = it
+                            prefs.tvModeEnabled = it
+                            org.senda.browser.core.cast.SendaTvMode.evaluate()
                             onSettingsChanged()
                         }
                     )
+                }
+                if (tvMode) {
+                    HorizontalDivider()
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                            Text(text = strings.dlg_tv_sharp, style = MaterialTheme.typography.bodyMedium)
+                            Text(text = strings.dlg_tv_sharp_sub, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Switch(
+                            checked = tvSharp,
+                            onCheckedChange = {
+                                tvSharp = it
+                                prefs.tvModeSharp = it
+                                org.senda.browser.core.cast.SendaTvMode.evaluate()
+                                onSettingsChanged()
+                            }
+                        )
+                    }
                 }
                 HorizontalDivider()
                 Button(

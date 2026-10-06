@@ -237,13 +237,19 @@ class PreferencesManager(context: Context) {
         set(value) = prefs.edit().putBoolean("show_cast_button", value).apply()
 
     /**
-     * Mientras se duplica la pantalla en una TV, la TV muestra el teléfono tal cual y los videos de Senda pasan a la
-     * TV a pantalla completa y en su formato (pantalla secundaria); el teléfono no cambia. Las claves tv_mode_* de versiones anteriores
-     * (adaptaban el propio teléfono) ya no se usan.
+     * Modo TV: mientras se duplica la pantalla en una TV, el teléfono se adapta a la TV (horizontal, 16:9) y la TV
+     * muestra lo mismo a pantalla completa y en tiempo real, en cualquier app. Al desconectar todo vuelve a como
+     * estaba. Activado por defecto (2026-10-06, a pedido del usuario); clave nueva porque la anterior quedó en false.
+     * Desactivado: la TV muestra el teléfono tal cual y solo los videos de Senda pasan a la TV en formato TV.
      */
-    var tvVideoOnTv: Boolean
-        get() = prefs.getBoolean("tv_video_on_tv", true)
-        set(value) = prefs.edit().putBoolean("tv_video_on_tv", value).apply()
+    var tvModeEnabled: Boolean
+        get() = prefs.getBoolean("tv_mode_enabled_v3", true)
+        set(value) = prefs.edit().putBoolean("tv_mode_enabled_v3", value).apply()
+
+    /** Modo TV a la resolución de la TV (1080p): más nítido, pero el teléfono pierde imágenes al dibujarlo. */
+    var tvModeSharp: Boolean
+        get() = prefs.getBoolean("tv_mode_sharp", false)
+        set(value) = prefs.edit().putBoolean("tv_mode_sharp", value).apply()
 
     var toolbarFullWidth: Boolean
         get() = prefs.getBoolean("toolbar_full_width", true)
