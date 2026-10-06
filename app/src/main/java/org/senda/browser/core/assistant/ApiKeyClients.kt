@@ -45,8 +45,13 @@ enum class ApiProvider(
     fun client(apiKey: String): AssistantBackend = clientAt(baseUrl, apiKey)
 
     /** Con otra dirección base: solo para las pruebas (servidor simulado en el teléfono). */
-    internal fun clientAt(base: String, apiKey: String): AssistantBackend =
-        if (this == ANTHROPIC) AnthropicClient(base, apiKey) else OpenAiCompatibleClient(base, apiKey)
+    internal fun clientAt(base: String, apiKey: String): AssistantBackend = when (this) {
+        ANTHROPIC -> AnthropicClient(base, apiKey)
+        // Medido con una clave real el 2026-10-06 (SendaGeminiCapabilitiesTest): fotos, PDF y razonamiento sí;
+        // búsqueda en Google no se pudo comprobar (el plan gratuito responde «cuota superada»)
+        GEMINI -> OpenAiCompatibleClient(base, apiKey, attachments = true, deep = true, modelFilter = ::isGeminiChatModel)
+        else -> OpenAiCompatibleClient(base, apiKey)
+    }
 
     companion object {
         fun byId(id: String?): ApiProvider? = entries.firstOrNull { it.id == id }
@@ -54,13 +59,26 @@ enum class ApiProvider(
 }
 
 /**
- * Solo conversación por texto: búsqueda, adjuntos y razonamiento dependen de cada empresa y no se han comprobado
- * con una clave real, así que no se ofrecen (no se promete lo que no está verificado).
+ * Gemini lista también modelos que no sirven para conversar (voz, música, imágenes, especiales «Interactions API»):
+ * fuera de la lista. El primero, el «flash» más reciente (rápido y con nivel gratuito).
+ */
+private fun isGeminiChatModel(id: String): Boolean =
+    id.startsWith("gemini-") && listOf("tts", "image", "transcribe", "embedding", "live", "audio", "customtools", "robotics", "computer-use", "banana", "omni")
+        .none { id.contains(it) }
+
+private fun geminiOrder(ids: List<String>): List<String> {
+    val version = { id: String -> Regex("gemini-(\\d+)(?:\\.(\\d+))?").find(id)?.let { (it.groupValues[1].toInt() * 100) + (it.groupValues[2].toIntOrNull() ?: 0) } ?: 0 }
+    return ids.sortedWith(compareByDescending<String> { Regex("^gemini-[\\d.]+-flash$").matches(it) }.thenByDescending(version).thenBy { it })
+}
+
+/**
+ * Por defecto solo conversación por texto: búsqueda, adjuntos y razonamiento dependen de cada empresa y solo se
+ * ofrecen los comprobados con una clave real (no se promete lo que no está verificado).
  */
 private abstract class TextOnlyApiClient(protected val base: String, protected val apiKey: String) : AssistantBackend {
     override val canSearchWeb = false
-    override val canAttach = false
-    override val canThinkDeep = false
+    override val canAttach: Boolean = false
+    override val canThinkDeep: Boolean = false
 
     protected abstract fun authorize(conn: HttpURLConnection)
 
@@ -80,7 +98,8 @@ private abstract class TextOnlyApiClient(protected val base: String, protected v
         throw RemoteAiException(
             when (code) {
                 401, 403 -> RemoteAiException.Kind.AUTH
-                429 -> RemoteAiException.Kind.RATE_LIMIT
+                // 503: «demasiada demanda», pasajero
+                429, 503 -> RemoteAiException.Kind.RATE_LIMIT
                 else -> RemoteAiException.Kind.BAD_RESPONSE
             },
             "HTTP $code $err".trim()
@@ -115,7 +134,15 @@ private abstract class TextOnlyApiClient(protected val base: String, protected v
 }
 
 /** Gemini, Grok y Mistral: /models y /chat/completions (formato compatible con OpenAI, documentado por cada una). */
-private class OpenAiCompatibleClient(base: String, apiKey: String) : TextOnlyApiClient(base, apiKey) {
+private class OpenAiCompatibleClient(
+    base: String,
+    apiKey: String,
+    attachments: Boolean = false,
+    deep: Boolean = false,
+    private val modelFilter: ((String) -> Boolean)? = null
+) : TextOnlyApiClient(base, apiKey) {
+    override val canAttach = attachments
+    override val canThinkDeep = deep
 
     override fun authorize(conn: HttpURLConnection) = conn.setRequestProperty("Authorization", "Bearer $apiKey")
 
@@ -126,6 +153,7 @@ private class OpenAiCompatibleClient(base: String, apiKey: String) : TextOnlyApi
             (0 until data.length()).mapNotNull { data.optJSONObject(it)?.optString("id")?.takeIf { id -> id.isNotBlank() } }
                 // Gemini responde «models/gemini-…»; en /chat/completions se usa sin el prefijo
                 .map { it.removePrefix("models/") }.distinct().sorted()
+                .let { ids -> modelFilter?.let { f -> geminiOrder(ids.filter(f)) } ?: ids }
         } finally {
             conn.disconnect()
         }
@@ -134,10 +162,24 @@ private class OpenAiCompatibleClient(base: String, apiKey: String) : TextOnlyApi
     override suspend fun chat(model: String, system: String, turns: List<ChatTurn>, deep: Boolean, onDelta: (String) -> Unit): ChatReply =
         withContext(Dispatchers.IO) {
             val messages = JSONArray().put(JSONObject().put("role", "system").put("content", system))
-            turns.forEach { t -> messages.put(JSONObject().put("role", if (t.role == ChatTurn.Role.USER) "user" else "assistant").put("content", t.text)) }
+            turns.forEach { t ->
+                val role = if (t.role == ChatTurn.Role.USER) "user" else "assistant"
+                if (t.attachments.isEmpty() || !canAttach) {
+                    messages.put(JSONObject().put("role", role).put("content", t.text))
+                } else {
+                    // Fotos y PDF como image_url con datos (Gemini acepta así los PDF; el tipo «file» lo rechaza)
+                    val parts = JSONArray().put(JSONObject().put("type", "text").put("text", t.text))
+                    t.attachments.forEach { a ->
+                        parts.put(JSONObject().put("type", "image_url").put("image_url", JSONObject().put("url", "data:${a.mime};base64,${a.base64}")))
+                    }
+                    messages.put(JSONObject().put("role", role).put("content", parts))
+                }
+            }
+            val payload = JSONObject().put("model", model).put("messages", messages).put("stream", true)
+            if (deep && canThinkDeep) payload.put("reasoning_effort", "high")
             val out = StringBuilder()
             var finished = false
-            streamPost("$base/chat/completions", JSONObject().put("model", model).put("messages", messages).put("stream", true)) { data ->
+            streamPost("$base/chat/completions", payload) { data ->
                 if (data == "[DONE]") { finished = true; return@streamPost false }
                 val choice = JSONObject(data).optJSONArray("choices")?.optJSONObject(0) ?: return@streamPost true
                 val delta = choice.optJSONObject("delta")?.optString("content", "").orEmpty()

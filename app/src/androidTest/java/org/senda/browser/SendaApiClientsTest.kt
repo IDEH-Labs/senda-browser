@@ -80,8 +80,10 @@ class SendaApiClientsTest {
 
     @Test
     fun openAiCompatibleListsAndStreams() = runBlocking {
+        // Grok y Mistral muestran todos los modelos; Gemini solo los de conversación de Gemini
+        assertEquals(listOf("gemini-3-pro", "grok-5"), ApiProvider.XAI.clientAt("$base/openai", "clave-de-prueba").listModels())
         val client = ApiProvider.GEMINI.clientAt("$base/openai", "clave-de-prueba")
-        assertEquals(listOf("gemini-3-pro", "grok-5"), client.listModels())
+        assertEquals(listOf("gemini-3-pro"), client.listModels())
         val parts = mutableListOf<String>()
         val reply = client.chat("gemini-3-pro", "sistema", listOf(ChatTurn(ChatTurn.Role.USER, "hola")), deep = false) { parts += it }
         assertEquals("Hola mundo", reply.text)
