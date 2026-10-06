@@ -57,13 +57,15 @@ class PreferencesManager(context: Context) {
                 prefs.all.keys.filter { it.startsWith("ai_") || it == "selected_local_ai_model" }.forEach { remove(it) }
             }.apply()
         }
-        // El asistente ya solo usa ChatGPT (2026-10-06): se borran las claves de API y el servidor propio guardados
-        val oldKeys = listOf("anthropic", "openai", "gemini", "xai", "mistral", "own")
-            .flatMap { listOf("assistant_key_enc_$it", "assistant_key_iv_$it") } + "assistant_server_url"
-        if (oldKeys.any { prefs.contains(it) } || (prefs.getString("assistant_provider", null) ?: "chatgpt_plan") != "chatgpt_plan") {
+        // El asistente usa ChatGPT o, para avanzados, Claude, Gemini, Grok o Mistral con clave (2026-10-06): se borran
+        // la clave de OpenAI por API y el servidor propio, que ya no existen
+        val oldKeys = listOf("openai", "own").flatMap { listOf("assistant_key_enc_$it", "assistant_key_iv_$it") } + "assistant_server_url"
+        val stillValid = setOf("chatgpt_plan", "anthropic", "gemini", "xai", "mistral")
+        val provider = prefs.getString("assistant_provider", null)
+        if (oldKeys.any { prefs.contains(it) } || (provider != null && provider !in stillValid)) {
             prefs.edit().apply {
                 oldKeys.forEach { remove(it) }
-                if ((prefs.getString("assistant_provider", null) ?: "chatgpt_plan") != "chatgpt_plan") {
+                if (provider != null && provider !in stillValid) {
                     remove("assistant_provider"); remove("assistant_model"); remove("assistant_privacy_accepted")
                 }
             }.apply()
@@ -561,7 +563,7 @@ class PreferencesManager(context: Context) {
 
     // --- ASISTENTE CON IA REMOTA ---
     // Prefijo «assistant_»: los «ai_*» de la IA local retirada se borran al arrancar
-    /** «chatgpt_plan» (SendaAssistant.PROVIDER_ID) o null si el asistente no está configurado. */
+    /** «chatgpt_plan» (SendaAssistant.PROVIDER_ID), el id de una IA con clave (ApiProvider) o null. */
     var assistantProvider: String?
         get() = prefs.getString("assistant_provider", null)
         set(value) = prefs.edit().putString("assistant_provider", value).apply()
@@ -589,7 +591,7 @@ class PreferencesManager(context: Context) {
         get() = prefs.getBoolean("assistant_privacy_accepted", false)
         set(value) = prefs.edit().putBoolean("assistant_privacy_accepted", value).apply()
 
-    /** Secreto del asistente (las credenciales de ChatGPT), cifrado con el almacén de claves del teléfono. */
+    /** Credenciales del asistente (sesión de ChatGPT o clave de API), cifradas con el almacén de claves del teléfono. */
     fun getAssistantKey(providerId: String): String {
         val enc = prefs.getString("assistant_key_enc_$providerId", null) ?: return ""
         val iv = prefs.getString("assistant_key_iv_$providerId", null) ?: return ""

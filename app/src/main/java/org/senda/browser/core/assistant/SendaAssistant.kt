@@ -6,28 +6,41 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Asistente con ChatGPT, con el plan del usuario («Sign in with ChatGPT»). Las demás IA (Claude, Gemini, Grok,
- * Mistral) se usan en su web oficial: así es más sencillo y no hay claves técnicas que configurar (2026-10-06).
+ * Asistente con IA. Lo normal: ChatGPT con el plan del usuario («Sign in with ChatGPT», lo único que una empresa
+ * permite hoy con la suscripción). Para usuarios avanzados, en Ajustes: Claude, Gemini, Grok o Mistral con clave de
+ * API (se paga aparte; ver [ApiProvider]).
  *
  * Límites (auditoría del 2026-10-05): la IA solo prepara borradores, nunca envía ni actúa por su cuenta; no ve
  * la Bóveda; no inventa experiencia en hojas de vida; el texto de una página son datos, no órdenes.
  */
 object SendaAssistant {
 
-    /** Identificador guardado en assistant_provider. */
+    /** Identificador guardado en assistant_provider para ChatGPT con el plan. */
     const val PROVIDER_ID = "chatgpt_plan"
 
-    /** Con sesión de ChatGPT, modelo elegido y aviso de privacidad aceptado. */
-    fun isConfigured(prefs: PreferencesManager): Boolean =
-        prefs.assistantProvider == PROVIDER_ID && prefs.assistantModel.isNotBlank() &&
-            prefs.assistantPrivacyAccepted && ChatGptPlanAuth.isSignedIn(prefs)
+    /** IA con clave de API elegida, o null si se usa ChatGPT (o nada). */
+    fun apiProvider(prefs: PreferencesManager): ApiProvider? = ApiProvider.byId(prefs.assistantProvider)
+
+    /** IA elegida, con su credencial, modelo y aviso de privacidad aceptado. */
+    fun isConfigured(prefs: PreferencesManager): Boolean {
+        if (prefs.assistantModel.isBlank() || !prefs.assistantPrivacyAccepted) return false
+        val api = apiProvider(prefs)
+        return when {
+            api != null -> prefs.getAssistantKey(api.id).isNotBlank()
+            prefs.assistantProvider == PROVIDER_ID -> ChatGptPlanAuth.isSignedIn(prefs)
+            else -> false
+        }
+    }
 
     /** Adónde viajan los datos. */
-    const val DESTINATION = "api.openai.com"
+    fun destination(prefs: PreferencesManager): String = apiProvider(prefs)?.host ?: CHATGPT_DESTINATION
 
-    fun client(prefs: PreferencesManager): ChatGptPlanClient {
+    const val CHATGPT_DESTINATION = "api.openai.com"
+
+    fun client(prefs: PreferencesManager): AssistantBackend {
         if (!isConfigured(prefs)) throw RemoteAiException(RemoteAiException.Kind.NOT_CONFIGURED)
-        return ChatGptPlanClient(prefs)
+        val api = apiProvider(prefs)
+        return api?.client(prefs.getAssistantKey(api.id)) ?: ChatGptPlanClient(prefs)
     }
 
     /** Instrucciones en el idioma de la interfaz; el modelo responde en el idioma del usuario. */
