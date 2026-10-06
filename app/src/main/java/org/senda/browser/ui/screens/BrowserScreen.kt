@@ -423,8 +423,12 @@ fun BrowserScreen(
         ) {
             org.senda.browser.core.cast.SendaTvPlayer.autoStart(activeTab, prefs.tvVideoOnTv)
         }
-        org.senda.browser.core.cast.SendaTvPlayer.playback?.let { playback ->
-            org.senda.browser.ui.components.TvPresentationHost(playback)
+        val tvPlayback = org.senda.browser.core.cast.SendaTvPlayer.playback
+        if (tvPlayback != null) {
+            org.senda.browser.ui.components.TvPresentationHost(tvPlayback)
+        } else if (org.senda.browser.core.cast.SendaTvMode.tvConnected && prefs.tvVideoOnTv) {
+            // Sin video: la página que se ve en el teléfono, en formato TV
+            org.senda.browser.ui.components.TvPageHost(url = activeTab?.url, isPrivate = activeTab?.isPrivate == true)
         }
 
         // Transmitir con la TV ya conectada: el video de la TV y «Desconectar TV»
