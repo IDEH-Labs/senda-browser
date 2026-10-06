@@ -36,7 +36,6 @@ import org.senda.browser.core.PreferencesManager
 import org.senda.browser.core.ToolbarPosition
 import org.senda.browser.ui.components.BookmarksManagerDialog
 import org.senda.browser.ui.components.CastDialog
-import org.senda.browser.ui.components.TvVideoPlayer
 import org.senda.browser.ui.components.ClearBrowsingDataDialog
 import org.senda.browser.ui.components.DevToolsSheet
 import org.senda.browser.ui.components.DownloadsManagerDialog
@@ -366,6 +365,14 @@ fun BrowserScreen(
                     }
                 }
 
+                // Video en la TV: el teléfono sigue normal; desde aquí se pausa o se vuelve a ver en el teléfono
+                val tvPlayback = org.senda.browser.core.cast.SendaTvPlayer.playback
+                if (tvPlayback != null) {
+                    org.senda.browser.ui.components.TvNowPlayingBar(
+                        playback = tvPlayback,
+                        modifier = Modifier.align(Alignment.BottomCenter)
+                    )
+                }
             }
         }
 
@@ -409,16 +416,16 @@ fun BrowserScreen(
             org.senda.browser.ui.components.SendaAssistantSheet(prefs = prefs, activeTab = activeTab, onDismiss = { showAssistant = false })
         }
 
-        // El reproductor de TV solo se activa si el usuario habilitó explícitamente el modo TV en horizontal en ajustes
-        LaunchedEffect(org.senda.browser.core.cast.SendaTvMode.tvConnected, activeTab?.isMediaPlaying, activeTab?.url, prefs.tvModeEnabled, prefs.tvModeLandscape) {
-            if (prefs.tvModeEnabled && prefs.tvModeLandscape) {
-                org.senda.browser.core.cast.SendaTvPlayer.maybeStart(activeTab)
-            }
+        // Duplicando en una TV: el video que suena pasa a la TV como pantalla secundaria (el teléfono no cambia)
+        LaunchedEffect(
+            org.senda.browser.core.cast.SendaTvMode.tvConnected,
+            activeTab?.url,
+            org.senda.browser.core.cast.SendaMediaCatalog.version
+        ) {
+            org.senda.browser.core.cast.SendaTvPlayer.autoStart(activeTab, prefs.tvVideoOnTv)
         }
-        if (prefs.tvModeEnabled && prefs.tvModeLandscape) {
-            org.senda.browser.core.cast.SendaTvPlayer.playback?.let { playback ->
-                TvVideoPlayer(playback)
-            }
+        org.senda.browser.core.cast.SendaTvPlayer.playback?.let { playback ->
+            org.senda.browser.ui.components.TvPresentationHost(playback)
         }
 
         // Diálogo de transmisión: video directo a la TV (DLNA) o duplicar la pantalla (Miracast)

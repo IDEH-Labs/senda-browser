@@ -35,7 +35,10 @@ class SendaCastRelay private constructor(
     @Volatile private var closed = false
 
     private val baseUrl: String
-        get() = "http://${server.inetAddress.hostAddress}:${server.localPort}/$secret/"
+        get() {
+            val host = server.inetAddress.hostAddress?.substringBefore('%') ?: "127.0.0.1"
+            return "http://${if (server.inetAddress is java.net.Inet6Address) "[$host]" else host}:${server.localPort}/$secret/"
+        }
 
     /** Dirección local que se le da a la TV para [original]. */
     fun urlFor(original: String): String {
@@ -221,10 +224,11 @@ class SendaCastRelay private constructor(
 
         /**
          * Abre el relé en la interfaz de red por la que se llega a [tvAddress] (el Wi‑Fi de la casa), en un puerto libre.
-         * Debe llamarse fuera del hilo principal.
+         * Con una TV debe llamarse fuera del hilo principal; con [tvAddress] 127.0.0.1 (reproductor del teléfono) no.
          */
         fun open(tvAddress: InetAddress, referer: String?, proxy: Proxy): SendaCastRelay {
-            val local = java.net.DatagramSocket().use { probe ->
+            // Para el reproductor del propio teléfono basta 127.0.0.1 (y así no hay red en el hilo principal)
+            val local = if (tvAddress.isLoopbackAddress) tvAddress else java.net.DatagramSocket().use { probe ->
                 // Sin enviar nada: solo pregunta al sistema qué IP propia usaría para hablar con la TV
                 probe.connect(tvAddress, 1900)
                 probe.localAddress

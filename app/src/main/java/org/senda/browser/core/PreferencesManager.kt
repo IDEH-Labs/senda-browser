@@ -236,20 +236,14 @@ class PreferencesManager(context: Context) {
         get() = prefs.getBoolean("show_cast_button", true)
         set(value) = prefs.edit().putBoolean("show_cast_button", value).apply()
 
-    // Modo TV: adaptar todo el teléfono mientras se duplica la pantalla en una TV
-    // Por defecto desactivado para respetar la orientación natural del celular y no secuestrar la pantalla
-    var tvModeEnabled: Boolean
-        get() = prefs.getBoolean("tv_mode_enabled_v2", false)
-        set(value) = prefs.edit().putBoolean("tv_mode_enabled_v2", value).apply()
-
-    var tvModeLandscape: Boolean
-        get() = prefs.getBoolean("tv_mode_landscape_v2", false)
-        set(value) = prefs.edit().putBoolean("tv_mode_landscape_v2", value).apply()
-
-    /** Modo TV a la resolución de la TV (1080p): más nítido, pero el teléfono pierde imágenes al dibujarlo. */
-    var tvModeSharp: Boolean
-        get() = prefs.getBoolean("tv_mode_sharp", false)
-        set(value) = prefs.edit().putBoolean("tv_mode_sharp", value).apply()
+    /**
+     * Mientras se duplica la pantalla en una TV, el video que suena en Senda se ve en la TV a pantalla completa y en
+     * su formato (pantalla secundaria); el teléfono no cambia. Las claves tv_mode_* de versiones anteriores
+     * (adaptaban el propio teléfono) ya no se usan.
+     */
+    var tvVideoOnTv: Boolean
+        get() = prefs.getBoolean("tv_video_on_tv", true)
+        set(value) = prefs.edit().putBoolean("tv_video_on_tv", value).apply()
 
     var toolbarFullWidth: Boolean
         get() = prefs.getBoolean("toolbar_full_width", true)

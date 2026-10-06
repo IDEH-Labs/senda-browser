@@ -59,7 +59,6 @@ fun CastDialog(
     val context = LocalContext.current
     val cast = org.senda.browser.core.cast.SendaUnifiedCast
     val currentUrl = activeTab?.url ?: "about:blank"
-    val canDrawOverlay = remember { org.senda.browser.core.cast.SendaTvMode.canDrawOverlay(context) }
     // Video que se puede enviar: el archivo real que descargó la página, nunca la dirección de la página
     val media = remember(currentUrl) { org.senda.browser.core.cast.SendaMediaCatalog.bestFor(currentUrl) }
     val isYouTube = remember(currentUrl) { org.senda.browser.core.cast.SendaYouTube.youTubeVideoId(currentUrl) != null }
@@ -103,18 +102,6 @@ fun CastDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // Primero: con el teléfono en horizontal el diálogo es bajo y esta salida no debe quedar oculta
-                if (org.senda.browser.core.cast.SendaTvMode.active) {
-                    CastActionCard(
-                        icon = Icons.Default.StayCurrentPortrait,
-                        title = strings.cast_normal_screen,
-                        subtitle = strings.cast_normal_screen_sub,
-                        onClick = {
-                            org.senda.browser.core.cast.SendaTvMode.restoreNow()
-                            onDismiss()
-                        }
-                    )
-                }
                 cast.activePlayback?.let { playback -> CastControls(playback) }
 
                 // 1. El video, directo al reproductor de la TV (DLNA)
@@ -165,50 +152,19 @@ fun CastDialog(
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp))
 
-                // 2. Todo el teléfono por Miracast, con el modo TV (horizontal, 16:9, 60 Hz) para que llene la TV.
-                // Android solo deja conectar Miracast desde su propio menú (CONFIGURE_WIFI_DISPLAY es de sistema)
+                // 2. Todo el teléfono por Miracast. Android solo deja conectar desde su propio menú
+                // (CONFIGURE_WIFI_DISPLAY es de sistema). El teléfono no cambia: los videos de Senda pasan solos a la
+                // TV a pantalla completa (SendaTvPlayer)
                 SectionHeader(strings.cast_mirror_header, null)
                 CastActionCard(
                     icon = Icons.Default.ScreenShare,
                     title = strings.cast_mirror_header,
                     subtitle = strings.cast_mirror_sub,
                     onClick = {
-                        // La pantalla del teléfono no se toca: solo con el modo TV activado en Ajustes se adapta a la TV
-                        val tvMode = org.senda.browser.core.PreferencesManager(context).tvModeEnabled
-                        fun startMirroring() {
-                            if (tvMode) {
-                                org.senda.browser.core.cast.SendaTvMode.evaluate()
-                                org.senda.browser.core.cast.SendaTvMode.awaitTv()
-                            }
-                            CastHelper.openSystemCast(context)
-                        }
-                        // Sin permiso de notificaciones Android oculta la del modo TV y su botón «Pantalla normal»
-                        val requester = BrowserTab.androidPermissionRequester
-                        if (tvMode && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU && requester != null) {
-                            requester(listOf(android.Manifest.permission.POST_NOTIFICATIONS)) { startMirroring() }
-                        } else {
-                            startMirroring()
-                        }
+                        CastHelper.openSystemCast(context)
                         onDismiss()
                     }
                 )
-                if (!canDrawOverlay && org.senda.browser.core.PreferencesManager(context).tvModeEnabled) {
-                    CastActionCard(
-                        icon = Icons.Default.Fullscreen,
-                        title = strings.cast_mirror_overlay_needed,
-                        subtitle = "",
-                        onClick = {
-                            try {
-                                context.startActivity(
-                                    Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, android.net.Uri.parse("package:${context.packageName}"))
-                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                )
-                            } catch (_: Exception) {
-                            }
-                            onDismiss()
-                        }
-                    )
-                }
             }
         },
         confirmButton = {
