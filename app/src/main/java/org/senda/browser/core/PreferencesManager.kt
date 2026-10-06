@@ -237,8 +237,8 @@ class PreferencesManager(context: Context) {
         set(value) = prefs.edit().putBoolean("show_cast_button", value).apply()
 
     /**
-     * Mientras se duplica la pantalla en una TV, el video que suena en Senda se ve en la TV a pantalla completa y en
-     * su formato (pantalla secundaria); el teléfono no cambia. Las claves tv_mode_* de versiones anteriores
+     * Mientras se duplica la pantalla en una TV, la página y los videos de Senda se ven en la TV a pantalla completa
+     * y en su formato (pantalla secundaria); el teléfono no cambia. Las claves tv_mode_* de versiones anteriores
      * (adaptaban el propio teléfono) ya no se usan.
      */
     var tvVideoOnTv: Boolean
