@@ -64,56 +64,67 @@ fun TvPresentationHost(playback: SendaTvPlayer.Playback) {
     }
 }
 
-/** Barra del teléfono mientras el video está en la TV: pausa y volver a verlo en el teléfono. */
+/**
+ * Barra del modo TV, siempre visible mientras hay una TV conectada: a qué TV y, con un video en la TV, su título,
+ * pausa y «Ver en el teléfono».
+ */
 @Composable
-fun TvNowPlayingBar(playback: SendaTvPlayer.Playback, modifier: Modifier = Modifier) {
+fun TvStatusBar(playback: SendaTvPlayer.Playback?, modifier: Modifier = Modifier) {
     val strings = org.senda.browser.core.LocalSendaStrings.current
+    val tvName = SendaTvMode.tvName ?: ""
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = 12.dp, vertical = 6.dp),
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.primaryContainer,
         tonalElevation = 4.dp
     ) {
         Row(
-            modifier = Modifier.padding(start = 14.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+            modifier = Modifier
+                .heightIn(min = 52.dp)
+                .padding(start = 14.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(Icons.Default.Tv, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Text(
-                    text = strings.cast_on_tv,
+                    text = if (playback != null) strings.cast_on_tv.replace("{tv}", tvName)
+                    else strings.cast_connected_to.replace("{tv}", tvName),
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
                 Text(
-                    text = playback.tab.title,
+                    text = playback?.tab?.title ?: strings.cast_videos_go_to_tv,
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             }
-            val paused = SendaTvPlayer.paused
-            IconButton(onClick = {
-                val controls = SendaTvPlayer.controls ?: return@IconButton
-                if (paused) controls.play() else controls.pause()
-            }) {
-                Icon(
-                    if (paused) Icons.Default.PlayArrow else Icons.Default.Pause,
-                    contentDescription = if (paused) strings.cast_resume else strings.cast_pause,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            }
-            IconButton(onClick = { SendaTvPlayer.requestReturn?.invoke() }) {
-                Icon(
-                    Icons.Default.PhoneAndroid,
-                    contentDescription = strings.cast_back_to_phone,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer
-                )
+            if (playback != null) {
+                val paused = SendaTvPlayer.paused
+                IconButton(onClick = {
+                    val controls = SendaTvPlayer.controls ?: return@IconButton
+                    if (paused) controls.play() else controls.pause()
+                }) {
+                    Icon(
+                        if (paused) Icons.Default.PlayArrow else Icons.Default.Pause,
+                        contentDescription = if (paused) strings.cast_resume else strings.cast_pause,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+                IconButton(onClick = { SendaTvPlayer.requestReturn?.invoke() }) {
+                    Icon(
+                        Icons.Default.PhoneAndroid,
+                        contentDescription = strings.cast_back_to_phone,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
             }
         }
     }
