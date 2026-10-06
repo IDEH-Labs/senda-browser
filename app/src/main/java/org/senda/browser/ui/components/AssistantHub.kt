@@ -4,9 +4,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Psychology
@@ -18,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -139,47 +142,16 @@ fun AssistantHubDialog(
         title = { Text(strings.as_settings_title) },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(strings.as_hub_intro, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(strings.as_hub_intro, fontSize = 13.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-                // ChatGPT: siempre primero
-                if (SendaAssistant.PROVIDER_ID in connected) {
-                    AiCard(
-                        prefs, SendaAssistant.PROVIDER_ID, ready(SendaAssistant.PROVIDER_ID), working,
-                        status = strings.as_conn_plan.format(ChatGptPlanAuth.email(prefs) ?: "ChatGPT"),
-                        onUse = {
-                            when {
-                                !prefs.assistantConsentFor(SendaAssistant.PROVIDER_ID) -> consentFor = SendaAssistant.PROVIDER_ID
-                                prefs.assistantModelFor(SendaAssistant.PROVIDER_ID).isBlank() -> finishConnecting(SendaAssistant.PROVIDER_ID)
-                                else -> { SendaAssistant.use(prefs, SendaAssistant.PROVIDER_ID); revision++ }
-                            }
-                        },
-                        onChangeModel = { modelPickerFor = SendaAssistant.PROVIDER_ID },
-                        onDisconnect = { SendaAssistant.disconnect(prefs, SendaAssistant.PROVIDER_ID); revision++ }
-                    )
-                } else {
-                    Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)) {
-                        Column(Modifier.fillMaxWidth().padding(12.dp)) {
-                            // Botón «Continue with ChatGPT» con el logo, como piden las pautas de OpenAI
-                            Button(
-                                enabled = !working && signIn !is ChatGptPlanAuth.SignInState.Waiting,
-                                onClick = { consentFor = SendaAssistant.PROVIDER_ID },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                ChatGptLogo(18)
-                                Spacer(Modifier.width(8.dp))
-                                Text(strings.as_chatgpt_continue)
-                            }
-                            Text(strings.as_chatgpt_plan_note, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
-                            CapabilityRow(SendaAssistant.PROVIDER_ID)
-                        }
-                    }
-                }
-
-                // Las conectadas con clave
-                connected.filter { it != SendaAssistant.PROVIDER_ID }.forEach { id ->
+                // Orden: la que responde ahora, luego las demás conectadas (ChatGPT antes que las de clave)
+                val inUse = connected.filter { ready(it) }
+                val others = connected.filterNot { ready(it) }
+                fun cardFor(id: String) = @Composable {
                     AiCard(
                         prefs, id, ready(id), working,
-                        status = strings.as_conn_key,
+                        connection = if (id == SendaAssistant.PROVIDER_ID)
+                            strings.as_conn_plan.format(ChatGptPlanAuth.email(prefs) ?: "ChatGPT") else strings.as_conn_key,
                         onUse = {
                             when {
                                 !prefs.assistantConsentFor(id) -> consentFor = id
@@ -190,6 +162,20 @@ fun AssistantHubDialog(
                         onChangeModel = { modelPickerFor = id },
                         onDisconnect = { SendaAssistant.disconnect(prefs, id); revision++ }
                     )
+                }
+                if (inUse.isNotEmpty()) {
+                    SectionTitle(strings.as_section_in_use)
+                    inUse.forEach { cardFor(it)() }
+                }
+                if (others.isNotEmpty() || SendaAssistant.PROVIDER_ID !in connected) {
+                    SectionTitle(if (inUse.isEmpty()) strings.as_section_choose else strings.as_section_others)
+                    others.forEach { cardFor(it)() }
+                    if (SendaAssistant.PROVIDER_ID !in connected) {
+                        ChatGptConnectCard(
+                            enabled = !working && signIn !is ChatGptPlanAuth.SignInState.Waiting,
+                            onConnect = { consentFor = SendaAssistant.PROVIDER_ID }
+                        )
+                    }
                 }
 
                 status?.let {
@@ -202,11 +188,66 @@ fun AssistantHubDialog(
                     }
                 }
 
-                TextButton(onClick = { showAdd = true }, enabled = !working) { Text(strings.as_add_ai) }
+                SectionTitle(strings.as_add_ai)
+                OutlinedCard(
+                    onClick = { showAdd = true }, enabled = !working,
+                    shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(10.dp))
+                        Text(strings.as_add_ai_sub, fontSize = 12.sp, lineHeight = 17.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text(strings.general_close) } }
     )
+}
+
+@Composable
+private fun SectionTitle(text: String) {
+    Text(
+        text.uppercase(), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp,
+        color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 6.dp)
+    )
+}
+
+/** Marca de cada IA: el logo de ChatGPT (obligatorio en sus pautas) o la inicial en un círculo. */
+@Composable
+private fun AiMark(id: String) {
+    if (id == SendaAssistant.PROVIDER_ID) {
+        ChatGptLogo(28)
+    } else {
+        Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.size(28.dp)) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(SendaAssistant.displayName(id).take(1), fontWeight = FontWeight.Bold, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSecondaryContainer)
+            }
+        }
+    }
+}
+
+/**
+ * Cabecera común: marca, nombre y cómo está conectada (una línea cada uno; lo largo se corta con «…») y, a la
+ * derecha, «✓ En uso» si es la que responde.
+ */
+@Composable
+private fun AiHeader(id: String, connection: String, inUse: Boolean = false) {
+    val strings = LocalSendaStrings.current
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        AiMark(id)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(SendaAssistant.displayName(id), fontWeight = FontWeight.SemiBold, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(connection, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        if (inUse) {
+            Spacer(Modifier.width(8.dp))
+            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(4.dp))
+            Text(strings.as_in_use, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold, maxLines = 1)
+        }
+    }
 }
 
 @Composable
@@ -215,7 +256,7 @@ private fun AiCard(
     id: String,
     inUse: Boolean,
     working: Boolean,
-    status: String,
+    connection: String,
     onUse: () -> Unit,
     onChangeModel: () -> Unit,
     onDisconnect: () -> Unit
@@ -223,57 +264,79 @@ private fun AiCard(
     val strings = LocalSendaStrings.current
     val model = prefs.assistantModelFor(id)
     Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = if (inUse) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        shape = RoundedCornerShape(16.dp),
+        color = if (inUse) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+        border = if (inUse) androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)) else null
     ) {
-        Column(Modifier.fillMaxWidth().padding(12.dp)) {
+        Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            AiHeader(id, connection, inUse)
+            CapabilityPills(id)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (id == SendaAssistant.PROVIDER_ID) { ChatGptLogo(20); Spacer(Modifier.width(8.dp)) }
-                Column(Modifier.weight(1f)) {
-                    Text(SendaAssistant.displayName(id), fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
-                    Text(status, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(strings.as_model_label, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    model.ifBlank { strings.as_model_pending },
+                    fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f)
+                )
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+            // Acciones secundarias en su fila; la principal («Usar»), ancha y al final
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = onChangeModel, enabled = !working, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                    Text(strings.as_change_model, fontSize = 13.sp, maxLines = 1)
                 }
-                if (inUse) {
-                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text(strings.as_in_use, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
-                } else {
-                    FilledTonalButton(onClick = onUse, enabled = !working) { Text(strings.as_use) }
+                Spacer(Modifier.weight(1f))
+                TextButton(onClick = onDisconnect, enabled = !working, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                    Text(strings.as_disconnect, fontSize = 13.sp, color = MaterialTheme.colorScheme.error, maxLines = 1)
                 }
             }
-            CapabilityRow(id)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    if (model.isBlank()) strings.as_model_pending else strings.as_model_line.format(model),
-                    fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f)
-                )
-                TextButton(onClick = onChangeModel, enabled = !working, contentPadding = PaddingValues(horizontal = 6.dp)) {
-                    Text(strings.as_change_model, fontSize = 12.sp)
-                }
-                TextButton(onClick = onDisconnect, enabled = !working, contentPadding = PaddingValues(horizontal = 6.dp)) {
-                    Text(strings.as_disconnect, fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
-                }
+            if (!inUse) {
+                FilledTonalButton(onClick = onUse, enabled = !working, modifier = Modifier.fillMaxWidth()) { Text(strings.as_use) }
             }
         }
     }
 }
 
-/** Iconos de lo que esa IA tiene comprobado en Senda; lo demás no se muestra. */
+/** ChatGPT aún sin conectar: la misma tarjeta, con el botón oficial «Continuar con ChatGPT». */
 @Composable
-private fun CapabilityRow(id: String) {
+private fun ChatGptConnectCard(enabled: Boolean, onConnect: () -> Unit) {
+    val strings = LocalSendaStrings.current
+    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)) {
+        Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            AiHeader(SendaAssistant.PROVIDER_ID, strings.as_conn_plan_offer)
+            CapabilityPills(SendaAssistant.PROVIDER_ID)
+            // Botón «Continue with ChatGPT» con el logo, como piden las pautas de OpenAI
+            Button(enabled = enabled, onClick = onConnect, modifier = Modifier.fillMaxWidth()) {
+                ChatGptLogo(18)
+                Spacer(Modifier.width(8.dp))
+                Text(strings.as_chatgpt_continue)
+            }
+        }
+    }
+}
+
+/** Etiquetas de lo que esa IA tiene comprobado en Senda (bajan de línea si no caben); lo demás no se muestra. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun CapabilityPills(id: String) {
     val strings = LocalSendaStrings.current
     val caps = SendaAssistant.capabilities(id)
-    val items = listOfNotNull(
+    val items: List<Pair<ImageVector?, String>> = listOfNotNull(
         (Icons.Default.Search to strings.as_cap_search).takeIf { caps.searchWeb },
         (Icons.Default.AttachFile to strings.as_cap_attach).takeIf { caps.attach },
         (Icons.Default.Psychology to strings.as_deep).takeIf { caps.thinkDeep }
     ).ifEmpty { listOf(null to strings.as_cap_text_only) }
-    Row(modifier = Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         items.forEach { (icon, label) ->
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                (icon as ImageVector?)?.let { Icon(it, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) }
-                Spacer(Modifier.width(3.dp))
-                Text(label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f)) {
+                Row(Modifier.padding(horizontal = 10.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    icon?.let {
+                        Icon(it, contentDescription = null, modifier = Modifier.size(13.dp), tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                        Spacer(Modifier.width(4.dp))
+                    }
+                    Text(label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSecondaryContainer, maxLines = 1)
+                }
             }
         }
     }
@@ -371,7 +434,7 @@ private fun AddApiAiDialog(prefs: PreferencesManager, onDismiss: () -> Unit) {
                         RadioButton(selected = p == provider, onClick = { provider = p; status = null })
                         Column {
                             Text(p.displayName, fontSize = 14.sp)
-                            CapabilityRow(p.id)
+                            CapabilityPills(p.id)
                         }
                     }
                 }
