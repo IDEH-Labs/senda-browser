@@ -102,6 +102,10 @@ fun CastDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                // Modo TV (duplicando): sus controles y «Desconectar TV» van primero
+                if (org.senda.browser.core.cast.SendaTvMode.tvConnected) {
+                    TvControlsCard(onDone = onDismiss)
+                }
                 cast.activePlayback?.let { playback -> CastControls(playback) }
 
                 // 1. El video, directo al reproductor de la TV (DLNA)

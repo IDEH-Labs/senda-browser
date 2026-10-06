@@ -17,6 +17,7 @@ import android.widget.VideoView
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CastConnected
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.PlayArrow
@@ -65,65 +66,79 @@ fun TvPresentationHost(playback: SendaTvPlayer.Playback) {
 }
 
 /**
- * Barra del modo TV, siempre visible mientras hay una TV conectada: a qué TV y, con un video en la TV, su título,
- * pausa y «Ver en el teléfono».
+ * Modo TV dentro del diálogo de transmisión: a qué TV está conectado, el video que se ve en ella (pausa y «Ver en
+ * el teléfono») y «Desconectar TV». Fuera de aquí no hay nada fijo en pantalla: el botón de transmitir en color
+ * indica que la TV está conectada.
  */
 @Composable
-fun TvStatusBar(playback: SendaTvPlayer.Playback?, modifier: Modifier = Modifier) {
+fun TvControlsCard(onDone: () -> Unit) {
     val strings = org.senda.browser.core.LocalSendaStrings.current
+    val context = LocalContext.current
     val tvName = SendaTvMode.tvName ?: ""
+    val playback = SendaTvPlayer.playback
     Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.primaryContainer,
-        tonalElevation = 4.dp
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.primaryContainer
     ) {
-        Row(
-            modifier = Modifier
-                .heightIn(min = 52.dp)
-                .padding(start = 14.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(Icons.Default.Tv, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
-            Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text = if (playback != null) strings.cast_on_tv.replace("{tv}", tvName)
-                    else strings.cast_connected_to.replace("{tv}", tvName),
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-                Text(
-                    text = playback?.tab?.title ?: strings.cast_videos_go_to_tv,
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            }
-            if (playback != null) {
-                val paused = SendaTvPlayer.paused
-                IconButton(onClick = {
-                    val controls = SendaTvPlayer.controls ?: return@IconButton
-                    if (paused) controls.play() else controls.pause()
-                }) {
-                    Icon(
-                        if (paused) Icons.Default.PlayArrow else Icons.Default.Pause,
-                        contentDescription = if (paused) strings.cast_resume else strings.cast_pause,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Tv, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = strings.cast_connected_to.replace("{tv}", tvName),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Text(
+                        text = playback?.tab?.title ?: strings.cast_videos_go_to_tv,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 }
-                IconButton(onClick = { SendaTvPlayer.requestReturn?.invoke() }) {
-                    Icon(
-                        Icons.Default.PhoneAndroid,
-                        contentDescription = strings.cast_back_to_phone,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (playback != null) {
+                    val paused = SendaTvPlayer.paused
+                    IconButton(onClick = {
+                        val controls = SendaTvPlayer.controls ?: return@IconButton
+                        if (paused) controls.play() else controls.pause()
+                    }) {
+                        Icon(
+                            if (paused) Icons.Default.PlayArrow else Icons.Default.Pause,
+                            contentDescription = if (paused) strings.cast_resume else strings.cast_pause,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                    IconButton(onClick = {
+                        SendaTvPlayer.requestReturn?.invoke()
+                        onDone()
+                    }) {
+                        Icon(
+                            Icons.Default.PhoneAndroid,
+                            contentDescription = strings.cast_back_to_phone,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                    Spacer(Modifier.weight(1f))
+                }
+                FilledTonalButton(onClick = {
+                    SendaTvMode.disconnect(context)
+                    onDone()
+                }) {
+                    Icon(Icons.Default.CastConnected, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(strings.cast_disconnect_tv)
                 }
             }
         }
