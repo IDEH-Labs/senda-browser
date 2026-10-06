@@ -189,7 +189,16 @@ fun BrowserScreen(
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
             bottomBar = {
-                if (!isFullScreen && !showTabsSheet && (toolbarPos == ToolbarPosition.BOTTOM || toolbarPos == ToolbarPosition.FLOATING)) {
+                Column {
+                val toolbarAtBottom = toolbarPos == ToolbarPosition.BOTTOM || toolbarPos == ToolbarPosition.FLOATING
+                // Modo TV: mientras haya una TV conectada la barra está siempre, en su propio espacio (no tapa la página)
+                if (org.senda.browser.core.cast.SendaTvMode.tvConnected && prefs.tvVideoOnTv && !isFullScreen && !showTabsSheet) {
+                    org.senda.browser.ui.components.TvStatusBar(
+                        playback = org.senda.browser.core.cast.SendaTvPlayer.playback,
+                        modifier = if (toolbarAtBottom) Modifier else Modifier.navigationBarsPadding()
+                    )
+                }
+                if (!isFullScreen && !showTabsSheet && toolbarAtBottom) {
                     SendaToolbar(
                         activeTab = activeTab,
                         tabsCount = tabs.size,
@@ -232,6 +241,7 @@ fun BrowserScreen(
                         onCloseCurrentTab = { if (activeTab != null) onCloseTab(activeTab) },
                         onCloseAllTabs = onCloseAllTabs
                     )
+                }
                 }
             },
             contentWindowInsets = if (isFullScreen || showTabsSheet) WindowInsets(0, 0, 0, 0) else ScaffoldDefaults.contentWindowInsets,
@@ -365,14 +375,6 @@ fun BrowserScreen(
                     }
                 }
 
-                // Video en la TV: el teléfono sigue normal; desde aquí se pausa o se vuelve a ver en el teléfono
-                val tvPlayback = org.senda.browser.core.cast.SendaTvPlayer.playback
-                if (tvPlayback != null) {
-                    org.senda.browser.ui.components.TvNowPlayingBar(
-                        playback = tvPlayback,
-                        modifier = Modifier.align(Alignment.BottomCenter)
-                    )
-                }
             }
         }
 

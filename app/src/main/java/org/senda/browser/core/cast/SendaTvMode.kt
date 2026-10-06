@@ -43,9 +43,15 @@ object SendaTvMode {
         evaluate()
     }
 
+    /** Nombre de la TV conectada, sin el sufijo de Miracast («[R1]»). */
+    var tvName by mutableStateOf<String?>(null)
+        private set
+
     fun evaluate() {
         if (!::appContext.isInitialized) return
-        tvConnected = tvDisplay() != null
+        val tv = tvDisplay()
+        tvConnected = tv != null
+        tvName = tv?.name?.replace(Regex("\\[R\\d+]$"), "")?.trim()
     }
 
     /** Pantalla de la TV en la que Senda puede mostrar contenido propio (null si no hay TV conectada). */
