@@ -148,15 +148,6 @@ fun TvControlsCard(onDone: () -> Unit) {
                     }
                 }
                 Spacer(Modifier.weight(1f))
-                // Modo TV aplicado: devolver el teléfono a la normalidad aunque la TV siga conectada
-                if (SendaTvMode.adapted) {
-                    TextButton(onClick = {
-                        SendaTvMode.restoreNow()
-                        onDone()
-                    }) {
-                        Text(strings.cast_normal_screen, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                    }
-                }
                 FilledTonalButton(onClick = {
                     SendaTvMode.disconnect(context)
                     onDone()
