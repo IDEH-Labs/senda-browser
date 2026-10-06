@@ -41,9 +41,13 @@ class RemoteAiException(val kind: Kind, detail: String = "") : Exception(detail)
  * (herramienta web_search, con fuentes), fotos (input_image), PDF (input_file) y razonamiento alto funcionan; crear
  * imágenes no: OpenAI responde «subscription_sharing_unsupported_capability» ('image_generation' is not supported).
  */
-class ChatGptPlanClient(private val prefs: org.senda.browser.core.PreferencesManager) {
+class ChatGptPlanClient(private val prefs: org.senda.browser.core.PreferencesManager) : AssistantBackend {
 
-    suspend fun listModels(): List<String> = withContext(Dispatchers.IO) {
+    override val canSearchWeb = true
+    override val canAttach = true
+    override val canThinkDeep = true
+
+    override suspend fun listModels(): List<String> = withContext(Dispatchers.IO) {
         val conn = open("$BASE/models", ChatGptPlanAuth.accessToken(prefs)).apply { requestMethod = "GET" }
         try {
             val body = readOrThrow(conn)
@@ -60,7 +64,7 @@ class ChatGptPlanClient(private val prefs: org.senda.browser.core.PreferencesMan
      * Respuesta completa; [onDelta] recibe el texto acumulado mientras llega. [deep]: razonamiento alto (más lento y
      * cuidadoso). La búsqueda en internet está siempre disponible: el modelo decide cuándo usarla.
      */
-    suspend fun chat(
+    override suspend fun chat(
         model: String,
         system: String,
         turns: List<ChatTurn>,
