@@ -179,8 +179,25 @@ fun BrowserScreen(
     // Una sola función: sin TV, el botón abre el panel de Android para elegirla (solo el sistema puede conectar);
     // con TV, sus controles. Los videos pasan solos a la TV
     val openCast: () -> Unit = {
-        if (org.senda.browser.core.cast.SendaTvMode.tvConnected) showCastDialog = true
-        else org.senda.browser.ui.components.CastHelper.openSystemCast(context)
+        if (org.senda.browser.core.cast.SendaTvMode.tvConnected) {
+            showCastDialog = true
+        } else if (prefs.tvModeEnabled) {
+            fun startMirroring() {
+                org.senda.browser.core.cast.SendaTvMode.evaluate()
+                // Que Android no congele Senda mientras se elige la TV: el modo TV se aplica al conectar
+                org.senda.browser.core.cast.SendaTvMode.awaitTv()
+                org.senda.browser.ui.components.CastHelper.openSystemCast(context)
+            }
+            // Sin permiso de notificaciones Android oculta la del modo TV y su botón «Pantalla normal»
+            val requester = org.senda.browser.ui.model.BrowserTab.androidPermissionRequester
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU && requester != null) {
+                requester(listOf(android.Manifest.permission.POST_NOTIFICATIONS)) { startMirroring() }
+            } else {
+                startMirroring()
+            }
+        } else {
+            org.senda.browser.ui.components.CastHelper.openSystemCast(context)
+        }
     }
 
     val toolbarPos = prefs.toolbarPosition
@@ -432,7 +449,8 @@ fun BrowserScreen(
             org.senda.browser.core.cast.SendaMediaCatalog.version,
             foregroundCount
         ) {
-            org.senda.browser.core.cast.SendaTvPlayer.autoStart(activeTab, prefs.tvVideoOnTv)
+            // Con el modo TV la TV ya muestra el teléfono en formato TV: los videos se ven ahí como en el teléfono
+            org.senda.browser.core.cast.SendaTvPlayer.autoStart(activeTab, enabled = !prefs.tvModeEnabled)
         }
         val tvPlayback = org.senda.browser.core.cast.SendaTvPlayer.playback
         if (tvPlayback != null) {
