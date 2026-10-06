@@ -11,8 +11,8 @@ import androidx.compose.runtime.setValue
 
 /**
  * TV conectada por duplicación de pantalla (Miracast, «Enviar pantalla» o HDMI). Android la presenta como una
- * pantalla secundaria: lo que Senda dibuja en ella ([SendaTvPlayer]) se ve en la TV en su formato (16:9, a su
- * resolución) mientras el teléfono sigue exactamente igual.
+ * pantalla secundaria: la TV muestra el teléfono tal cual, salvo los videos de Senda, que se ven en la TV en su
+ * formato (16:9, a su resolución, [SendaTvPlayer]) mientras el teléfono sigue exactamente igual.
  *
  * Antes Senda adaptaba el propio teléfono (horizontal, 16:9, otra resolución y escala) para que el espejo llenara
  * la TV; el usuario no quería que la pantalla del teléfono cambiara al transmitir (2026-10-06).

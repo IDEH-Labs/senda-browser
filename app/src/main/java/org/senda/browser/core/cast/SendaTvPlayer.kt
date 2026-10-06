@@ -72,6 +72,8 @@ object SendaTvPlayer {
 
     // Video que el usuario devolvió al teléfono o que la TV no pudo mostrar: no volver a pasarlo solo
     private var skippedKey: String? = null
+    // Dónde iba en la TV un video que se retiró al salir de Senda: al volver sigue desde ahí
+    private val resumeAt = HashMap<String, Int>()
     private var starting = false
 
     /**
@@ -112,21 +114,23 @@ object SendaTvPlayer {
                 return@pauseMediaAndGetPosition
             }
             paused = false
+            val from = resumeAt.remove(key) ?: start
             playback = if (videoId != null) {
                 val playlist = try { Uri.parse(tab.url).getQueryParameter("list") } catch (_: Exception) { null }
-                Playback.YouTube(tab, videoId, start, playlist?.takeIf { it.isNotBlank() }, tab.mediaDurationSeconds)
+                Playback.YouTube(tab, videoId, from, playlist?.takeIf { it.isNotBlank() }, tab.mediaDurationSeconds)
             } else {
-                Playback.File(tab, media!!, start, tab.mediaDurationSeconds)
+                Playback.File(tab, media!!, from, tab.mediaDurationSeconds)
             }
-            Log.i(TAG, "Video a la TV: $key desde ${start}s")
+            Log.i(TAG, "Video a la TV desde ${from}s")
         }
     }
 
     /**
      * Cierra el video de la TV y lo devuelve a la pestaña. [positionSeconds] y [durationSeconds] son los del
      * reproductor de la TV (null si nunca llegó a reproducir). [userExit]: el usuario lo pidió; no se vuelve a pasar.
+     * [resumeOnPhone]: false al salir de Senda (queda en pausa).
      */
-    fun finish(positionSeconds: Double?, durationSeconds: Double?, userExit: Boolean) {
+    fun finish(positionSeconds: Double?, durationSeconds: Double?, userExit: Boolean, resumeOnPhone: Boolean = true) {
         val current = playback ?: return
         playback = null
         controls = null
@@ -142,10 +146,21 @@ object SendaTvPlayer {
         val sameVideo = durationSeconds != null && current.tabDurationSeconds > 0.0 &&
             kotlin.math.abs(durationSeconds - current.tabDurationSeconds) < 1.5
         if (sameVideo) tab.seekMedia(positionSeconds)
-        tab.resumeMedia()
+        // Al salir de Senda el video no debe sonar en el teléfono mientras se usa otra app
+        if (resumeOnPhone) tab.resumeMedia()
         Log.i(TAG, "Video de vuelta al teléfono en ${positionSeconds.toInt()}s (mismo video: $sameVideo)")
     }
 
     /** Pide al reproductor de la TV que devuelva el video al teléfono (con su posición). */
     var requestReturn: (() -> Unit)? = null
+
+    /**
+     * Senda pasó a segundo plano: la TV vuelve a mostrar el teléfono (otra app, p. ej. Telegram). Se recuerda dónde
+     * iba el video para seguir desde ahí al volver a Senda.
+     */
+    var requestLeave: (() -> Unit)? = null
+
+    internal fun rememberResume(key: String, seconds: Double?) {
+        if (seconds != null && seconds > 1.0) resumeAt[key] = seconds.toInt()
+    }
 }
