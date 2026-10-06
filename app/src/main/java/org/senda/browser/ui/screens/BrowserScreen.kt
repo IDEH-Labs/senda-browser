@@ -138,8 +138,34 @@ fun BrowserScreen(
     }
 
     // Prioridad 3: Interceptar botón atrás si la pestaña actual puede retroceder en su historial web
+    // Salida de emergencia: una página que se vuelve a poner delante al retroceder (redirección o pushState)
+    // dejaba a Senda sin poder cerrarse con Atrás. Si 3 pulsaciones seguidas no retroceden en el historial
+    // de la pestaña, Atrás saca a Senda a segundo plano. Retroceder rápido por páginas reales sí baja la posición
+    var backTrapTabId by remember { mutableStateOf<String?>(null) }
+    var backTrapIndex by remember { mutableIntStateOf(-1) }
+    var backTrapCount by remember { mutableIntStateOf(0) }
+    var backTrapAt by remember { mutableLongStateOf(0L) }
     BackHandler(enabled = activeTab?.isFullScreen != true && !isAddressBarEditing && activeTab?.canGoBack == true) {
-        activeTab?.goBack()
+        val tab = activeTab ?: return@BackHandler
+        val now = android.os.SystemClock.elapsedRealtime()
+        val index = tab.historyIndex
+        if (index >= 0 && tab.id == backTrapTabId && index >= backTrapIndex && now - backTrapAt < 2500L) {
+            backTrapCount++
+        } else {
+            backTrapTabId = tab.id
+            backTrapIndex = index
+            backTrapCount = 1
+        }
+        backTrapAt = now
+        if (backTrapCount >= 3) {
+            android.util.Log.w("SendaBack", "Atrás atrapado en ${tab.url}: Senda pasa a segundo plano")
+            backTrapTabId = null
+            backTrapCount = 0
+            generateSequence(context) { (it as? android.content.ContextWrapper)?.baseContext }
+                .filterIsInstance<android.app.Activity>().firstOrNull()?.moveTaskToBack(true)
+            return@BackHandler
+        }
+        tab.goBack()
     }
 
     // Prioridad 4: pestaña abierta desde un enlace y sin historial propio: cerrarla y volver a la de origen
@@ -395,7 +421,7 @@ fun BrowserScreen(
             }
         }
 
-        // Diálogo de transmisión con Chromecast
+        // Diálogo de transmisión: video directo a la TV (DLNA) o duplicar la pantalla (Miracast)
         if (showCastDialog) {
             CastDialog(
                 activeTab = activeTab,

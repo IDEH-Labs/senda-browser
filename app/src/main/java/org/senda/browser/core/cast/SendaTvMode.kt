@@ -39,7 +39,8 @@ import org.senda.browser.core.PreferencesManager
  *  - 60 Hz en todo el sistema: la TV no muestra más, y componer y codificar 120 imágenes por segundo
  *    es lo que retrasa y entrecorta el duplicado.
  *  - Horizontal: Telegram, la galería o cualquier app se ven ocupando la TV y no como una tira vertical.
- *  - Proporción de la TV (16:9) en vez de la del móvil (20:9): la TV ya no pone franjas negras.
+ *  - Proporción y resolución de la TV (16:9, normalmente 1920×1080) en vez de las del móvil (20:9, p. ej.
+ *    720×1600): la TV no pone franjas negras y recibe una imagen nítida, no 720p estirado.
  *
  * Los dos primeros usan una ventana invisible de 1 px sobre las demás apps (permiso «Mostrar sobre
  * otras apps»). La proporción necesita WRITE_SECURE_SETTINGS, que solo se concede por ADB; sin él se
@@ -52,11 +53,19 @@ object SendaTvMode {
     private const val KEY_FORCED = "forced_size_active"
     private const val KEY_ORIGINAL_W = "original_w"
     private const val KEY_ORIGINAL_H = "original_h"
+    private const val KEY_ORIGINAL_DENSITY = "original_density"
+    // Usuario de Android en el que corre Senda (con USER_CURRENT, -2, Android exige INTERACT_ACROSS_USERS)
+    private val userId: Int
+        get() = android.os.Process.myUid() / 100_000
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private lateinit var appContext: Context
     private var overlay: View? = null
-    private var active = false
+    /** true mientras el teléfono está adaptado a la TV (horizontal, 16:9). */
+    var active by mutableStateOf(false)
+        private set
+    // El usuario pidió la pantalla normal desde la notificación: no se vuelve a adaptar hasta la próxima conexión
+    private var restoredByUser = false
 
     /** true mientras la pantalla del teléfono se duplica en una TV (Miracast, «Enviar pantalla» o HDMI). */
     var tvConnected by mutableStateOf(false)
@@ -100,8 +109,42 @@ object SendaTvMode {
         if (!::appContext.isInitialized) return
         val tv = mirroringDisplay()
         tvConnected = tv != null
+        if (tv == null) restoredByUser = false
         val enabled = PreferencesManager(appContext).tvModeEnabled
-        if (tv != null && enabled) activate(tv) else deactivate()
+        if (tv != null && enabled && !restoredByUser) activate(tv) else deactivate()
+    }
+
+    /**
+     * Devuelve el teléfono a la normalidad aunque la duplicación siga conectada: si la TV se apaga o cambia de
+     * entrada, Android puede mantener la conexión y el teléfono se quedaba en horizontal y 16:9 sin motivo visible.
+     */
+    fun restoreNow() {
+        if (!::appContext.isInitialized) return
+        restoredByUser = true
+        mainHandler.removeCallbacks(stopWaiting)
+        deactivate()
+        appContext.stopService(Intent(appContext, SendaTvModeService::class.java))
+    }
+
+    private val stopWaiting = Runnable {
+        if (!active) appContext.stopService(Intent(appContext, SendaTvModeService::class.java))
+    }
+
+    /**
+     * El usuario va a elegir la TV en el menú de Android: mientras tanto Senda queda en segundo plano y Android
+     * congela su proceso, así que el modo TV no se aplicaba hasta volver a Senda. El servicio se arranca ya
+     * (Senda aún está delante) y mantiene el proceso despierto; si en 2 minutos no se conecta ninguna TV, se detiene.
+     */
+    fun awaitTv() {
+        if (!::appContext.isInitialized) return
+        try {
+            appContext.startForegroundService(Intent(appContext, SendaTvModeService::class.java))
+        } catch (e: Exception) {
+            Log.w(TAG, "No se pudo iniciar el servicio del modo TV: ${e.message}")
+            return
+        }
+        mainHandler.removeCallbacks(stopWaiting)
+        mainHandler.postDelayed(stopWaiting, 120_000L)
     }
 
     private fun mirroringDisplay(): Display? =
@@ -112,8 +155,9 @@ object SendaTvMode {
     private fun activate(tv: Display) {
         val prefs = PreferencesManager(appContext)
         if (active) {
-            // Ya activo: solo reaplicar la orientación por si el usuario cambió el ajuste
+            // Ya activo: reaplicar orientación y resolución por si el usuario cambió los ajustes
             updateOverlay(prefs.tvModeLandscape)
+            forceTvAspect(tv)
             return
         }
         active = true
@@ -206,26 +250,42 @@ object SendaTvMode {
             val initial = Point().also { iface.getMethod("getInitialDisplaySize", Int::class.java, Point::class.java).invoke(wms, Display.DEFAULT_DISPLAY, it) }
             val base = Point().also { iface.getMethod("getBaseDisplaySize", Int::class.java, Point::class.java).invoke(wms, Display.DEFAULT_DISPLAY, it) }
 
-            val tvLong = maxOf(tv.mode.physicalWidth, tv.mode.physicalHeight).toFloat()
-            val tvShort = minOf(tv.mode.physicalWidth, tv.mode.physicalHeight).toFloat()
-            if (tvShort <= 0f) return
-            val aspect = tvLong / tvShort
+            val tvLong = maxOf(tv.mode.physicalWidth, tv.mode.physicalHeight)
+            val tvShort = minOf(tv.mode.physicalWidth, tv.mode.physicalHeight)
+            if (tvShort <= 0) return
+            // Proporción de la TV con el lado corto del móvil (720×1600 → 720×1280): medido el 2026-10-06 en un
+            // moto g34 duplicando en un LG, 0 imágenes perdidas de 943. Con «Máxima nitidez» se dibuja a la
+            // resolución de la TV (1080×1920; Android siempre envía 1920×1080 y así no llega 720p estirado), pero
+            // reducirlo a la pantalla del móvil a la vez cuesta: 6 % de imágenes perdidas (810 px: 4 %, 900 px: 3 %).
+            // En par para el codificador. La densidad cambia en la misma proporción: todo queda del mismo tamaño
             val phoneShort = minOf(initial.x, initial.y)
             val phoneLong = maxOf(initial.x, initial.y)
-            // Lado largo para igualar la TV, en par para el codificador y sin pasar del panel físico
-            val targetLong = ((phoneShort * aspect).toInt() and 1.inv()).coerceAtMost(phoneLong)
-            if (targetLong >= phoneLong - 8) return // el móvil ya tiene la proporción de la TV
-            val (w, h) = if (initial.x < initial.y) phoneShort to targetLong else targetLong to phoneShort
+            val sharp = PreferencesManager(appContext).tvModeSharp
+            val shortSide = (if (sharp) tvShort else phoneShort) and 1.inv()
+            val longSide = (if (sharp) tvLong else (phoneShort.toLong() * tvLong / tvShort).toInt().coerceAtMost(phoneLong)) and 1.inv()
+            if (!sharp && longSide >= phoneLong - 8) {
+                // El móvil ya tiene la proporción de la TV: si quedó un tamaño forzado de antes, se quita
+                restoreDisplaySize()
+                return
+            }
+            val (w, h) = if (initial.x < initial.y) shortSide to longSide else longSide to shortSide
+            if (base.x == w && base.y == h) return
+            val baseDensity = iface.getMethod("getBaseDisplayDensity", Int::class.java).invoke(wms, Display.DEFAULT_DISPLAY) as Int
+            val initialDensity = iface.getMethod("getInitialDisplayDensity", Int::class.java).invoke(wms, Display.DEFAULT_DISPLAY) as Int
+            val density = (baseDensity * shortSide.toFloat() / minOf(base.x, base.y)).toInt()
 
             val state = appContext.getSharedPreferences(STATE_PREFS, Context.MODE_PRIVATE)
             if (!state.getBoolean(KEY_FORCED, false)) {
-                // Guardar el tamaño que tenía el usuario (normalmente el de fábrica) para devolverlo tal cual
+                // Guardar el tamaño y la escala que tenía el usuario (puede tener una propia) para devolverlos tal cual
                 state.edit()
                     .putBoolean(KEY_FORCED, true)
                     .putInt(KEY_ORIGINAL_W, if (base == initial) 0 else base.x)
                     .putInt(KEY_ORIGINAL_H, if (base == initial) 0 else base.y)
+                    .putInt(KEY_ORIGINAL_DENSITY, if (baseDensity == initialDensity) 0 else baseDensity)
                     .commit()
             }
+            iface.getMethod("setForcedDisplayDensityForUser", Int::class.java, Int::class.java, Int::class.java)
+                .invoke(wms, Display.DEFAULT_DISPLAY, density, userId)
             iface.getMethod("setForcedDisplaySize", Int::class.java, Int::class.java, Int::class.java)
                 .invoke(wms, Display.DEFAULT_DISPLAY, w, h)
             Log.i(TAG, "Pantalla adaptada a la TV: ${w}x$h (TV ${tv.mode.physicalWidth}x${tv.mode.physicalHeight})")
@@ -248,7 +308,18 @@ object SendaTvMode {
             } else {
                 iface.getMethod("clearForcedDisplaySize", Int::class.java).invoke(wms, Display.DEFAULT_DISPLAY)
             }
-            state.edit().putBoolean(KEY_FORCED, false).commit()
+            // Versiones anteriores no cambiaban la escala ni la guardaban: entonces no se toca
+            if (state.contains(KEY_ORIGINAL_DENSITY)) {
+                val density = state.getInt(KEY_ORIGINAL_DENSITY, 0)
+                if (density > 0) {
+                    iface.getMethod("setForcedDisplayDensityForUser", Int::class.java, Int::class.java, Int::class.java)
+                        .invoke(wms, Display.DEFAULT_DISPLAY, density, userId)
+                } else {
+                    iface.getMethod("clearForcedDisplayDensityForUser", Int::class.java, Int::class.java)
+                        .invoke(wms, Display.DEFAULT_DISPLAY, userId)
+                }
+            }
+            state.edit().putBoolean(KEY_FORCED, false).remove(KEY_ORIGINAL_DENSITY).commit()
             Log.i(TAG, "Pantalla del móvil restaurada")
         } catch (e: Exception) {
             Log.w(TAG, "No se pudo restaurar la pantalla: ${e.cause?.message ?: e.message}")
@@ -268,6 +339,10 @@ class SendaTvModeService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_RESTORE) {
+            SendaTvMode.restoreNow()
+            return START_NOT_STICKY
+        }
         val isSpanish = resources.configuration.locales[0].language == "es"
         val manager = getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
@@ -280,10 +355,20 @@ class SendaTvModeService : Service() {
             .setSmallIcon(R.drawable.ic_senda_monochrome)
             .setContentTitle(if (isSpanish) "Modo TV activo" else "TV mode on")
             .setContentText(
-                if (isSpanish) "La pantalla se adapta a la TV. Vuelve a la normalidad al dejar de transmitir."
-                else "The screen is adapted to the TV. It returns to normal when you stop casting."
+                if (isSpanish) "La pantalla se adapta a la TV. Vuelve a la normalidad al dejar de transmitir o con «Pantalla normal»."
+                else "The screen is adapted to the TV. It returns to normal when you stop casting or with «Normal screen»."
             )
             .setContentIntent(openSenda)
+            .addAction(
+                Notification.Action.Builder(
+                    android.graphics.drawable.Icon.createWithResource(this, R.drawable.ic_senda_monochrome),
+                    if (isSpanish) "Pantalla normal" else "Normal screen",
+                    PendingIntent.getService(
+                        this, 1, Intent(this, SendaTvModeService::class.java).setAction(ACTION_RESTORE),
+                        PendingIntent.FLAG_IMMUTABLE
+                    )
+                ).build()
+            )
             .setOngoing(true)
             .build()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -296,6 +381,7 @@ class SendaTvModeService : Service() {
 
     private companion object {
         const val CHANNEL = "senda_tv_mode"
+        const val ACTION_RESTORE = "org.senda.browser.TV_MODE_RESTORE"
         const val NOTIFICATION_ID = 4210
     }
 }

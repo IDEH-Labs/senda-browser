@@ -22,6 +22,8 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- Solo para la notificación del modo TV, con su botón «Pantalla normal»; se pide al duplicar la pantalla -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Si el móvil se reinicia o Senda se actualiza en plena transmisión, devolver la pantalla a la normalidad -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Solo se concede por ADB (pm grant); sin él la TV conserva la proporción del móvil -->

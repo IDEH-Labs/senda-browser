@@ -393,6 +393,7 @@ fun SettingsChromecastDialog(
 ) {
     var showCast by remember { mutableStateOf(prefs.showCastButton) }
     var tvLandscape by remember { mutableStateOf(prefs.tvModeLandscape) }
+    var tvSharp by remember { mutableStateOf(prefs.tvModeSharp) }
     val isSpanish = strings === org.senda.browser.core.SendaStringsEs
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -456,6 +457,26 @@ fun SettingsChromecastDialog(
                         onCheckedChange = {
                             tvLandscape = it
                             prefs.tvModeLandscape = it
+                            org.senda.browser.core.cast.SendaTvMode.evaluate()
+                            onSettingsChanged()
+                        }
+                    )
+                }
+                HorizontalDivider()
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                        Text(text = strings.dlg_tv_sharp, style = MaterialTheme.typography.bodyMedium)
+                        Text(text = strings.dlg_tv_sharp_sub, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(
+                        checked = tvSharp,
+                        onCheckedChange = {
+                            tvSharp = it
+                            prefs.tvModeSharp = it
                             org.senda.browser.core.cast.SendaTvMode.evaluate()
                             onSettingsChanged()
                         }

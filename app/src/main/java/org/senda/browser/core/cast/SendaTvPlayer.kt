@@ -53,7 +53,7 @@ object SendaTvPlayer {
             return
         }
         if (tab == null || playback != null || starting || !tab.isMediaPlaying) return
-        val videoId = SendaDialCast.youTubeVideoId(tab.url) ?: return
+        val videoId = SendaYouTube.youTubeVideoId(tab.url) ?: return
         if (videoId == skippedVideoId) return
         starting = true
         // Pausar y tomar la posición exacta en la que quedó: la TV sigue justo desde ahí

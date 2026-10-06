@@ -1,7 +1,5 @@
 package org.senda.browser.ui.components
 
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
@@ -10,6 +8,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -19,13 +19,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.senda.browser.core.cast.SendaDialCast
 import org.senda.browser.ui.model.BrowserTab
 
 object CastHelper {
@@ -47,34 +47,6 @@ object CastHelper {
         Toast.makeText(context, strings.cast_no_system_menu, Toast.LENGTH_SHORT).show()
         return false
     }
-
-    fun shareToCastApp(context: Context, url: String, title: String) {
-        val strings = org.senda.browser.core.SendaStrings.get("SYSTEM", context)
-        try {
-            val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                putExtra(Intent.EXTRA_TEXT, url)
-                putExtra(Intent.EXTRA_SUBJECT, title.ifBlank { "Senda Browser" })
-                type = "text/plain"
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            }
-            val chooser = Intent.createChooser(sendIntent, strings.cast_share_link_chooser)
-            chooser.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            context.startActivity(chooser)
-        } catch (e: Exception) {
-            Toast.makeText(context, "${strings.cast_share_error}: ${e.message}", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    fun copyUrl(context: Context, url: String) {
-        val strings = org.senda.browser.core.SendaStrings.get("SYSTEM", context)
-        try {
-            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            val clip = ClipData.newPlainText("Senda URL", url)
-            clipboard.setPrimaryClip(clip)
-            Toast.makeText(context, strings.tb_link_copied_clipboard, Toast.LENGTH_SHORT).show()
-        } catch (_: Exception) {
-        }
-    }
 }
 
 @Composable
@@ -84,20 +56,19 @@ fun CastDialog(
 ) {
     val strings = org.senda.browser.core.LocalSendaStrings.current
     val context = LocalContext.current
+    val cast = org.senda.browser.core.cast.SendaUnifiedCast
     val currentUrl = activeTab?.url ?: "about:blank"
-    val currentTitle = activeTab?.title ?: "Senda Browser"
-    val isSpanish = strings === org.senda.browser.core.SendaStringsEs
-
     val canDrawOverlay = remember { org.senda.browser.core.cast.SendaTvMode.canDrawOverlay(context) }
-    val canAdaptAspect = remember { org.senda.browser.core.cast.SendaTvMode.canAdaptAspect(context) }
+    // Video que se puede enviar: el archivo real que descargó la página, nunca la dirección de la página
+    val media = remember(currentUrl) { org.senda.browser.core.cast.SendaMediaCatalog.bestFor(currentUrl) }
+    val isYouTube = remember(currentUrl) { org.senda.browser.core.cast.SendaYouTube.youTubeVideoId(currentUrl) != null }
 
-    // Si ya se está duplicando la pantalla, evaluar modo TV y buscar dispositivos directos
     LaunchedEffect(Unit) {
         org.senda.browser.core.cast.SendaTvMode.evaluate()
-        org.senda.browser.core.cast.SendaDialCast.init(context)
-        org.senda.browser.core.cast.SendaDialCast.search()
-        org.senda.browser.core.cast.SendaUnifiedCast.startDiscovery(context)
+        cast.startDiscovery(context)
     }
+
+    fun toast(text: String) = Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -126,202 +97,104 @@ fun CastDialog(
         },
         text = {
             Column(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                if (currentUrl.isNotBlank() && currentUrl != "about:blank") {
-                    Text(
-                        text = currentUrl,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                // Primero: con el teléfono en horizontal el diálogo es bajo y esta salida no debe quedar oculta
+                if (org.senda.browser.core.cast.SendaTvMode.active) {
+                    CastActionCard(
+                        icon = Icons.Default.StayCurrentPortrait,
+                        title = strings.cast_normal_screen,
+                        subtitle = strings.cast_normal_screen_sub,
+                        onClick = {
+                            org.senda.browser.core.cast.SendaTvMode.restoreNow()
+                            onDismiss()
+                        }
                     )
                 }
+                cast.activePlayback?.let { playback -> CastControls(playback) }
 
-                org.senda.browser.core.cast.SendaUnifiedCast.activePlayback?.let { playback ->
+                // 1. El video, directo al reproductor de la TV (DLNA)
+                SectionHeader(strings.cast_send_video_header, strings.cast_send_video_sub)
+                when {
+                    media == null -> Hint(if (isYouTube) strings.cast_video_protected else strings.cast_no_video)
+                    cast.devices.isEmpty() -> Hint(if (cast.isSearching) strings.cast_searching_tvs else strings.cast_no_tvs)
+                }
+                cast.devices.forEach { device ->
                     CastActionCard(
-                        icon = Icons.Default.Stop,
-                        title = if (isSpanish) "Detener en ${playback.device.name}" else "Stop on ${playback.device.name}",
-                        subtitle = if (isSpanish) "Detiene la transmisión en la TV" else "Stops streaming on the TV",
+                        icon = Icons.Default.Tv,
+                        title = device.name,
+                        subtitle = device.model,
+                        enabled = media != null,
                         onClick = {
-                            org.senda.browser.core.cast.SendaUnifiedCast.stopActivePlayback()
+                            val video = media ?: return@CastActionCard
+                            val tab = activeTab ?: return@CastActionCard
+                            toast(strings.cast_sending.replace("{tv}", device.name))
+                            // El video sigue en la TV desde donde iba: en el teléfono se pausa
+                            tab.pauseMediaAndGetPosition { start ->
+                                cast.playOnDlna(
+                                    device = device,
+                                    media = video,
+                                    title = tab.title,
+                                    startSeconds = start,
+                                    proxy = org.senda.browser.core.cast.SendaCastRelay.proxyFrom(
+                                        org.senda.browser.core.PreferencesManager(context)
+                                    )
+                                ) { result ->
+                                    when (result) {
+                                        org.senda.browser.core.cast.SendaUnifiedCast.SendResult.PLAYING ->
+                                            toast(strings.cast_playing_on.replace("{tv}", device.name))
+                                        org.senda.browser.core.cast.SendaUnifiedCast.SendResult.TV_CANNOT_PLAY -> {
+                                            toast(strings.cast_tv_cannot_play.replace("{tv}", device.name))
+                                            tab.resumeMedia()
+                                        }
+                                        org.senda.browser.core.cast.SendaUnifiedCast.SendResult.TV_UNREACHABLE -> {
+                                            toast(strings.cast_tv_unreachable.replace("{tv}", device.name))
+                                            tab.resumeMedia()
+                                        }
+                                    }
+                                }
+                            }
                             onDismiss()
                         }
                     )
                 }
 
-                // 1. Dispositivos Google Cast / Chromecast directos en la red Wi-Fi
-                val chromecastDevices = org.senda.browser.core.cast.SendaUnifiedCast.devices.filter {
-                    it.type == org.senda.browser.core.cast.CastDeviceType.CHROMECAST
-                }
+                HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp))
 
-                if (chromecastDevices.isNotEmpty()) {
-                    Text(
-                        text = if (isSpanish) "Chromecast (Transmisión Directa 60 fps)" else "Chromecast (Direct 60 fps)",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    chromecastDevices.forEach { device ->
-                        CastActionCard(
-                            icon = Icons.Default.Cast,
-                            title = device.name,
-                            subtitle = if (isSpanish) "Flujo directo sin lag ni compresión • ${device.model}"
-                                       else "Direct stream without lag • ${device.model}",
-                            onClick = {
-                                Toast.makeText(
-                                    context,
-                                    if (isSpanish) "Conectando con ${device.name}…" else "Connecting to ${device.name}…",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                                val startSecs = activeTab?.currentMediaSeconds ?: 0
-                                org.senda.browser.core.cast.SendaUnifiedCast.playOnChromecast(
-                                    device = device,
-                                    mediaUrl = currentUrl,
-                                    title = activeTab?.title ?: "Senda Stream",
-                                    startSeconds = startSecs
-                                ) { ok ->
-                                    val msg = if (ok) {
-                                        if (isSpanish) "Transmitiendo a ${device.name} con máxima fluidez"
-                                        else "Playing on ${device.name} at full quality"
-                                    } else {
-                                        if (isSpanish) "No se pudo iniciar transmisión directa en ${device.name}"
-                                        else "Could not stream to ${device.name}"
-                                    }
-                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                                }
-                                onDismiss()
-                            }
-                        )
-                    }
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp))
-                }
-
-                // 2. Dispositivos Smart TV con YouTube / DIAL
-                val dialDevices = (org.senda.browser.core.cast.SendaDialCast.devices.map {
-                    org.senda.browser.core.cast.CastDevice(
-                        id = it.appsUrl,
-                        name = it.name,
-                        model = it.model,
-                        type = org.senda.browser.core.cast.CastDeviceType.DIAL_YOUTUBE,
-                        endpoint = it.appsUrl
-                    )
-                } + org.senda.browser.core.cast.SendaUnifiedCast.devices.filter {
-                    it.type == org.senda.browser.core.cast.CastDeviceType.DIAL_YOUTUBE
-                }).distinctBy { it.name }
-
-                if (dialDevices.isNotEmpty()) {
-                    Text(
-                        text = if (isSpanish) "Smart TVs (Transmisión Directa YouTube)" else "Smart TVs (Direct YouTube)",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    dialDevices.forEach { device ->
-                        CastActionCard(
-                            icon = Icons.Default.Tv,
-                            title = device.name,
-                            subtitle = if (isSpanish) "Transmisión nativa sin carga para el celular • ${device.model}"
-                                       else "Native stream without phone load • ${device.model}",
-                            onClick = {
-                                val videoId = org.senda.browser.core.cast.SendaDialCast.youTubeVideoId(currentUrl)
-                                if (videoId != null) {
-                                    val startPos = activeTab?.currentMediaSeconds ?: 0
-                                    org.senda.browser.core.cast.SendaDialCast.playYouTube(
-                                        org.senda.browser.core.cast.DialDevice(device.name, device.model, device.endpoint),
-                                        videoId,
-                                        startPos
-                                    ) { ok ->
-                                        val msg = if (ok) {
-                                            if (isSpanish) "Reproduciendo en ${device.name}" else "Playing on ${device.name}"
-                                        } else {
-                                            if (isSpanish) "No se pudo reproducir en ${device.name}" else "Could not play on ${device.name}"
-                                        }
-                                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                                    }
-                                } else {
-                                    Toast.makeText(context, if (isSpanish) "Abre un video de YouTube para transmitir directamente" else "Open a YouTube video to cast directly", Toast.LENGTH_SHORT).show()
-                                }
-                                onDismiss()
-                            }
-                        )
-                    }
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp))
-                }
-
-                // 3. Dispositivos Smart TV DLNA / UPnP encontrados en la red local
-                val dlnaDevices = org.senda.browser.core.cast.SendaUnifiedCast.devices.filter {
-                    it.type == org.senda.browser.core.cast.CastDeviceType.DLNA_SMART_TV
-                }
-
-                if (dlnaDevices.isNotEmpty()) {
-                    Text(
-                        text = if (isSpanish) "Televisores Smart TV (DLNA / UPnP)" else "Smart TVs (DLNA / UPnP)",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    dlnaDevices.forEach { device ->
-                        CastActionCard(
-                            icon = Icons.Default.Tv,
-                            title = device.name,
-                            subtitle = device.model,
-                            onClick = {
-                                Toast.makeText(
-                                    context,
-                                    if (isSpanish) "Conectando con ${device.name}…" else "Connecting to ${device.name}…",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                                org.senda.browser.core.cast.SendaUnifiedCast.playOnDlna(
-                                    device = device,
-                                    mediaUrl = currentUrl,
-                                    title = activeTab?.title ?: "Senda Stream"
-                                ) { ok ->
-                                    val msg = if (ok) {
-                                        if (isSpanish) "Reproduciendo en ${device.name}" else "Playing on ${device.name}"
-                                    } else {
-                                        if (isSpanish) "No se pudo reproducir en ${device.name}" else "Could not play on ${device.name}"
-                                    }
-                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                                }
-                                onDismiss()
-                            }
-                        )
-                    }
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp))
-                }
-
-                Text(
-                    text = strings.cast_desc,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                // Opción: Duplicar pantalla completa vía Android Cast
+                // 2. Todo el teléfono por Miracast, con el modo TV (horizontal, 16:9, 60 Hz) para que llene la TV.
+                // Android solo deja conectar Miracast desde su propio menú (CONFIGURE_WIFI_DISPLAY es de sistema)
+                SectionHeader(strings.cast_mirror_header, null)
                 CastActionCard(
-                    icon = Icons.Default.Tv,
-                    title = if (isSpanish) "Duplicar pantalla completa (Modo espejo)" else strings.cast_action_system_title,
-                    subtitle = if (isSpanish) "Muestra toda la pantalla del celular en la TV. (Para videos usa la transmisión directa de arriba)."
-                               else strings.cast_action_system_sub,
+                    icon = Icons.Default.ScreenShare,
+                    title = strings.cast_mirror_header,
+                    subtitle = strings.cast_mirror_sub,
                     onClick = {
-                        CastHelper.openSystemCast(context)
+                        fun startMirroring() {
+                            val prefs = org.senda.browser.core.PreferencesManager(context)
+                            prefs.tvModeEnabled = true
+                            prefs.tvModeLandscape = true
+                            org.senda.browser.core.cast.SendaTvMode.evaluate()
+                            org.senda.browser.core.cast.SendaTvMode.awaitTv()
+                            CastHelper.openSystemCast(context)
+                        }
+                        // Sin permiso de notificaciones Android oculta la del modo TV y su botón «Pantalla normal»
+                        val requester = BrowserTab.androidPermissionRequester
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU && requester != null) {
+                            requester(listOf(android.Manifest.permission.POST_NOTIFICATIONS)) { startMirroring() }
+                        } else {
+                            startMirroring()
+                        }
                         onDismiss()
                     }
                 )
-
-                // Modo TV: sin «Mostrar sobre otras apps» Telegram y las demás apps no se adaptan a la TV
                 if (!canDrawOverlay) {
                     CastActionCard(
                         icon = Icons.Default.Fullscreen,
-                        title = if (isSpanish) "Pantalla completa en la TV para todas las apps" else "Full screen on TV for every app",
-                        subtitle = if (isSpanish) "Permite «Mostrar sobre otras apps» para que Telegram y la galería llenen la TV al duplicar"
-                        else "Allow «Display over other apps» so Telegram and the gallery fill the TV while mirroring",
+                        title = strings.cast_mirror_overlay_needed,
+                        subtitle = "",
                         onClick = {
                             try {
                                 context.startActivity(
@@ -333,43 +206,7 @@ fun CastDialog(
                             onDismiss()
                         }
                     )
-                } else if (!canAdaptAspect) {
-                    val landscapeForced = org.senda.browser.core.PreferencesManager(context).tvModeLandscape
-                    Text(
-                        text = if (isSpanish) {
-                            if (landscapeForced) "Modo TV activo: 60 Hz y horizontal al duplicar."
-                            else "Transmisión activa: La orientación del celular se mantiene libre y natural."
-                        } else {
-                            if (landscapeForced) "TV mode active: 60 Hz and forced landscape while mirroring."
-                            else "Casting active: Phone orientation remains free and natural."
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                 }
-
-                // Opción 2: Enviar video o web a app de transmisión
-                CastActionCard(
-                    icon = Icons.Default.PlayCircle,
-                    title = strings.cast_action_app_title,
-                    subtitle = strings.cast_action_app_sub,
-                    onClick = {
-                        CastHelper.shareToCastApp(context, currentUrl, currentTitle)
-                        onDismiss()
-                    }
-                )
-
-                // Opción 3: Copiar enlace
-                CastActionCard(
-                    icon = Icons.Default.ContentCopy,
-                    title = strings.cast_action_copy_title,
-                    subtitle = strings.cast_action_copy_sub,
-                    onClick = {
-                        CastHelper.copyUrl(context, currentUrl)
-                        onDismiss()
-                    }
-                )
             }
         },
         confirmButton = {
@@ -382,18 +219,114 @@ fun CastDialog(
     )
 }
 
+/** Controles del video que se está viendo en la TV. */
+@Composable
+private fun CastControls(playback: org.senda.browser.core.cast.SendaUnifiedCast.ActiveCastPlayback) {
+    val strings = org.senda.browser.core.LocalSendaStrings.current
+    val cast = org.senda.browser.core.cast.SendaUnifiedCast
+    fun clock(seconds: Int) = if (seconds >= 3600) "%d:%02d:%02d".format(seconds / 3600, seconds / 60 % 60, seconds % 60)
+        else "%d:%02d".format(seconds / 60, seconds % 60)
+    Surface(
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)),
+        color = MaterialTheme.colorScheme.primaryContainer
+    ) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                text = strings.cast_now_on.replace("{tv}", playback.device.name),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            Text(
+                text = playback.title,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            if (playback.durationSeconds > 0) {
+                LinearProgressIndicator(
+                    progress = { (playback.positionSeconds.toFloat() / playback.durationSeconds).coerceIn(0f, 1f) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    text = "${clock(playback.positionSeconds)} / ${clock(playback.durationSeconds)}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                IconButton(onClick = { cast.seekBy(-10) }) {
+                    Icon(Icons.Default.Replay10, contentDescription = strings.cast_back10)
+                }
+                IconButton(onClick = { if (playback.paused) cast.resume() else cast.pause() }) {
+                    Icon(
+                        if (playback.paused) Icons.Default.PlayArrow else Icons.Default.Pause,
+                        contentDescription = if (playback.paused) strings.cast_resume else strings.cast_pause
+                    )
+                }
+                IconButton(onClick = { cast.seekBy(10) }) {
+                    Icon(Icons.Default.Forward10, contentDescription = strings.cast_fwd10)
+                }
+                IconButton(onClick = { cast.stopActivePlayback() }) {
+                    Icon(Icons.Default.Stop, contentDescription = strings.cast_stop)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SectionHeader(title: String, subtitle: String?) {
+    Column {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.SemiBold
+        )
+        if (subtitle != null) {
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun Hint(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            .padding(horizontal = 10.dp, vertical = 8.dp)
+    )
+}
+
 @Composable
 private fun CastActionCard(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
     subtitle: String,
+    enabled: Boolean = true,
     onClick: () -> Unit
 ) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .clickable(onClick = onClick)
+            .alpha(if (enabled) 1f else 0.45f)
+            .clickable(enabled = enabled, onClick = onClick)
             .border(
                 width = 0.8.dp,
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
@@ -421,12 +354,14 @@ private fun CastActionCard(
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                if (subtitle.isNotBlank()) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
             Icon(
                 imageVector = Icons.Default.ChevronRight,
