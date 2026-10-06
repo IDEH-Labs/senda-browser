@@ -9,11 +9,11 @@ import org.mozilla.geckoview.WebExtension
 
 /**
  * Videos que cada página descargó (MP4, WebM, HLS), según la extensión integrada media@senda.org, que solo
- * observa la red. Es lo que se puede enviar a la TV por DLNA: la TV necesita la dirección del archivo de video,
- * no la de la página.
+ * observa la red. Es lo que se muestra en la TV al duplicar la pantalla ([SendaTvPlayer]): hace falta la dirección
+ * del archivo de video, no la de la página.
  *
  * Los videos que la web arma por trozos en el navegador (blob:, MSE: YouTube, Netflix y la mayoría de plataformas)
- * no aparecen aquí porque no existe un archivo que la TV pueda pedir.
+ * no aparecen aquí porque no existe un archivo que reproducir (YouTube usa su reproductor oficial).
  */
 object SendaMediaCatalog {
 

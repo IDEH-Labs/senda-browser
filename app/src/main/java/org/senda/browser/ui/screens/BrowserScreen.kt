@@ -176,6 +176,13 @@ fun BrowserScreen(
         onCloseTab(child)
     }
 
+    // Una sola función: sin TV, el botón abre el panel de Android para elegirla (solo el sistema puede conectar);
+    // con TV, sus controles. Los videos pasan solos a la TV
+    val openCast: () -> Unit = {
+        if (org.senda.browser.core.cast.SendaTvMode.tvConnected) showCastDialog = true
+        else org.senda.browser.ui.components.CastHelper.openSystemCast(context)
+    }
+
     val toolbarPos = prefs.toolbarPosition
     val showFire = prefs.showFireButton
     val showDevTools = prefs.showDevToolsButton
@@ -208,7 +215,7 @@ fun BrowserScreen(
                         onOpenDevTools = { showDevToolsSheet = true },
                         onOpenAssistant = { showAssistant = true },
                         onOpenSettings = onOpenSettings,
-                        onOpenCast = { showCastDialog = true },
+                        onOpenCast = openCast,
                         onOpenBookmarks = { showBookmarksDialog = true },
                         onOpenHistory = { showHistoryDialog = true },
                         onOpenDownloads = { showDownloadsDialog = true },
@@ -256,7 +263,7 @@ fun BrowserScreen(
                         onOpenDevTools = { showDevToolsSheet = true },
                         onOpenAssistant = { showAssistant = true },
                         onOpenSettings = onOpenSettings,
-                        onOpenCast = { showCastDialog = true },
+                        onOpenCast = openCast,
                         onOpenBookmarks = { showBookmarksDialog = true },
                         onOpenHistory = { showHistoryDialog = true },
                         onOpenDownloads = { showDownloadsDialog = true },
@@ -420,12 +427,9 @@ fun BrowserScreen(
             org.senda.browser.ui.components.TvPresentationHost(playback)
         }
 
-        // Diálogo de transmisión: video directo a la TV (DLNA) o duplicar la pantalla (Miracast)
+        // Transmitir con la TV ya conectada: el video de la TV y «Desconectar TV»
         if (showCastDialog) {
-            CastDialog(
-                activeTab = activeTab,
-                onDismiss = { showCastDialog = false }
-            )
+            CastDialog(onDismiss = { showCastDialog = false })
         }
 
         // Diálogo gestor de favoritos / marcadores

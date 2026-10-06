@@ -310,7 +310,7 @@ object SendaGeckoEngine {
                     android.util.Log.i("Senda", "Senda Proxy listo: ${ext.id} ${ext.metaData.version}")
                 }
 
-                // 3. Detector de videos para enviarlos a la TV por DLNA: solo observa la red, no toca las páginas
+                // 3. Detector de videos para mostrarlos en la TV al duplicar: solo observa la red, no toca las páginas
                 installBuiltInFolder("resource://android/assets/extensions/senda_media/", "media@senda.org") { ext ->
                     ext.setMessageDelegate(org.senda.browser.core.cast.SendaMediaCatalog.messageDelegate, "senda_media")
                 }
