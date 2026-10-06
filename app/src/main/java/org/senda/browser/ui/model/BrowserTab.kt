@@ -58,6 +58,9 @@ class BrowserTab(
     var progress by mutableIntStateOf(0)
     var trackersBlocked by mutableIntStateOf(0)
     var canGoBack by mutableStateOf(false)
+    /** Posición en el historial de la pestaña (-1 si Gecko aún no la informó); sirve para detectar trampas de Atrás. */
+    var historyIndex = -1
+        private set
     var canGoForward by mutableStateOf(false)
     var isFullScreen by mutableStateOf(false)
     // El video a pantalla completa es más alto que ancho (Shorts, grabaciones de móvil): no girar a horizontal
@@ -422,7 +425,7 @@ class BrowserTab(
                     }
                     showingError = false
                     url = newUrl
-                    val videoId = org.senda.browser.core.cast.SendaDialCast.youTubeVideoId(newUrl)
+                    val videoId = org.senda.browser.core.cast.SendaYouTube.youTubeVideoId(newUrl)
                     if (videoId != mediaVideoId) {
                         mediaVideoId = videoId
                         resetMediaPosition()
@@ -493,6 +496,12 @@ class BrowserTab(
                 )
                 opener(tab, false)
                 return GeckoResult.fromValue(newSession)
+            }
+        }
+
+        session.historyDelegate = object : GeckoSession.HistoryDelegate {
+            override fun onHistoryStateChange(session: GeckoSession, historyList: GeckoSession.HistoryDelegate.HistoryList) {
+                historyIndex = historyList.currentIndex
             }
         }
 

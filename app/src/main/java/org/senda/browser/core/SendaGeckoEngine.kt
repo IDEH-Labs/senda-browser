@@ -19,7 +19,7 @@ import kotlinx.coroutines.withContext
 object SendaGeckoEngine {
 
     private var runtime: GeckoRuntime? = null
-    val EMBEDDED_EXTENSION_IDS = setOf("uBlock0@raymondhill.net", "proxy@senda.org")
+    val EMBEDDED_EXTENSION_IDS = setOf("uBlock0@raymondhill.net", "proxy@senda.org", "media@senda.org")
     val installedExtensions = mutableStateListOf<WebExtension>()
     var cachedUBlockOptionsUrl: String? = null
         private set
@@ -305,6 +305,11 @@ object SendaGeckoEngine {
                 installBuiltInFolder("resource://android/assets/extensions/senda_proxy/", "proxy@senda.org") { ext ->
                     setupProxyMessageDelegate(ext)
                     android.util.Log.i("Senda", "Senda Proxy listo: ${ext.id} ${ext.metaData.version}")
+                }
+
+                // 3. Detector de videos para enviarlos a la TV por DLNA: solo observa la red, no toca las páginas
+                installBuiltInFolder("resource://android/assets/extensions/senda_media/", "media@senda.org") { ext ->
+                    ext.setMessageDelegate(org.senda.browser.core.cast.SendaMediaCatalog.messageDelegate, "senda_media")
                 }
 
                 // Retirar el detector de video de Chromecast de una versión de prueba: no debe inyectar nada en las páginas

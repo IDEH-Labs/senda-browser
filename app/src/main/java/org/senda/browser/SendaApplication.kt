@@ -52,8 +52,6 @@ class SendaApplication : Application() {
         instance = this
         // Modo TV: adaptar el teléfono mientras se duplica en una TV, y restaurarlo si quedó adaptado
         org.senda.browser.core.cast.SendaTvMode.init(this)
-        // Inicializar subsistema de transmisión DLNA y Cast V2
-        org.senda.browser.core.cast.SendaUnifiedCast.initialize(this)
         Thread {
             // Senda ya no incluye IA (2026-10-05): ningún modelo pequeño respondía con fiabilidad en sus 8 idiomas
             // en un teléfono. Se borran los modelos descargados (hasta 3,3 GB) que ya no se pueden usar

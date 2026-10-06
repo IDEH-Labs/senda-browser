@@ -1,0 +1,20 @@
+{
+  "manifest_version": 2,
+  "name": "Senda Media Finder",
+  "version": "1.0",
+  "description": "Detecta los archivos de video que descarga la página para poder enviarlos a la TV. No modifica ni inyecta nada en las páginas",
+  "permissions": [
+    "webRequest",
+    "nativeMessaging",
+    "geckoViewAddons",
+    "<all_urls>"
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "media@senda.org"
+    }
+  },
+  "background": {
+    "scripts": ["background.js"]
+  }
+}
