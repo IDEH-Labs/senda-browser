@@ -38,7 +38,8 @@ object CastHelper {
         )
         for (intent in intents) {
             try {
-                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                // Limpio: si Ajustes quedó abierto en otra pantalla, Android lo traía tal cual en vez de «Enviar pantalla»
+                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                 context.startActivity(intent)
                 return true
             } catch (_: Exception) {
@@ -172,17 +173,18 @@ fun CastDialog(
                     title = strings.cast_mirror_header,
                     subtitle = strings.cast_mirror_sub,
                     onClick = {
+                        // La pantalla del teléfono no se toca: solo con el modo TV activado en Ajustes se adapta a la TV
+                        val tvMode = org.senda.browser.core.PreferencesManager(context).tvModeEnabled
                         fun startMirroring() {
-                            val prefs = org.senda.browser.core.PreferencesManager(context)
-                            prefs.tvModeEnabled = true
-                            prefs.tvModeLandscape = true
-                            org.senda.browser.core.cast.SendaTvMode.evaluate()
-                            org.senda.browser.core.cast.SendaTvMode.awaitTv()
+                            if (tvMode) {
+                                org.senda.browser.core.cast.SendaTvMode.evaluate()
+                                org.senda.browser.core.cast.SendaTvMode.awaitTv()
+                            }
                             CastHelper.openSystemCast(context)
                         }
                         // Sin permiso de notificaciones Android oculta la del modo TV y su botón «Pantalla normal»
                         val requester = BrowserTab.androidPermissionRequester
-                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU && requester != null) {
+                        if (tvMode && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU && requester != null) {
                             requester(listOf(android.Manifest.permission.POST_NOTIFICATIONS)) { startMirroring() }
                         } else {
                             startMirroring()
@@ -190,7 +192,7 @@ fun CastDialog(
                         onDismiss()
                     }
                 )
-                if (!canDrawOverlay) {
+                if (!canDrawOverlay && org.senda.browser.core.PreferencesManager(context).tvModeEnabled) {
                     CastActionCard(
                         icon = Icons.Default.Fullscreen,
                         title = strings.cast_mirror_overlay_needed,
