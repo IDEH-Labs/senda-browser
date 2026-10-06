@@ -64,23 +64,32 @@ fun AssistantHubDialog(
     var showAdd by remember { mutableStateOf(false) }
     var showWelcome by remember { mutableStateOf(false) }
 
-    /** «En uso» solo si de verdad está lista (en uso, con modelo y consentimiento); si no, se ofrece «Usar». */
-    fun ready(id: String) = active == id && prefs.assistantModelFor(id).isNotBlank() && prefs.assistantConsentFor(id)
+    /** «En uso» si es la activa y tiene consentimiento (el modelo se elige solo si falta); si no, «Usar». */
+    fun ready(id: String) = active == id && prefs.assistantConsentFor(id)
 
-    /** Elige el modelo solo (probándolo) y deja la IA en uso. */
+    // Una IA preparándose (aunque este cuadro se haya cerrado y vuelto a abrir mientras tanto)
+    val preparing by SendaAssistant.connecting.collectAsState()
+    LaunchedEffect(preparing) {
+        working = preparing != null
+        if (preparing != null) status = strings.as_finding_model
+        revision++
+    }
+
+    /**
+     * La deja en uso y elige el modelo solo (probándolo). En el ámbito del asistente, no de esta pantalla: cerrar
+     * «Mis IA» antes de que termine ya no lo cancela (pasó el 2026-10-06 y la IA quedó sin modelo).
+     */
     fun finishConnecting(id: String) {
-        working = true; status = strings.as_finding_model
-        scope.launch {
+        SendaAssistant.use(prefs, id)
+        SendaAssistant.connecting.value = id
+        SendaAssistant.scope.launch {
             try {
-                val model = SendaAssistant.autoSelectModel(SendaAssistant.backendFor(id, prefs))
-                prefs.setAssistantModelFor(id, model)
-                SendaAssistant.use(prefs, id)
+                SendaAssistant.ensureModel(prefs)
                 status = null
             } catch (e: Exception) {
                 status = connectErrorText(e, strings, SendaAssistant.destinationOf(id))
             } finally {
-                working = false
-                revision++
+                SendaAssistant.connecting.value = null
             }
         }
     }
