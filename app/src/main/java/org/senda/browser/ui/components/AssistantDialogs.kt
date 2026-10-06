@@ -17,16 +17,19 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Job
@@ -34,10 +37,11 @@ import kotlinx.coroutines.launch
 import org.senda.browser.core.LocalSendaStrings
 import org.senda.browser.core.PreferencesManager
 import org.senda.browser.core.SendaStringPack
+import org.senda.browser.core.assistant.Attachment
+import org.senda.browser.core.assistant.ChatGptPlanClient
 import org.senda.browser.core.assistant.ChatTurn
-import org.senda.browser.core.assistant.RemoteAiClients
+import org.senda.browser.core.assistant.Source
 import org.senda.browser.core.assistant.RemoteAiException
-import org.senda.browser.core.assistant.RemoteAiProvider
 import org.senda.browser.core.assistant.SendaAssistant
 import org.senda.browser.ui.model.BrowserTab
 
@@ -45,12 +49,10 @@ import org.senda.browser.ui.model.BrowserTab
 fun assistantErrorText(e: Throwable, strings: SendaStringPack, destination: String): String = when (e) {
     is RemoteAiException -> when (e.kind) {
         RemoteAiException.Kind.NOT_CONFIGURED -> strings.as_err_incomplete
-        RemoteAiException.Kind.INSECURE_URL -> strings.as_err_insecure
         RemoteAiException.Kind.AUTH -> strings.as_err_auth
         RemoteAiException.Kind.RATE_LIMIT -> strings.as_err_rate
         RemoteAiException.Kind.NETWORK -> strings.as_err_network.format(destination)
-        RemoteAiException.Kind.REFUSED -> strings.as_err_refused
-        // Código HTTP y el comienzo del mensaje del proveedor (nunca incluye la clave)
+        // Código HTTP y el comienzo del mensaje de OpenAI
         RemoteAiException.Kind.BAD_RESPONSE -> strings.as_err_bad.format(e.message?.take(80)?.ifBlank { null } ?: "?")
         RemoteAiException.Kind.USAGE_LIMIT -> strings.as_chatgpt_limit
         RemoteAiException.Kind.NOT_ELIGIBLE -> strings.as_chatgpt_not_eligible
@@ -142,41 +144,33 @@ fun SendaAssistantSettingsDialog(
     val strings = LocalSendaStrings.current
     val scope = rememberCoroutineScope()
 
-    var provider by remember { mutableStateOf(RemoteAiProvider.byId(prefs.assistantProvider) ?: RemoteAiProvider.ANTHROPIC) }
-    var serverUrl by remember { mutableStateOf(prefs.assistantServerUrl) }
-    var apiKey by remember(provider) { mutableStateOf(prefs.getAssistantKey(provider.id)) }
-    var models by remember(provider) { mutableStateOf<List<String>>(emptyList()) }
-    var model by remember(provider) {
-        mutableStateOf(if (prefs.assistantProvider == provider.id) prefs.assistantModel else "")
-    }
+    var models by remember { mutableStateOf<List<String>>(emptyList()) }
+    var model by remember { mutableStateOf(prefs.assistantModel) }
     var status by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(false) }
-    var accepted by remember(provider) { mutableStateOf(prefs.assistantPrivacyAccepted && prefs.assistantProvider == provider.id) }
-    val isPlan = provider.style == RemoteAiProvider.Style.CHATGPT_PLAN
+    var accepted by remember { mutableStateOf(prefs.assistantPrivacyAccepted) }
     var planEmail by remember { mutableStateOf(org.senda.browser.core.assistant.ChatGptPlanAuth.email(prefs)) }
     var planSignedIn by remember { mutableStateOf(org.senda.browser.core.assistant.ChatGptPlanAuth.isSignedIn(prefs)) }
     var showWelcome by remember { mutableStateOf(false) }
 
     fun loadModels() {
         loading = true; status = strings.as_loading
-        // Proveedor del momento de la llamada (tras iniciar sesión cambia en el mismo instante)
-        val current = provider
-        val plan = current.style == RemoteAiProvider.Style.CHATGPT_PLAN
         scope.launch {
             try {
-                val client = if (plan) org.senda.browser.core.assistant.ChatGptPlanClient(prefs)
-                    else RemoteAiClients.create(current, apiKey, serverUrl)
-                val list = client.listModels()
+                val list = ChatGptPlanClient(prefs).listModels()
                 models = list
-                if (model !in list) model = current.suggestedModel?.takeIf { it in list } ?: list.firstOrNull().orEmpty()
+                if (model !in list) model = list.firstOrNull().orEmpty()
                 status = strings.as_models_loaded.format(list.size)
             } catch (e: Exception) {
-                status = assistantErrorText(e, strings, "api.openai.com".takeIf { plan } ?: current.baseUrl.orEmpty())
+                status = assistantErrorText(e, strings, SendaAssistant.DESTINATION)
             } finally {
                 loading = false
             }
         }
     }
+
+    // Con sesión iniciada los modelos se cargan solos: nada que buscar ni probar a mano
+    LaunchedEffect(Unit) { if (planSignedIn) loadModels() }
 
     if (showWelcome) ChatGptWelcomeDialog { prefs.assistantChatGptWelcomeSeen = true; showWelcome = false }
 
@@ -186,7 +180,6 @@ fun SendaAssistantSettingsDialog(
         when (val st = signIn) {
             is org.senda.browser.core.assistant.ChatGptPlanAuth.SignInState.Waiting -> status = strings.as_chatgpt_waiting
             is org.senda.browser.core.assistant.ChatGptPlanAuth.SignInState.Done -> {
-                provider = RemoteAiProvider.CHATGPT_PLAN
                 planSignedIn = true; planEmail = st.email
                 if (!prefs.assistantChatGptWelcomeSeen) showWelcome = true
                 org.senda.browser.core.assistant.ChatGptPlanAuth.acknowledge()
@@ -200,9 +193,6 @@ fun SendaAssistantSettingsDialog(
         }
     }
 
-    val destination = provider.baseUrl?.let { runCatching { java.net.URL(it).host }.getOrNull() }
-        ?: runCatching { java.net.URL(serverUrl).host }.getOrNull() ?: serverUrl
-
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(strings.as_settings_title) },
@@ -210,82 +200,28 @@ fun SendaAssistantSettingsDialog(
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 Text(strings.as_settings_intro, fontSize = 13.sp)
                 Spacer(Modifier.height(12.dp))
-                Text(strings.as_provider, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                // Dos tipos de usuario: quien ya paga una suscripción (cuenta) y quien usa claves o su servidor (API)
-                @Composable
-                fun ProviderRow(p: RemoteAiProvider) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().selectable(selected = p == provider, onClick = {
-                            provider = p; status = null
-                        }).padding(vertical = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(selected = p == provider, onClick = { provider = p; status = null })
-                        Text(if (p.isOwnServer) strings.as_own_server else p.displayName, fontSize = 14.sp)
-                    }
-                }
-                Spacer(Modifier.height(4.dp))
-                Text(strings.as_group_accounts_title, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
-                Text(strings.as_group_accounts_sub, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                ProviderRow(RemoteAiProvider.CHATGPT_PLAN)
-                OfficialSiteChips(prefs, null) { onLeaveForSignIn() }
-                Spacer(Modifier.height(10.dp))
-                Text(strings.as_group_api_title, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
-                Text(strings.as_group_api_sub, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                RemoteAiProvider.entries.filter { it != RemoteAiProvider.CHATGPT_PLAN }.forEach { ProviderRow(it) }
-                Spacer(Modifier.height(8.dp))
-                if (provider.isOwnServer) {
-                    OutlinedTextField(
-                        value = serverUrl, onValueChange = { serverUrl = it.trim() },
-                        label = { Text(strings.as_server_url, fontSize = 12.sp) },
-                        singleLine = true, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Uri),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(Modifier.height(6.dp))
-                }
-                if (isPlan) {
-                    Text(strings.as_chatgpt_plan_note, fontSize = 12.sp)
-                    Spacer(Modifier.height(6.dp))
-                    if (planSignedIn) {
+                if (planSignedIn) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        ChatGptLogo(18)
+                        Spacer(Modifier.width(8.dp))
                         Text(strings.as_chatgpt_signed_in.format(planEmail ?: "ChatGPT"), fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                        TextButton(onClick = {
-                            org.senda.browser.core.assistant.ChatGptPlanAuth.signOut(prefs)
-                            planSignedIn = false; planEmail = null; models = emptyList(); model = ""
-                        }) { Text(strings.as_chatgpt_sign_out) }
-                    } else {
-                        // Botón «Continue with ChatGPT» con el logo, como piden las pautas de OpenAI
-                        Button(
-                            enabled = !loading && signIn !is org.senda.browser.core.assistant.ChatGptPlanAuth.SignInState.Waiting,
-                            onClick = {
-                                org.senda.browser.core.assistant.ChatGptPlanAuth.startSignIn(context, prefs) { url -> openSignInBrowser(context, url) }
-                                onLeaveForSignIn()
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            ChatGptLogo(18)
-                            Spacer(Modifier.width(8.dp))
-                            Text(strings.as_chatgpt_continue)
-                        }
                     }
-                } else OutlinedTextField(
-                    value = apiKey, onValueChange = { apiKey = it.trim() },
-                    label = { Text(if (provider.isOwnServer) strings.as_api_key_optional else strings.as_api_key) },
-                    singleLine = true, visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Password),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                provider.keysPage?.let { page ->
-                    Text(strings.as_get_key.format(page), fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
+                } else {
+                    // Botón «Continue with ChatGPT» con el logo, como piden las pautas de OpenAI
+                    Button(
+                        enabled = !loading && signIn !is org.senda.browser.core.assistant.ChatGptPlanAuth.SignInState.Waiting,
+                        onClick = {
+                            org.senda.browser.core.assistant.ChatGptPlanAuth.startSignIn(context, prefs) { url -> openSignInBrowser(context, url) }
+                            onLeaveForSignIn()
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        ChatGptLogo(18)
+                        Spacer(Modifier.width(8.dp))
+                        Text(strings.as_chatgpt_continue)
+                    }
+                    Text(strings.as_chatgpt_plan_note, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                if (destination.isNotBlank() && !isPlan) {
-                    Text(strings.as_key_encrypted.format(destination), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Spacer(Modifier.height(8.dp))
-                if (!isPlan || planSignedIn) FilledTonalButton(
-                    enabled = !loading,
-                    onClick = { loadModels() },
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text(strings.as_load_models) }
                 status?.let { Text(it, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp)) }
                 if (models.isNotEmpty()) {
                     Spacer(Modifier.height(8.dp))
@@ -301,40 +237,35 @@ fun SendaAssistantSettingsDialog(
                             }
                         }
                     }
-                } else if (model.isNotBlank()) {
-                    Text("${strings.as_model}: $model", fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
                 }
-                Spacer(Modifier.height(8.dp))
-                Row(verticalAlignment = Alignment.Top, modifier = Modifier.clickable { accepted = !accepted }) {
-                    Checkbox(checked = accepted, onCheckedChange = { accepted = it })
-                    Text(strings.as_privacy_ack.format(destination.ifBlank { "?" }), fontSize = 12.sp, modifier = Modifier.padding(top = 12.dp))
-                }
-                if (prefs.assistantProvider != null) {
+                if (planSignedIn) {
+                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.Top, modifier = Modifier.clickable { accepted = !accepted }) {
+                        Checkbox(checked = accepted, onCheckedChange = { accepted = it })
+                        Text(strings.as_privacy_ack.format(SendaAssistant.DESTINATION), fontSize = 12.sp, modifier = Modifier.padding(top = 12.dp))
+                    }
                     TextButton(onClick = {
                         org.senda.browser.core.assistant.ChatGptPlanAuth.signOut(prefs)
-                        RemoteAiProvider.entries.forEach { prefs.setAssistantKey(it.id, "") }
                         prefs.assistantProvider = null
                         prefs.assistantModel = ""
                         prefs.assistantPrivacyAccepted = false
                         onDismiss()
-                    }) { Text(strings.as_remove, color = MaterialTheme.colorScheme.error) }
+                    }) { Text(strings.as_chatgpt_sign_out, color = MaterialTheme.colorScheme.error) }
                 }
+                // Las demás IA, en su web oficial: un toque y se entra con la cuenta de cada una
+                Spacer(Modifier.height(12.dp))
+                HorizontalDivider()
+                Spacer(Modifier.height(8.dp))
+                Text(strings.as_web_title, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Text(strings.as_web_note, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                OfficialSiteChips(prefs, null, includeChatGpt = false) { onLeaveForSignIn() }
             }
         },
         confirmButton = {
-            Button(
-                enabled = !loading && accepted && model.isNotBlank() && when {
-                    isPlan -> planSignedIn
-                    provider.isOwnServer -> serverUrl.isNotBlank()
-                    else -> apiKey.isNotBlank()
-                },
+            if (planSignedIn) Button(
+                enabled = !loading && accepted && model.isNotBlank(),
                 onClick = {
-                    if (!isPlan && !prefs.setAssistantKey(provider.id, apiKey)) {
-                        Toast.makeText(context, strings.as_key_not_saved, Toast.LENGTH_LONG).show()
-                        return@Button
-                    }
-                    prefs.assistantProvider = provider.id
-                    prefs.assistantServerUrl = serverUrl
+                    prefs.assistantProvider = SendaAssistant.PROVIDER_ID
                     prefs.assistantModel = model
                     prefs.assistantPrivacyAccepted = true
                     Toast.makeText(context, strings.as_saved, Toast.LENGTH_SHORT).show()
@@ -346,10 +277,63 @@ fun SendaAssistantSettingsDialog(
     )
 }
 
-private data class AssistantMessage(val role: ChatTurn.Role, val shown: String, val sent: String)
+private data class AssistantMessage(
+    val role: ChatTurn.Role,
+    val shown: String,
+    val sent: String,
+    val attachments: List<Attachment> = emptyList(),
+    val sources: List<Source> = emptyList()
+)
 
-/** Chat con el proveedor configurado. La página solo se envía si el usuario la incluye en ese mensaje. */
-@OptIn(ExperimentalMaterial3Api::class)
+/** Fotos y PDF: lo que ChatGPT acepta con el plan (medido el 2026-10-06). */
+private const val ATTACH_MAX_MB = 20
+private const val IMAGE_MAX_SIDE = 1600
+
+/**
+ * Prepara un archivo elegido por el usuario: las fotos se reducen a 1600 px en JPEG (ChatGPT no necesita más y la
+ * petición pesa mucho menos); los PDF van tal cual hasta 20 MB. Otros tipos no se aceptan.
+ */
+private fun readAttachment(context: Context, uri: android.net.Uri): Result<Attachment> = runCatching {
+    val resolver = context.contentResolver
+    val mime = resolver.getType(uri).orEmpty()
+    val name = resolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
+        if (it.moveToFirst()) it.getString(0) else null
+    } ?: uri.lastPathSegment ?: "archivo"
+    when {
+        mime.startsWith("image/") -> {
+            val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            resolver.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it, null, bounds) }
+            var sample = 1
+            while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= IMAGE_MAX_SIDE) sample *= 2
+            val bmp = resolver.openInputStream(uri)?.use {
+                android.graphics.BitmapFactory.decodeStream(it, null, android.graphics.BitmapFactory.Options().apply { inSampleSize = sample })
+            } ?: error("unreadable")
+            val scale = IMAGE_MAX_SIDE.toFloat() / maxOf(bmp.width, bmp.height)
+            val sized = if (scale < 1f) android.graphics.Bitmap.createScaledBitmap(bmp, (bmp.width * scale).toInt(), (bmp.height * scale).toInt(), true) else bmp
+            val out = java.io.ByteArrayOutputStream()
+            sized.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, out)
+            Attachment(name, "image/jpeg", android.util.Base64.encodeToString(out.toByteArray(), android.util.Base64.NO_WRAP))
+        }
+        mime == "application/pdf" -> {
+            val bytes = resolver.openInputStream(uri)?.use { input ->
+                val buf = java.io.ByteArrayOutputStream()
+                val chunk = ByteArray(64 * 1024)
+                while (true) {
+                    val n = input.read(chunk)
+                    if (n < 0) break
+                    buf.write(chunk, 0, n)
+                    if (buf.size() > ATTACH_MAX_MB * 1024 * 1024) throw IllegalStateException("too_big:$name")
+                }
+                buf.toByteArray()
+            } ?: error("unreadable")
+            Attachment(name, mime, android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP))
+        }
+        else -> throw IllegalArgumentException("unsupported")
+    }
+}
+
+/** Chat con ChatGPT. La página solo se envía si el usuario la incluye en ese mensaje. */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SendaAssistantSheet(prefs: PreferencesManager, activeTab: BrowserTab?, onDismiss: () -> Unit) {
     val context = LocalContext.current
@@ -362,30 +346,62 @@ fun SendaAssistantSheet(prefs: PreferencesManager, activeTab: BrowserTab?, onDis
     var partial by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf<Job?>(null) }
     var includePage by remember { mutableStateOf(false) }
+    var deep by remember { mutableStateOf(false) }
+    val pending = remember { mutableStateListOf<Attachment>() }
     val listState = rememberLazyListState()
     val hasPage = activeTab != null && activeTab.url.isNotBlank() && activeTab.url != "about:blank"
-    val destination = SendaAssistant.destination(prefs)
+    val destination = SendaAssistant.DESTINATION
     val language = remember { org.senda.browser.core.SendaLocaleManager.getEffectiveLanguage(prefs.appLanguage, context) }
-    val usingPlan = prefs.assistantProvider == RemoteAiProvider.CHATGPT_PLAN.id
     var showLimit by remember { mutableStateOf(false) }
     if (showLimit) ChatGptUsageLimitDialog { showLimit = false }
 
+    // Fotos y PDF: el selector del sistema; Senda no ve más archivos que los elegidos
+    val picker = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        scope.launch {
+            uris.forEach { uri ->
+                val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { readAttachment(context, uri) }
+                result.onSuccess { pending += it }.onFailure { e ->
+                    val msg = when {
+                        e.message?.startsWith("too_big:") == true -> strings.as_attach_too_big.format(e.message!!.removePrefix("too_big:"), ATTACH_MAX_MB)
+                        else -> strings.as_attach_unsupported
+                    }
+                    Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    fun openInTab(url: String) {
+        val opener = BrowserTab.tabOpener
+        if (opener != null) {
+            opener(BrowserTab(isPrivate = activeTab?.isPrivate ?: false, prefs = prefs,
+                searchBaseUrl = activeTab?.searchBaseUrl ?: prefs.customSearchEngineUrl, initialUrl = url), false)
+        } else {
+            openInBrowser(context, url)
+        }
+        busy?.cancel(); onDismiss()
+    }
+
     fun send(text: String, withPage: Boolean) {
         val question = text.trim()
-        if (question.isEmpty() || busy != null) return
+        if ((question.isEmpty() && pending.isEmpty()) || busy != null) return
+        val files = pending.toList()
         input = ""
         partial = ""
+        pending.clear()
         busy = scope.launch {
             val pageText = if (withPage && hasPage) activeTab?.extractPageText() else null
             val sent = if (pageText != null)
                 SendaAssistant.pageBlock(activeTab?.title.orEmpty(), activeTab?.url.orEmpty(), pageText) + "\n\n" + question
             else question
-            messages += AssistantMessage(ChatTurn.Role.USER, question, sent)
+            messages += AssistantMessage(ChatTurn.Role.USER, question, sent, files)
             includePage = false
             try {
-                val turns = messages.map { ChatTurn(it.role, it.sent) }
-                val answer = SendaAssistant.client(prefs).chat(prefs.assistantModel, SendaAssistant.systemPrompt(language), turns) { partial = it }
-                messages += AssistantMessage(ChatTurn.Role.ASSISTANT, answer, answer)
+                val turns = messages.map { ChatTurn(it.role, it.sent, it.attachments) }
+                val reply = SendaAssistant.client(prefs).chat(prefs.assistantModel, SendaAssistant.systemPrompt(language), turns, deep) { partial = it }
+                messages += AssistantMessage(ChatTurn.Role.ASSISTANT, reply.text, reply.text, sources = reply.sources)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -394,6 +410,7 @@ fun SendaAssistantSheet(prefs: PreferencesManager, activeTab: BrowserTab?, onDis
                 if (e is RemoteAiException && e.kind == RemoteAiException.Kind.USAGE_LIMIT) showLimit = true
                 else Toast.makeText(context, assistantErrorText(e, strings, destination), Toast.LENGTH_LONG).show()
                 input = question
+                pending.addAll(files)
             } finally {
                 partial = ""
                 busy = null
@@ -427,7 +444,7 @@ fun SendaAssistantSheet(prefs: PreferencesManager, activeTab: BrowserTab?, onDis
                     }
                 }
                 if (messages.isNotEmpty() && busy == null) {
-                    TextButton(onClick = { messages.clear() }) { Text(strings.as_new_chat, fontSize = 12.sp) }
+                    TextButton(onClick = { messages.clear(); pending.clear() }) { Text(strings.as_new_chat, fontSize = 12.sp) }
                 }
                 IconButton(onClick = { showSettings = true }) { Icon(Icons.Default.Settings, contentDescription = strings.as_settings_title) }
             }
@@ -435,7 +452,11 @@ fun SendaAssistantSheet(prefs: PreferencesManager, activeTab: BrowserTab?, onDis
                 Spacer(Modifier.height(24.dp))
                 Text(strings.as_not_configured, fontSize = 15.sp)
                 Spacer(Modifier.height(12.dp))
-                Button(onClick = { showSettings = true }) { Text(strings.as_configure) }
+                Button(onClick = { showSettings = true }) {
+                    ChatGptLogo(18)
+                    Spacer(Modifier.width(8.dp))
+                    Text(strings.as_chatgpt_continue)
+                }
                 Spacer(Modifier.height(24.dp))
                 AssistantWebShortcuts(prefs, activeTab) { busy?.cancel(); onDismiss() }
                 return@Column
@@ -445,7 +466,7 @@ fun SendaAssistantSheet(prefs: PreferencesManager, activeTab: BrowserTab?, onDis
                 if (messages.isEmpty() && busy == null) {
                     item { Column { Spacer(Modifier.height(12.dp)); AssistantWebShortcuts(prefs, activeTab) { onDismiss() } } }
                 }
-                items(messages) { m -> AssistantBubble(m, strings, context) }
+                items(messages) { m -> AssistantBubble(m, strings, context) { url -> openInTab(url) } }
                 if (busy != null) {
                     item {
                         if (partial.isBlank()) {
@@ -455,33 +476,56 @@ fun SendaAssistantSheet(prefs: PreferencesManager, activeTab: BrowserTab?, onDis
                                 Text(strings.as_waiting.format(destination), fontSize = 12.sp)
                             }
                         } else {
-                            AssistantBubble(AssistantMessage(ChatTurn.Role.ASSISTANT, partial, partial), strings, context)
+                            AssistantBubble(AssistantMessage(ChatTurn.Role.ASSISTANT, partial, partial), strings, context) { }
                         }
                     }
                 }
             }
-            if (hasPage) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+            // Opciones del mensaje: página, pensar a fondo y crear imágenes (en chatgpt.com: aquí OpenAI no lo permite)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (hasPage) {
                     FilterChip(selected = includePage, onClick = { includePage = !includePage }, label = { Text(strings.as_include_page, fontSize = 12.sp) })
-                    Spacer(Modifier.width(8.dp))
                     AssistChip(enabled = busy == null, onClick = { send(strings.as_summarize_prompt, true) }, label = { Text(strings.as_summarize, fontSize = 12.sp) })
                 }
-                if (includePage) Text(strings.as_page_on, fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
+                FilterChip(
+                    selected = deep, onClick = { deep = !deep },
+                    leadingIcon = { Icon(Icons.Default.Psychology, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                    label = { Text(strings.as_deep, fontSize = 12.sp) }
+                )
+                AssistChip(
+                    onClick = { openInTab(ChatGptPlanClient.CHATGPT_WEB) },
+                    leadingIcon = { Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                    trailingIcon = { Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(14.dp)) },
+                    label = { Text(strings.as_create_image, fontSize = 12.sp) }
+                )
             }
-            // Etiqueta obligatoria de OpenAI junto al cuadro de escritura cuando se usa el plan
-            if (usingPlan) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
-                    ChatGptLogo(14)
-                    Spacer(Modifier.width(6.dp))
-                    Text(strings.as_chatgpt_using_plan, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (includePage) Text(strings.as_page_on, fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
+            if (pending.isNotEmpty()) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    pending.forEach { a ->
+                        InputChip(
+                            selected = false, onClick = { pending.remove(a) },
+                            label = { Text(a.name, fontSize = 12.sp, maxLines = 1) },
+                            trailingIcon = { Icon(Icons.Default.Close, contentDescription = strings.as_remove_attachment, modifier = Modifier.size(14.dp)) }
+                        )
+                    }
                 }
             }
+            // Etiqueta obligatoria de OpenAI junto al cuadro de escritura cuando se usa el plan
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
+                ChatGptLogo(14)
+                Spacer(Modifier.width(6.dp))
+                Text(strings.as_chatgpt_using_plan, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 8.dp)) {
+                IconButton(enabled = busy == null, onClick = { picker.launch(arrayOf("image/*", "application/pdf")) }) {
+                    Icon(Icons.Default.AttachFile, contentDescription = strings.as_attach)
+                }
                 OutlinedTextField(
                     value = input, onValueChange = { input = it }, placeholder = { Text(strings.as_input_hint) },
                     modifier = Modifier.weight(1f), maxLines = 5, shape = RoundedCornerShape(20.dp)
                 )
-                IconButton(enabled = busy == null && input.isNotBlank(), onClick = { send(input, includePage) }) {
+                IconButton(enabled = busy == null && (input.isNotBlank() || pending.isNotEmpty()), onClick = { send(input, includePage) }) {
                     Icon(Icons.AutoMirrored.Filled.Send, contentDescription = strings.as_send)
                 }
             }
@@ -489,8 +533,9 @@ fun SendaAssistantSheet(prefs: PreferencesManager, activeTab: BrowserTab?, onDis
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun AssistantBubble(m: AssistantMessage, strings: SendaStringPack, context: Context) {
+private fun AssistantBubble(m: AssistantMessage, strings: SendaStringPack, context: Context, onOpenSource: (String) -> Unit) {
     val mine = m.role == ChatTurn.Role.USER
     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = if (mine) Alignment.CenterEnd else Alignment.CenterStart) {
         Surface(
@@ -499,11 +544,37 @@ private fun AssistantBubble(m: AssistantMessage, strings: SendaStringPack, conte
             modifier = Modifier.widthIn(max = if (mine) 300.dp else 600.dp)
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
-                SelectionContainer { Text(m.shown, fontSize = 14.sp, lineHeight = 20.sp) }
+                m.attachments.forEach { a ->
+                    Text(strings.as_attached.format(a.name), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                if (m.shown.isNotBlank()) {
+                    val linkColor = MaterialTheme.colorScheme.primary
+                    val shown = if (mine) AnnotatedString(m.shown) else remember(m.shown, linkColor) { assistantMarkdown(m.shown, linkColor, onOpenSource) }
+                    SelectionContainer { Text(shown, fontSize = 14.sp, lineHeight = 20.sp) }
+                }
+                if (m.sources.isNotEmpty()) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(strings.as_sources, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        m.sources.forEach { src ->
+                            if (src.url.isBlank()) {
+                                // Servicio de datos de OpenAI sin página (p. ej. el tiempo): se nombra, no se abre
+                                AssistChip(onClick = {}, enabled = false, label = { Text("OpenAI · ${src.title}", fontSize = 11.sp, maxLines = 1) })
+                            } else {
+                                val host = runCatching { java.net.URL(src.url).host.removePrefix("www.") }.getOrDefault(src.url)
+                                AssistChip(
+                                    onClick = { onOpenSource(src.url) },
+                                    label = { Text(host, fontSize = 11.sp, maxLines = 1) },
+                                    trailingIcon = { Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(12.dp)) }
+                                )
+                            }
+                        }
+                    }
+                }
                 if (!mine) {
                     TextButton(onClick = {
                         val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        cm.setPrimaryClip(ClipData.newPlainText("Senda", m.shown))
+                        cm.setPrimaryClip(ClipData.newPlainText("Senda", assistantPlainText(m.shown)))
                         Toast.makeText(context, strings.as_copied, Toast.LENGTH_SHORT).show()
                     }, contentPadding = PaddingValues(0.dp)) {
                         Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp))
@@ -548,19 +619,26 @@ private fun AssistantWebShortcuts(prefs: PreferencesManager, activeTab: BrowserT
             Text(strings.as_web_copy_page, fontSize = 12.sp)
         }
     }
-    OfficialSiteChips(prefs, activeTab, copyPage && hasPage, onOpened)
+    // Sin ChatGPT: ya se está usando aquí, y «Crear imágenes en ChatGPT» abre su web
+    OfficialSiteChips(prefs, activeTab, copyPage = copyPage && hasPage, includeChatGpt = false, onOpened = onOpened)
 }
 
-/** Botones de las webs oficiales (sin ChatGPT cuando ya se ofrece con el plan, para no repetirlo dos veces). */
+/** Botones de las webs oficiales. En la configuración, sin ChatGPT: ahí ya está «Continuar con ChatGPT». */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun OfficialSiteChips(prefs: PreferencesManager, activeTab: BrowserTab?, copyPage: Boolean = false, onOpened: () -> Unit) {
+fun OfficialSiteChips(
+    prefs: PreferencesManager,
+    activeTab: BrowserTab?,
+    copyPage: Boolean = false,
+    includeChatGpt: Boolean = true,
+    onOpened: () -> Unit
+) {
     val context = LocalContext.current
     val strings = LocalSendaStrings.current
     val scope = rememberCoroutineScope()
     val hasPage = activeTab != null && activeTab.url.isNotBlank() && activeTab.url != "about:blank"
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OFFICIAL_AI_SITES.forEach { (name, url) ->
+        OFFICIAL_AI_SITES.filter { includeChatGpt || it.first != "ChatGPT" }.forEach { (name, url) ->
             AssistChip(
                 onClick = {
                     scope.launch {

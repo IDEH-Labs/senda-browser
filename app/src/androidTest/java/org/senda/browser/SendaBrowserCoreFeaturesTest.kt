@@ -9,7 +9,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.MethodSorters
 import org.senda.browser.core.*
-import org.senda.browser.core.cast.SendaDialCast
+import org.senda.browser.core.cast.SendaYouTube
 import org.senda.browser.ui.model.SendaUrlResolver
 import java.io.File
 
@@ -86,21 +86,21 @@ class SendaBrowserCoreFeaturesTest {
         val testId = "dQw4w9WgXcQ"
 
         // URL estándar watch
-        assertEquals(testId, SendaDialCast.youTubeVideoId("https://www.youtube.com/watch?v=$testId"))
-        assertEquals(testId, SendaDialCast.youTubeVideoId("https://m.youtube.com/watch?v=$testId&t=42s"))
+        assertEquals(testId, SendaYouTube.youTubeVideoId("https://www.youtube.com/watch?v=$testId"))
+        assertEquals(testId, SendaYouTube.youTubeVideoId("https://m.youtube.com/watch?v=$testId&t=42s"))
 
         // Enlace corto youtu.be
-        assertEquals(testId, SendaDialCast.youTubeVideoId("https://youtu.be/$testId"))
-        assertEquals(testId, SendaDialCast.youTubeVideoId("https://youtu.be/$testId?t=10"))
+        assertEquals(testId, SendaYouTube.youTubeVideoId("https://youtu.be/$testId"))
+        assertEquals(testId, SendaYouTube.youTubeVideoId("https://youtu.be/$testId?t=10"))
 
         // Shorts y Embed
-        assertEquals(testId, SendaDialCast.youTubeVideoId("https://www.youtube.com/shorts/$testId"))
-        assertEquals(testId, SendaDialCast.youTubeVideoId("https://www.youtube-nocookie.com/embed/$testId"))
+        assertEquals(testId, SendaYouTube.youTubeVideoId("https://www.youtube.com/shorts/$testId"))
+        assertEquals(testId, SendaYouTube.youTubeVideoId("https://www.youtube-nocookie.com/embed/$testId"))
 
         // URLs no válidas no deben extraer ID
-        assertNull(SendaDialCast.youTubeVideoId("https://vimeo.com/12345678"))
-        assertNull(SendaDialCast.youTubeVideoId("https://senda.org/watch?v=$testId"))
-        assertNull(SendaDialCast.youTubeVideoId("about:blank"))
+        assertNull(SendaYouTube.youTubeVideoId("https://vimeo.com/12345678"))
+        assertNull(SendaYouTube.youTubeVideoId("https://senda.org/watch?v=$testId"))
+        assertNull(SendaYouTube.youTubeVideoId("about:blank"))
     }
 
     // =========================================================================
