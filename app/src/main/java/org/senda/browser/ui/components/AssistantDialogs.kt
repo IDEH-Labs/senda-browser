@@ -103,21 +103,40 @@ fun ChatGptWelcomeDialog(onDismiss: () -> Unit) {
 }
 
 /** Aviso de límite de uso del plan, con la acción «Manage usage» que exige la guía de OpenAI. */
+/**
+ * Límite de uso de la IA en uso alcanzado (plan de ChatGPT o cuota de la clave, p. ej. el nivel gratuito de Gemini).
+ * Dice qué pasó y ofrece lo útil: seguir con otra IA conectada o ver el uso en la página oficial de esa empresa.
+ */
 @Composable
-fun ChatGptUsageLimitDialog(onDismiss: () -> Unit) {
+fun UsageLimitDialog(prefs: PreferencesManager, onSwitched: () -> Unit, onDismiss: () -> Unit) {
     val strings = LocalSendaStrings.current
     val context = LocalContext.current
+    val current = prefs.assistantProvider ?: SendaAssistant.PROVIDER_ID
+    val name = SendaAssistant.displayName(current)
+    // Otra IA ya conectada y aceptada a la que pasar con un toque (ChatGPT primero)
+    val alternative = SendaAssistant.connected(prefs).firstOrNull { it != current && prefs.assistantConsentFor(it) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        icon = { ChatGptLogo(28) },
-        title = { Text(strings.as_chatgpt_using_plan) },
-        text = { Text(strings.as_chatgpt_limit) },
+        icon = { if (current == SendaAssistant.PROVIDER_ID) ChatGptLogo(28) },
+        title = { Text(strings.as_limit_title.format(name)) },
+        text = { Text(if (current == SendaAssistant.PROVIDER_ID) strings.as_chatgpt_limit else strings.as_limit_body.format(name)) },
         confirmButton = {
-            Button(onClick = { openInBrowser(context, org.senda.browser.core.assistant.ChatGptPlanClient.MANAGE_USAGE_URL); onDismiss() }) {
-                Text(strings.as_chatgpt_manage_usage)
+            if (alternative != null) {
+                Button(onClick = { SendaAssistant.use(prefs, alternative); onSwitched(); onDismiss() }) {
+                    Text(strings.as_use_other.format(SendaAssistant.displayName(alternative)))
+                }
+            } else {
+                Button(onClick = { openInBrowser(context, SendaAssistant.usagePageOf(current)); onDismiss() }) { Text(strings.as_see_usage) }
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(strings.general_cancel) } }
+        dismissButton = {
+            Row {
+                if (alternative != null) {
+                    TextButton(onClick = { openInBrowser(context, SendaAssistant.usagePageOf(current)); onDismiss() }) { Text(strings.as_see_usage) }
+                }
+                TextButton(onClick = onDismiss) { Text(strings.general_close) }
+            }
+        }
     )
 }
 
@@ -205,13 +224,15 @@ fun SendaAssistantSheet(prefs: PreferencesManager, activeTab: BrowserTab?, onDis
     val pending = remember { mutableStateListOf<Attachment>() }
     val listState = rememberLazyListState()
     val hasPage = activeTab != null && activeTab.url.isNotBlank() && activeTab.url != "about:blank"
-    val destination = SendaAssistant.destination(prefs)
+    // Cambia al pasar a otra IA desde el aviso de límite
+    var switched by remember { mutableIntStateOf(0) }
+    val destination = remember(switched) { SendaAssistant.destination(prefs) }
     // Lo que la IA elegida tiene comprobado: el chat no ofrece lo demás
-    val backend = remember(configured) { runCatching { SendaAssistant.client(prefs) }.getOrNull() }
+    val backend = remember(configured, switched) { runCatching { SendaAssistant.client(prefs) }.getOrNull() }
     val usingChatGpt = backend is ChatGptPlanClient
     val language = remember { org.senda.browser.core.SendaLocaleManager.getEffectiveLanguage(prefs.appLanguage, context) }
     var showLimit by remember { mutableStateOf(false) }
-    if (showLimit) ChatGptUsageLimitDialog { showLimit = false }
+    if (showLimit) UsageLimitDialog(prefs, onSwitched = { switched++ }, onDismiss = { showLimit = false })
 
     // Fotos y PDF: el selector del sistema; Senda no ve más archivos que los elegidos
     val picker = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -258,7 +279,9 @@ fun SendaAssistantSheet(prefs: PreferencesManager, activeTab: BrowserTab?, onDis
             includePage = false
             try {
                 val turns = messages.map { ChatTurn(it.role, it.sent, it.attachments) }
-                val reply = SendaAssistant.client(prefs).chat(SendaAssistant.model(prefs), SendaAssistant.systemPrompt(language), turns, deep && backend?.canThinkDeep == true) { partial = it }
+                // Si la IA en uso aún no tiene modelo (recién conectada o retirado), se elige ahora
+                val model = SendaAssistant.ensureModel(prefs)
+                val reply = SendaAssistant.client(prefs).chat(model, SendaAssistant.systemPrompt(language), turns, deep && backend?.canThinkDeep == true) { partial = it }
                 messages += AssistantMessage(ChatTurn.Role.ASSISTANT, reply.text, reply.text, sources = reply.sources)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
@@ -270,8 +293,8 @@ fun SendaAssistantSheet(prefs: PreferencesManager, activeTab: BrowserTab?, onDis
                 val modelGone = e is RemoteAiException && e.kind == RemoteAiException.Kind.BAD_RESPONSE &&
                     Regex("HTTP 40[04]").containsMatchIn(e.message.orEmpty()) && e.message.orEmpty().contains("model", ignoreCase = true)
                 if (modelGone) {
+                    // Se olvida: el próximo mensaje elegirá otro modelo que funcione (ensureModel)
                     prefs.assistantProvider?.let { prefs.setAssistantModelFor(it, "") }
-                    configured = false
                     Toast.makeText(context, strings.as_model_gone, Toast.LENGTH_LONG).show()
                 } else if (e is RemoteAiException && e.kind == RemoteAiException.Kind.USAGE_LIMIT) showLimit = true
                 else Toast.makeText(context, assistantErrorText(e, strings, destination), Toast.LENGTH_LONG).show()
@@ -306,7 +329,10 @@ fun SendaAssistantSheet(prefs: PreferencesManager, activeTab: BrowserTab?, onDis
                 Column(modifier = Modifier.weight(1f)) {
                     Text(strings.as_menu_title, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     if (configured) {
-                        Text(strings.as_sending_to.format(destination, SendaAssistant.model(prefs)), fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
+                        // Nombre de la IA (no la dirección técnica) y su modelo
+                        val aiName = remember(switched) { SendaAssistant.displayName(prefs.assistantProvider ?: SendaAssistant.PROVIDER_ID) }
+                        Text(strings.as_sending_to.format(aiName, SendaAssistant.model(prefs).ifBlank { strings.as_model_pending }),
+                            fontSize = 11.sp, color = MaterialTheme.colorScheme.primary, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                     }
                 }
                 if (messages.isNotEmpty() && busy == null) {

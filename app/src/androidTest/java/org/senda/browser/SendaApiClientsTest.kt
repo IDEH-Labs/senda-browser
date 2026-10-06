@@ -28,6 +28,7 @@ class SendaApiClientsTest {
     private lateinit var server: ServerSocket
     private val requests = mutableListOf<String>()
     @Volatile private var nextStatus = 200
+    @Volatile private var fail503Once = false
 
     @Before
     fun start() {
@@ -48,7 +49,11 @@ class SendaApiClientsTest {
                     synchronized(requests) { requests += head.toString() + body }
                     val path = head.lineSequence().first().split(' ')[1]
                     val retired = body.contains("\"model\":\"gemini-9-flash\"")
+                    val busy = fail503Once && path.endsWith("/chat/completions")
+                    if (busy) fail503Once = false
                     val (type, text) = when {
+                        busy -> "application/json" to """{"error":{"code":503,"message":"high demand"}}"""
+                        nextStatus == 429 -> "application/json" to """{"error":{"code":429,"message":"You exceeded your current quota, please check your plan"}}"""
                         nextStatus != 200 -> "application/json" to """{"error":{"message":"bad key"}}"""
                         retired -> "application/json" to """{"error":{"code":404,"message":"This model models/gemini-9-flash is no longer available to new users."}}"""
                         path.contains("/models") && path.contains("auto") -> "application/json" to """{"data":[{"id":"models/gemini-9-flash"},{"id":"models/gemini-8-flash"}]}"""
@@ -69,7 +74,7 @@ class SendaApiClientsTest {
                         ).joinToString("\n\n", postfix = "\n\n")
                     }
                     val bytes = text.toByteArray()
-                    val status = if (retired) "404 Not Found" else if (nextStatus == 200) "200 OK" else "$nextStatus Error"
+                    val status = if (busy) "503 Unavailable" else if (retired) "404 Not Found" else if (nextStatus == 200) "200 OK" else "$nextStatus Error"
                     sock.getOutputStream().write("HTTP/1.1 $status\r\nContent-Type: $type\r\nContent-Length: ${bytes.size}\r\nConnection: close\r\n\r\n".toByteArray() + bytes)
                 }
             }
@@ -128,5 +133,26 @@ class SendaApiClientsTest {
         // Primero el flash de versión más alta (gemini-9-flash, retirado en el simulador)
         assertEquals(listOf("gemini-9-flash", "gemini-8-flash"), client.listModels())
         assertEquals("gemini-8-flash", org.senda.browser.core.assistant.SendaAssistant.autoSelectModel(client))
+    }
+
+    /** Cuota agotada (429 «quota»): aviso de límite, no «ocupado». */
+    @Test
+    fun quotaIsUsageLimit() = runBlocking {
+        nextStatus = 429
+        try {
+            ApiProvider.GEMINI.clientAt("$base/openai", "k").chat("gemini-8-flash", "s", listOf(ChatTurn(ChatTurn.Role.USER, "hola")), deep = false) {}
+            fail("Debía fallar")
+        } catch (e: RemoteAiException) {
+            assertEquals(RemoteAiException.Kind.USAGE_LIMIT, e.kind)
+        }
+        Unit
+    }
+
+    /** «Demasiada demanda» (503) una vez: se reintenta solo y responde. */
+    @Test
+    fun busyIsRetriedOnce() = runBlocking {
+        fail503Once = true
+        val reply = ApiProvider.GEMINI.clientAt("$base/openai", "k").chat("gemini-8-flash", "s", listOf(ChatTurn(ChatTurn.Role.USER, "hola")), deep = false) {}
+        assertEquals("Hola mundo", reply.text)
     }
 }

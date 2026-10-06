@@ -33,6 +33,9 @@ object SendaAssistant {
 
     fun destinationOf(id: String): String = ApiProvider.byId(id)?.host ?: CHATGPT_DESTINATION
 
+    /** Página oficial donde el usuario ve su uso y sus límites con esa IA. */
+    fun usagePageOf(id: String): String = ApiProvider.byId(id)?.usagePage ?: ChatGptPlanClient.MANAGE_USAGE_URL
+
     /** Sin red: lo medido con cada empresa (ChatGptPlanClient, ApiProvider.clientAt). */
     fun capabilities(id: String): Capabilities = when (id) {
         PROVIDER_ID -> Capabilities(searchWeb = true, attach = true, thinkDeep = true)
@@ -43,11 +46,31 @@ object SendaAssistant {
     /** Modelo de la IA en uso. */
     fun model(prefs: PreferencesManager): String = prefs.assistantProvider?.let { prefs.assistantModelFor(it) }.orEmpty()
 
-    /** IA en uso conectada, con modelo y consentimiento. */
+    /**
+     * IA en uso conectada y con consentimiento. El modelo no hace falta: si falta (recién conectada, o la empresa
+     * retiró el que había), [ensureModel] lo elige al enviar el primer mensaje.
+     */
     fun isConfigured(prefs: PreferencesManager): Boolean {
         val id = prefs.assistantProvider ?: return false
-        return id in connected(prefs) && prefs.assistantModelFor(id).isNotBlank() && prefs.assistantConsentFor(id)
+        return id in connected(prefs) && prefs.assistantConsentFor(id)
     }
+
+    /** Modelo de la IA en uso; si no hay, lo elige ([autoSelectModel]) y lo guarda. */
+    suspend fun ensureModel(prefs: PreferencesManager): String {
+        val id = prefs.assistantProvider ?: throw RemoteAiException(RemoteAiException.Kind.NOT_CONFIGURED)
+        prefs.assistantModelFor(id).takeIf { it.isNotBlank() }?.let { return it }
+        return autoSelectModel(backendFor(id, prefs)).also { model ->
+            prefs.setAssistantModelFor(id, model)
+            android.util.Log.i("SendaAssistant", "Modelo elegido para $id: $model")
+        }
+    }
+
+    /**
+     * Para buscar el modelo al tocar «Usar» sin que cerrar «Mis IA» lo cancele: no depende de la pantalla.
+     * [connecting] dice qué IA se está preparando, para mostrarlo al volver a abrir.
+     */
+    val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main)
+    val connecting = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
 
     /** Adónde viajan los datos de la IA en uso. */
     fun destination(prefs: PreferencesManager): String = destinationOf(prefs.assistantProvider ?: PROVIDER_ID)
@@ -75,6 +98,8 @@ object SendaAssistant {
                 backend.chat(model, "Reply with: OK", listOf(ChatTurn(ChatTurn.Role.USER, "OK")), deep = false) {}
                 return model
             } catch (e: RemoteAiException) {
+                // Solo el tipo y el código: nunca la clave ni lo escrito
+                android.util.Log.w("SendaAssistant", "Modelo $model no responde: ${e.kind} ${e.message?.take(40)}")
                 if (e.kind != RemoteAiException.Kind.BAD_RESPONSE) throw e
                 last = e
             }

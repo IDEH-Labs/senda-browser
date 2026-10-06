@@ -33,12 +33,14 @@ enum class ApiProvider(
     /** Base de la API oficial (siempre https). */
     val baseUrl: String,
     /** Página oficial donde se crea la clave. */
-    val keysPage: String
+    val keysPage: String,
+    /** Página oficial donde se ve el uso y los límites (la que indica cada empresa en sus errores de cuota). */
+    val usagePage: String
 ) {
-    ANTHROPIC("anthropic", "Claude (Anthropic)", "https://api.anthropic.com/v1", "https://console.anthropic.com/settings/keys"),
-    GEMINI("gemini", "Gemini (Google)", "https://generativelanguage.googleapis.com/v1beta/openai", "https://aistudio.google.com/apikey"),
-    XAI("xai", "Grok (xAI)", "https://api.x.ai/v1", "https://console.x.ai"),
-    MISTRAL("mistral", "Mistral", "https://api.mistral.ai/v1", "https://console.mistral.ai/api-keys");
+    ANTHROPIC("anthropic", "Claude (Anthropic)", "https://api.anthropic.com/v1", "https://console.anthropic.com/settings/keys", "https://console.anthropic.com/settings/limits"),
+    GEMINI("gemini", "Gemini (Google)", "https://generativelanguage.googleapis.com/v1beta/openai", "https://aistudio.google.com/apikey", "https://ai.dev/rate-limit"),
+    XAI("xai", "Grok (xAI)", "https://api.x.ai/v1", "https://console.x.ai", "https://console.x.ai"),
+    MISTRAL("mistral", "Mistral", "https://api.mistral.ai/v1", "https://console.mistral.ai/api-keys", "https://console.mistral.ai/usage");
 
     val host: String get() = java.net.URL(baseUrl).host
 
@@ -96,18 +98,33 @@ private abstract class TextOnlyApiClient(protected val base: String, protected v
         // Solo el código y un fragmento del error (nunca contiene la clave enviada)
         val err = try { conn.errorStream?.bufferedReader()?.use { it.readText() }?.take(200) } catch (_: IOException) { null }.orEmpty()
         throw RemoteAiException(
-            when (code) {
-                401, 403 -> RemoteAiException.Kind.AUTH
-                // 503: «demasiada demanda», pasajero
-                429, 503 -> RemoteAiException.Kind.RATE_LIMIT
+            when {
+                code == 401 || code == 403 -> RemoteAiException.Kind.AUTH
+                // Cuota del plan agotada (p. ej. el nivel gratuito de Gemini): no se arregla esperando un momento
+                code == 429 && err.contains("quota", ignoreCase = true) -> RemoteAiException.Kind.USAGE_LIMIT
+                // 429 por ritmo y 503 «demasiada demanda»: pasajeros
+                code == 429 || code == 503 -> RemoteAiException.Kind.RATE_LIMIT
                 else -> RemoteAiException.Kind.BAD_RESPONSE
             },
             "HTTP $code $err".trim()
         )
     }
 
-    /** Recorre un flujo de eventos (SSE) y entrega cada línea «data:». */
+    /**
+     * Recorre un flujo de eventos (SSE) y entrega cada línea «data:». Con «demasiada demanda» (503) antes de
+     * empezar a responder se reintenta una vez a los 2 s: suele pasar enseguida.
+     */
     protected suspend fun streamPost(url: String, payload: JSONObject, onData: (String) -> Boolean) {
+        try {
+            streamPostOnce(url, payload, onData)
+        } catch (e: RemoteAiException) {
+            if (e.kind != RemoteAiException.Kind.RATE_LIMIT || e.message?.startsWith("HTTP 503") != true) throw e
+            kotlinx.coroutines.delay(2_000)
+            streamPostOnce(url, payload, onData)
+        }
+    }
+
+    private suspend fun streamPostOnce(url: String, payload: JSONObject, onData: (String) -> Boolean) {
         val conn = open(url).apply {
             requestMethod = "POST"; doOutput = true
             setRequestProperty("Content-Type", "application/json")
