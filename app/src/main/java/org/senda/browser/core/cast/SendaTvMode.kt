@@ -55,17 +55,19 @@ object SendaTvMode {
     }
 
     /**
-     * Desconecta la TV sin pasar por los ajustes de Android. Conectar y desconectar Miracast es de las apps del
-     * sistema (CONFIGURE_WIFI_DISPLAY); la vía pública es volver a la salida de video del propio teléfono con
-     * MediaRouter. Si el teléfono no lo permite, se abre el panel «Enviar pantalla», donde basta tocar «Desconectar».
+     * Desconecta la TV sin pasar por los ajustes de Android. Conectar Miracast es solo de las apps del sistema
+     * (CONFIGURE_WIFI_DISPLAY); desconectar lo puede pedir cualquier app, con una función oculta (probado en un
+     * moto g34; MediaRouter no lo hacía). Si no funcionara, se abre el panel «Enviar pantalla» para tocar «Desconectar».
      */
     fun disconnect(context: Context) {
         SendaTvPlayer.requestReturn?.invoke()
         try {
-            val router = context.getSystemService(android.media.MediaRouter::class.java)
-            router?.selectRoute(android.media.MediaRouter.ROUTE_TYPE_LIVE_VIDEO, router.defaultRoute)
+            // DisplayManager.disconnectWifiDisplay() es oculta, pero el sistema la permite a cualquier app («any app
+            // can request disconnection from the currently active wifi display», DisplayManagerService)
+            DisplayManager::class.java.getMethod("disconnectWifiDisplay")
+                .invoke(context.getSystemService(DisplayManager::class.java))
         } catch (e: Exception) {
-            android.util.Log.w("SendaTvMode", "MediaRouter no pudo desconectar: ${e.message}")
+            android.util.Log.w("SendaTvMode", "No se pudo desconectar la TV directamente: ${e.cause?.message ?: e.message}")
         }
         Handler(Looper.getMainLooper()).postDelayed({
             evaluate()

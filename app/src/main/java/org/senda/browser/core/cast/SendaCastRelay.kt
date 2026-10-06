@@ -16,12 +16,11 @@ import java.security.SecureRandom
 import java.util.concurrent.Executors
 
 /**
- * Relé del video hacia la TV durante una transmisión DLNA. La TV no puede pedir el video por su cuenta a
- * muchos sitios: lo exigen con el Referer de la página, o usan certificados HTTPS que un televisor de hace años
- * no reconoce. El teléfono lo pide como lo pidió la página (por el mismo proxy o Tor) y se lo pasa a la TV por
- * http en la red local, sin recomprimir nada: la TV recibe el archivo original.
+ * Relé local del video que se muestra en la TV ([org.senda.browser.ui.components.TvPresentationHost]). El
+ * reproductor de Android no usa el proxy de Senda ni sabe el Referer que exigen muchos sitios: el relé pide el
+ * video como lo pidió la página (por el mismo proxy o Tor) y se lo pasa sin recomprimir.
  *
- * Solo atiende a la IP de la TV y a rutas con un secreto aleatorio, y se cierra al terminar la transmisión.
+ * Solo atiende a la dirección indicada (127.0.0.1) y a rutas con un secreto aleatorio, y se cierra al terminar.
  * Las listas HLS se reescriben para que también sus trozos pasen por aquí.
  */
 class SendaCastRelay private constructor(
@@ -147,9 +146,7 @@ class SendaCastRelay private constructor(
             }
             val responseHeaders = linkedMapOf(
                 "Content-Type" to type.ifBlank { "video/mp4" },
-                "Accept-Ranges" to "bytes",
-                "transferMode.dlna.org" to "Streaming",
-                "contentFeatures.dlna.org" to DLNA_FEATURES
+                "Accept-Ranges" to "bytes"
             )
             conn.getHeaderField("Content-Length")?.let { responseHeaders["Content-Length"] = it }
             conn.getHeaderField("Content-Range")?.let { responseHeaders["Content-Range"] = it }
@@ -212,7 +209,6 @@ class SendaCastRelay private constructor(
     companion object {
         private const val TAG = "SendaCastRelay"
         private const val USER_AGENT = "Mozilla/5.0 (Android 15; Mobile; rv:157.0) Gecko/157.0 Firefox/157.0"
-        const val DLNA_FEATURES = "DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01700000000000000000000000000000"
 
         /** El mismo camino que la navegación (ver senda_proxy/background.js): con Tor el video también va por Tor. */
         fun proxyFrom(prefs: org.senda.browser.core.PreferencesManager): Proxy = when (prefs.proxyMode) {

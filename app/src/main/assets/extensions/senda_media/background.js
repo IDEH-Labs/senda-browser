@@ -1,5 +1,5 @@
 // Solo observa las respuestas de la red: cuando una página descarga un video (MP4, WebM, HLS) se avisa a Senda
-// con la dirección del video y la de la página, para poder enviarlo a la TV por DLNA. No se inyecta nada en
+// con la dirección del video y la de la página, para mostrarlo en la TV al duplicar la pantalla. No se inyecta nada en
 // las páginas ni se modifica ninguna petición
 
 const VIDEO_TYPES = /^(video\/(mp4|webm|quicktime|x-matroska|x-m4v)|application\/(vnd\.apple\.mpegurl|x-mpegurl)|audio\/mpegurl)/i;
