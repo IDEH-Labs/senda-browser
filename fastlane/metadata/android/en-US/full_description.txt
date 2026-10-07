@@ -1,0 +1,35 @@
+Senda is a free web browser for Android built on Mozilla's GeckoView engine, independent of Chromium. The interface is available in 8 languages: Spanish, English, German, French, Portuguese, Italian, Japanese and Chinese.
+
+<b>Alpha version.</b> It has been tested on a single phone model and has not had an external security audit. It is not yet recommended for sensitive data.
+
+<b>Privacy and security</b>
+<ul>
+<li>Strict tracking protection, isolated third-party cookies, tracking-parameter stripping and Global Privacy Control.</li>
+<li>Built-in uBlock Origin.</li>
+<li>HTTPS-only mode and DNS over HTTPS, both on by default.</li>
+<li>Built-in Tor network (optional), or your own SOCKS5/HTTP proxy.</li>
+<li>Password vault encrypted with AES-256-GCM, with the key kept in the phone's secure hardware and unlocked with fingerprint or PIN.</li>
+<li>Optional app lock and screenshot protection. No telemetry.</li>
+</ul>
+
+<b>Browsing</b>
+<ul>
+<li>Separate normal and private tabs, bookmarks, history and downloads.</li>
+<li>Reader mode and on-device page translation (the text never leaves the phone).</li>
+<li>Print or save as PDF, find in page, desktop site, home screen shortcuts.</li>
+<li>Home page with shortcuts and 64 freely licensed wallpapers.</li>
+</ul>
+
+<b>Other</b>
+<ul>
+<li>Casting to a TV through Android screen mirroring (Miracast).</li>
+<li>Optional assistant using your ChatGPT plan or your own API key (Claude, Gemini, Grok or Mistral). These are non-free network services: nothing is sent unless you use the assistant, and only to the service you choose.</li>
+</ul>
+
+<b>Connections Senda makes on its own</b>
+<ul>
+<li>Google Safe Browsing, on by default (can be turned off in Settings).</li>
+<li>uBlock Origin filter list updates.</li>
+<li>Home page news from the RSS feeds of MuyLinux, EFF and FSF, only in layouts that show news.</li>
+<li>Translation models from Mozilla, the first time a language is translated.</li>
+</ul>

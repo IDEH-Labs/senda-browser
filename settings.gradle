@@ -10,11 +10,10 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // Only GeckoView comes from Mozilla's repository
         maven {
             url = uri("https://maven.mozilla.org/maven2/")
-        }
-        maven {
-            url = uri("https://raw.githubusercontent.com/guardianproject/gpmaven/master")
+            content { includeGroup("org.mozilla.geckoview") }
         }
     }
 }

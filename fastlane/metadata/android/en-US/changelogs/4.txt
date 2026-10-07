@@ -1,0 +1,1 @@
+Security update: GeckoView 157.0.1 (MFSA 2026-104, CVE-2026-106016, moderate impact). Source code comments and developer documentation translated to English.
