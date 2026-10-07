@@ -1,0 +1,93 @@
+// Assets that Senda bundles but that are not kept as binaries in the repository: they are produced
+// during the build from source or from an official release verified by its SHA-256
+
+import java.net.IDN
+import java.security.MessageDigest
+import java.time.LocalDateTime
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
+
+// uBlock Origin: the official release signed by Mozilla (GeckoView only installs signed extensions)
+def ublockVersion = '1.75.0'
+def ublockSha256 = '5b74415860456370644bd80f16125e865b0e6c356bb5dfcfb84069967eaa5287'
+def ublockUrl = "https://github.com/gorhill/uBlock/releases/download/${ublockVersion}/uBlock0_${ublockVersion}.firefox.signed.xpi"
+
+// Mozilla Public Suffix List, kept as text (the official file, MPL 2.0) and turned into the
+// per-TLD archive PublicSuffixList.kt reads
+def pslSource = rootProject.file('third_party/publicsuffix/public_suffix_list.dat')
+
+def ublockDir = layout.buildDirectory.dir('generated/senda-assets/ublock')
+def pslDir = layout.buildDirectory.dir('generated/senda-assets/psl')
+
+static String sha256Of(File file) {
+    def digest = MessageDigest.getInstance('SHA-256')
+    file.withInputStream { input ->
+        byte[] buffer = new byte[65536]
+        int n
+        while ((n = input.read(buffer)) > 0) digest.update(buffer, 0, n)
+    }
+    return digest.digest().encodeHex().toString()
+}
+
+def fetchUBlockOrigin = tasks.register('fetchUBlockOrigin') {
+    description = 'Downloads the official signed uBlock Origin release and verifies its SHA-256'
+    inputs.property('url', ublockUrl)
+    inputs.property('sha256', ublockSha256)
+    outputs.dir(ublockDir)
+    doLast {
+        File target = ublockDir.get().file('extensions/ublock.xpi').asFile
+        if (target.isFile() && sha256Of(target) == ublockSha256) return
+        target.parentFile.mkdirs()
+        File partial = new File(target.path + '.part')
+        new URL(ublockUrl).withInputStream { input -> partial.withOutputStream { it << input } }
+        String actual = sha256Of(partial)
+        if (actual != ublockSha256) {
+            partial.delete()
+            throw new GradleException("uBlock Origin ${ublockVersion}: SHA-256 is ${actual}, expected ${ublockSha256}")
+        }
+        if (!partial.renameTo(target)) throw new GradleException("Could not move ${partial} to ${target}")
+    }
+}
+
+def generatePublicSuffixList = tasks.register('generatePublicSuffixList') {
+    description = 'Builds the per-TLD Public Suffix List archive from the official text list'
+    inputs.file(pslSource)
+    outputs.dir(pslDir)
+    doLast {
+        // Each archive entry is a TLD; each line is a rule ending in it, prefixed with \u0000 (ICANN section)
+        // or \u0001 (private section). Internationalized rules are also stored in their ASCII (punycode)
+        // form, which is how hosts reach Senda from Gecko
+        Map<String, LinkedHashSet<String>> rulesByTld = new TreeMap<>()
+        boolean privateSection = false
+        pslSource.eachLine('UTF-8') { raw ->
+            String line = raw.trim()
+            if (line.contains('===BEGIN PRIVATE DOMAINS===')) privateSection = true
+            if (line.isEmpty() || line.startsWith('//')) return
+            String rule = line.split(/\s+/)[0].toLowerCase(Locale.ROOT)
+            String prefix = privateSection ? '\u0001' : '\u0000'
+            String exception = rule.startsWith('!') ? '!' : ''
+            List<String> labels = rule.substring(exception.length()).split(/\./) as List
+            String ascii = exception + labels.collect { it == '*' ? it : IDN.toASCII(it, IDN.ALLOW_UNASSIGNED) }.join('.')
+            [rule, ascii].unique().each { form ->
+                String tld = form.substring(form.lastIndexOf('.') + 1)
+                rulesByTld.computeIfAbsent(tld) { new LinkedHashSet<String>() }.add(prefix + form)
+            }
+        }
+        File target = pslDir.get().file('public_suffix_list.dat').asFile
+        target.parentFile.mkdirs()
+        // Fixed date and order: the same list always gives the same bytes
+        new ZipOutputStream(new FileOutputStream(target)).withCloseable { zip ->
+            rulesByTld.each { tld, rules ->
+                ZipEntry entry = new ZipEntry(tld)
+                entry.setTimeLocal(LocalDateTime.of(1980, 1, 1, 0, 0))
+                zip.putNextEntry(entry)
+                zip.write((rules.join('\n') + '\n').getBytes('UTF-8'))
+                zip.closeEntry()
+            }
+        }
+    }
+}
+
+android.sourceSets.main.assets.srcDirs += [ublockDir.get().asFile, pslDir.get().asFile]
+
+tasks.named('preBuild') { dependsOn fetchUBlockOrigin, generatePublicSuffixList }

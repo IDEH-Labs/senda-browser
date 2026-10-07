@@ -4,9 +4,9 @@
 
 The interface is available in 8 languages: Spanish, English, German, French, Portuguese, Italian, Japanese and Chinese.
 
-> **Status: advanced alpha (0.1.1-alpha).** Its author uses it every day, but it is **not yet recommended for sensitive data**:
+> **Status: advanced alpha (0.1.3-alpha).** Its author uses it every day, but it is **not yet recommended for sensitive data**:
 > - Tested on a single phone model (Motorola moto g34 5G, Android 15).
-> - The signed release build has been tested on that phone (startup, browsing, reader mode, Tor, uBlock Origin and Settings). The password vault, TV casting and the assistant have not been tested on it yet.
+> - Signed release builds have been tested on that phone: startup, browsing, reader mode, Tor, uBlock Origin and Settings (0.1.1); the password vault filling in and saving accounts, the ChatGPT assistant and TV mode (a pre-release build of 0.1.2); browsing and the password vault (0.1.3).
 > - It has not had an external security audit.
 >
 > Bug reports are welcome.
@@ -49,7 +49,7 @@ Senda includes no telemetry or usage reports. Firefox's captive portal detection
 
 ## Building
 
-Requirements: JDK 17 and the Android SDK with platform 37. The APK only includes `arm64-v8a`, and the app runs on Android 8.0 (API 26) and later.
+Requirements: JDK 17, the Android SDK with platform 37, and network access: Gradle downloads the dependencies and the official signed uBlock Origin release, which is checked against a pinned SHA-256 (see `app/bundled-assets.gradle`). The APK only includes `arm64-v8a`, and the app runs on Android 8.0 (API 26) and later.
 
 ```bash
 git clone https://github.com/IDEH-Labs/senda-browser.git

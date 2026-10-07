@@ -1,0 +1,1 @@
+Free and private web browser built on GeckoView, with uBlock Origin and Tor

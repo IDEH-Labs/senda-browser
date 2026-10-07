@@ -98,6 +98,8 @@ android {
 
 }
 
+apply from: 'bundled-assets.gradle'
+
 configurations.all {
     resolutionStrategy {
         force 'org.jetbrains.kotlin:kotlin-stdlib:2.2.10'

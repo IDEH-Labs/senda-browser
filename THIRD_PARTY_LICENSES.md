@@ -5,13 +5,13 @@ Senda is distributed under the **GNU GPL v3** (see `LICENSE`). It includes or us
 | Component | Author | License | Use in Senda |
 |---|---|---|---|
 | [GeckoView](https://mozilla.github.io/geckoview/) | Mozilla | MPL 2.0 | Web engine (HTML, CSS, JavaScript) |
-| [uBlock Origin](https://github.com/gorhill/uBlock) | Raymond Hill | GPL v3 | Content blocker; its signed `.xpi` is included unmodified (`app/src/main/assets/extensions/ublock.xpi`) |
-| [Tor](https://gitlab.torproject.org/tpo/core/tor), [tor-android](https://github.com/guardianproject/tor-android), [jtorctl](https://github.com/guardianproject/jtorctl) | The Tor Project, Guardian Project | BSD 3-Clause | Built-in Tor network (optional) |
+| [uBlock Origin](https://github.com/gorhill/uBlock) | Raymond Hill | GPL v3 | Content blocker; the official signed `.xpi` (1.75.0) is downloaded from the uBlock GitHub release during the build, checked against a pinned SHA-256 and included unmodified (`app/bundled-assets.gradle`) |
+| [Tor](https://gitlab.torproject.org/tpo/core/tor), [tor-android](https://github.com/guardianproject/tor-android), [jtorctl](https://github.com/guardianproject/jtorctl) | The Tor Project, Guardian Project | BSD 3-Clause | Built-in Tor network (optional); from Maven Central |
 | [Jetpack Compose and AndroidX](https://developer.android.com/jetpack/androidx) (including `androidx.biometric`) | Google / AOSP | Apache 2.0 | User interface and fingerprint/PIN |
 | [Kotlin and kotlinx.coroutines](https://kotlinlang.org) | JetBrains | Apache 2.0 | Language and concurrency |
 | [HiddenApiBypass](https://github.com/LSPosed/AndroidHiddenApiBypass) | LSPosed | Apache 2.0 | GeckoView compatibility on some Android versions |
 | [Cantarell](https://gitlab.gnome.org/GNOME/cantarell-fonts) | The Cantarell Project Authors | SIL OFL 1.1 (notice included in the font metadata) | Optional interface typeface |
-| [Mozilla Public Suffix List](https://publicsuffix.org/) | Mozilla | MPL 2.0 | Domain canonicalization and anti-phishing in Password Vault (`app/src/main/assets/public_suffix_list.dat`) |
+| [Mozilla Public Suffix List](https://publicsuffix.org/) | Mozilla | MPL 2.0 | Domain canonicalization and anti-phishing in the password vault. The official text list is in `third_party/publicsuffix/` and is turned into a per-TLD archive during the build |
 
 ## Wallpapers
 

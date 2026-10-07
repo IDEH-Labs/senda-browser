@@ -21,3 +21,6 @@ keystore.properties
 *.keystore
 *.p12
 *signing.env
+
+# Store metadata images (F-Droid / fastlane)
+!fastlane/**/*.png

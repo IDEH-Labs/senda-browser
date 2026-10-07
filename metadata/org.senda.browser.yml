@@ -1,46 +1,35 @@
+AntiFeatures:
+  NonFreeNet:
+    en-US: |-
+      Google Safe Browsing is on by default (it can be turned off in Settings). The optional assistant
+      connects to the service the user chooses: ChatGPT, Claude, Gemini, Grok or Mistral.
 Categories:
   - Internet
   - Security
 License: GPL-3.0-only
+AuthorName: IDEH Labs
+AuthorWebSite: https://ideh.top/
 SourceCode: https://github.com/IDEH-Labs/senda-browser
 IssueTracker: https://github.com/IDEH-Labs/senda-browser/issues
+Changelog: https://github.com/IDEH-Labs/senda-browser/releases
 
 AutoName: Senda
-Summary: Free and private web browser built on GeckoView
-Description: |-
-  Senda is a free web browser for Android built on Mozilla's GeckoView engine.
-  * Strict tracking protection, built-in uBlock Origin, HTTPS-only mode and DNS over HTTPS.
-  * Built-in Tor network (optional) or your own proxy.
-  * Password vault encrypted on the phone, unlocked with fingerprint or PIN.
-  * Reader mode and on-device translation.
-  * No telemetry. Interface in 8 languages.
-
-  Alpha version: tested on a single phone model.
 
 RepoType: git
 Repo: https://github.com/IDEH-Labs/senda-browser.git
 
+# Draft: not submitted to F-Droid yet. GeckoView still comes prebuilt from maven.mozilla.org, which
+# F-Droid's scanner does not accept; that has to be resolved first. 0.1.0 to 0.1.3 are not listed:
+# they need the Guardian Project repository and binaries kept in the source tree.
 Builds:
-  - versionName: 0.1.0-alpha
-    versionCode: 1
-    commit: v0.1.0-alpha
+  - versionName: 0.1.4-alpha
+    versionCode: 5
+    commit: v0.1.4-alpha
+    subdir: app
     gradle:
       - yes
 
-  - versionName: 0.1.1-alpha
-    versionCode: 2
-    commit: v0.1.1-alpha
-    gradle:
-      - yes
-
-  - versionName: 0.1.2-alpha
-    versionCode: 3
-    commit: v0.1.2-alpha
-    gradle:
-      - yes
-
-  - versionName: 0.1.3-alpha
-    versionCode: 4
-    commit: v0.1.3-alpha
-    gradle:
-      - yes
+AutoUpdateMode: Version
+UpdateCheckMode: Tags ^v[\d.]+-alpha$
+CurrentVersion: 0.1.4-alpha
+CurrentVersionCode: 5
