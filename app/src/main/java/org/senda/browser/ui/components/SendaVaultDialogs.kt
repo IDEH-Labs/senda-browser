@@ -65,6 +65,8 @@ fun SendaVaultDialog(
                     Toast.makeText(context, strings.vault_err_no_lock, Toast.LENGTH_LONG).show()
                 org.senda.browser.core.security.VaultUnavailableException.Reason.KEY_INVALIDATED ->
                     showVaultReset = true
+                org.senda.browser.core.security.VaultUnavailableException.Reason.NO_SECURE_HARDWARE ->
+                    Toast.makeText(context, strings.vault_err_no_secure_hw, Toast.LENGTH_LONG).show()
             }
         }
         try {

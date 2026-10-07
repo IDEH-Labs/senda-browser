@@ -28,9 +28,11 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
+import androidx.core.util.AtomicFile
+import org.senda.browser.core.SendaGeckoEngine
 
 /**
- * Modelo inmutable de credencial almacenada en la Bóveda Soberana de Senda.
+ * Modelo inmutable de credencial almacenada en la Bóveda de Senda.
  * La contraseña se almacena cifrada con AES-256-GCM y su propio Nonce/IV único.
  */
 data class VaultCredential(
@@ -46,13 +48,20 @@ data class VaultCredential(
 )
 
 /**
- * Gestor Criptográfico de Grado Militar para la Bóveda de Contraseñas de Senda.
- * Cumple con especificaciones OWASP MASVS L2 (Nivel Bancario/Defensa):
- * - Clave maestra AES-256 en hardware seguro (Android Keystore / TEE / StrongBox).
- * - Cifrado autenticado AEAD (AES-256-GCM) con detección de manipulación de bits.
- * - Zeroization activa de memoria RAM (arrays limpiados tras uso).
- * - Verificación estricta de dominios contra ataques de Phishing (eTLD+1).
- * - Higiene de portapapeles con bandera de contenido sensible y auto-destrucción a 30s.
+ * Gestor criptográfico de la Bóveda de Contraseñas de Senda. Cada punto es comprobable en este archivo:
+ * - Clave AES-256 no exportable, generada y usada solo dentro del hardware seguro del teléfono
+ *   (StrongBox si existe, si no el TEE). Sin hardware seguro, la Bóveda no se abre (NO_SECURE_HARDWARE).
+ * - La clave solo se usa tras huella o PIN de los últimos 30 s y con el teléfono desbloqueado.
+ * - Cifrado autenticado AES-256-GCM (IV aleatorio de 96 bits por contraseña, etiqueta de 128 bits).
+ *   AES-256 es el algoritmo simétrico que exige la NSA en CNSA 2.0 para información clasificada.
+ * - Contraseñas en CharArray/ByteArray que se sobrescriben tras su uso (mejor esfuerzo: la JVM puede
+ *   haber hecho copias que no controlamos).
+ * - Dominios canónicos (eTLD+1) con la Public Suffix List de Mozilla.
+ * - Guardado atómico con AtomicFile (archivo temporal, fsync y renombrado).
+ * - Portapapeles marcado como sensible (Android 13+) y borrado a los 30 s.
+ *
+ * Diseñada siguiendo los controles OWASP MASVS-CRYPTO, MASVS-AUTH y MASVS-STORAGE.
+ * No ha tenido auditoría externa: no se afirma el cumplimiento de ningún perfil MASVS.
  */
 object SendaVaultManager {
 
@@ -73,8 +82,53 @@ object SendaVaultManager {
     private val secureRandom = SecureRandom()
     private val scope = CoroutineScope(Dispatchers.Default)
 
+    /** Alias cuya clave ya se comprobó que vive en hardware seguro (evita repetir la consulta en cada uso). */
+    private val verifiedHardwareAliases = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+
+    /** Nivel real de la clave según el Keystore: "STRONGBOX", "TEE", "SOFTWARE" o "DESCONOCIDO". */
+    private fun securityLevelOf(key: SecretKey): String {
+        val keyInfo = SecretKeyFactory.getInstance(key.algorithm, ANDROID_KEYSTORE)
+            .getKeySpec(key, KeyInfo::class.java) as KeyInfo
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            when (keyInfo.securityLevel) {
+                KeyProperties.SECURITY_LEVEL_STRONGBOX -> "STRONGBOX"
+                KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT -> "TEE"
+                KeyProperties.SECURITY_LEVEL_SOFTWARE -> "SOFTWARE"
+                else -> "DESCONOCIDO"
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            if (keyInfo.isInsideSecureHardware) "TEE" else "SOFTWARE"
+        }
+    }
+
     /**
-     * Obtiene o genera la clave maestra de 256 bits sellada en el chip de seguridad (Keystore).
+     * Las contraseñas solo se cifran con una clave que vive en hardware seguro (StrongBox o TEE).
+     * Si Android solo ofrece una clave en software, o no se puede confirmar dónde vive, la Bóveda no se usa.
+     * Una clave recién creada que resulta estar en software se borra; una ya existente no se toca.
+     */
+    private fun requireSecureHardware(key: SecretKey, alias: String, justGenerated: Boolean): SecretKey {
+        if (alias in verifiedHardwareAliases) return key
+        val level = try { securityLevelOf(key) } catch (e: Exception) {
+            Log.w(TAG, "No se pudo confirmar el nivel de seguridad de la clave: ${e.message}")
+            "DESCONOCIDO"
+        }
+        if (level == "STRONGBOX" || level == "TEE") {
+            verifiedHardwareAliases.add(alias)
+            return key
+        }
+        Log.w(TAG, "Clave de la Bóveda fuera de hardware seguro ($level): la Bóveda no se usa")
+        if (justGenerated) {
+            try {
+                KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }.deleteEntry(alias)
+            } catch (_: Exception) { }
+        }
+        throw VaultUnavailableException(VaultUnavailableException.Reason.NO_SECURE_HARDWARE)
+    }
+
+    /**
+     * Obtiene o genera la clave maestra AES-256 en el Android Keystore. Para la Bóveda, además, exige
+     * que la clave viva en hardware seguro (StrongBox o TEE).
      */
     @Synchronized
     private fun getOrCreateKey(alias: String): SecretKey {
@@ -82,9 +136,15 @@ object SendaVaultManager {
         if (keyStore.containsAlias(alias)) {
             val entry = keyStore.getEntry(alias, null) as? KeyStore.SecretKeyEntry
             if (entry != null) {
-                return entry.secretKey
+                return if (alias == VAULT_KEY_ALIAS) requireSecureHardware(entry.secretKey, alias, justGenerated = false)
+                else entry.secretKey
             }
         }
+        val generated = generateKey(alias)
+        return if (alias == VAULT_KEY_ALIAS) requireSecureHardware(generated, alias, justGenerated = true) else generated
+    }
+
+    private fun generateKey(alias: String): SecretKey {
 
         // Generar nueva clave AES-256 anclada a hardware
         val keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
@@ -181,6 +241,7 @@ object SendaVaultManager {
     /** Borra la clave anulada y las contraseñas que ya no se pueden descifrar, para empezar una Bóveda nueva. */
     fun resetInvalidatedVaultKey(context: Context) {
         KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }.deleteEntry(VAULT_KEY_ALIAS)
+        verifiedHardwareAliases.remove(VAULT_KEY_ALIAS)
         saveAll(context, emptyList())
     }
 
@@ -195,24 +256,13 @@ object SendaVaultManager {
 
     /**
      * Dónde vive realmente la clave maestra, según el propio Keystore: "STRONGBOX", "TEE", "SOFTWARE"
-     * o "DESCONOCIDO" si Android no lo informa.
+     * o "DESCONOCIDO" si Android no lo informa. Si la Bóveda rechaza la clave por estar en software, lo dice.
      */
     fun keySecurityLevel(alias: String = VAULT_KEY_ALIAS): String {
         return try {
-            val key = getOrCreateKey(alias)
-            val factory = SecretKeyFactory.getInstance(key.algorithm, ANDROID_KEYSTORE)
-            val keyInfo = factory.getKeySpec(key, KeyInfo::class.java) as KeyInfo
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                when (keyInfo.securityLevel) {
-                    KeyProperties.SECURITY_LEVEL_STRONGBOX -> "STRONGBOX"
-                    KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT -> "TEE"
-                    KeyProperties.SECURITY_LEVEL_SOFTWARE -> "SOFTWARE"
-                    else -> "DESCONOCIDO"
-                }
-            } else {
-                @Suppress("DEPRECATION")
-                if (keyInfo.isInsideSecureHardware) "TEE" else "SOFTWARE"
-            }
+            securityLevelOf(getOrCreateKey(alias))
+        } catch (e: VaultUnavailableException) {
+            if (e.reason == VaultUnavailableException.Reason.NO_SECURE_HARDWARE) "SOFTWARE" else "DESCONOCIDO"
         } catch (e: Exception) {
             Log.w(TAG, "No se pudo consultar el nivel de seguridad de la clave: ${e.message}")
             "DESCONOCIDO"
@@ -221,16 +271,8 @@ object SendaVaultManager {
 
     fun isHardwareBacked(): Boolean {
         return try {
-            val key = getOrCreateKey(VAULT_KEY_ALIAS)
-            val factory = SecretKeyFactory.getInstance(key.algorithm, ANDROID_KEYSTORE)
-            val keyInfo = factory.getKeySpec(key, KeyInfo::class.java) as KeyInfo
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                keyInfo.securityLevel == KeyProperties.SECURITY_LEVEL_STRONGBOX ||
-                keyInfo.securityLevel == KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT
-            } else {
-                @Suppress("DEPRECATION")
-                keyInfo.isInsideSecureHardware
-            }
+            val level = securityLevelOf(getOrCreateKey(VAULT_KEY_ALIAS))
+            level == "STRONGBOX" || level == "TEE"
         } catch (e: Exception) {
             Log.w(TAG, "No se pudo consultar el estado de hardware seguro: ${e.message}")
             false // Si no se puede comprobar, no se afirma que esté en hardware
@@ -275,8 +317,12 @@ object SendaVaultManager {
         val decryptedBytes = try {
             cipherFor(Cipher.DECRYPT_MODE, alias, iv).doFinal(encryptedBytes)
         } catch (e: javax.crypto.AEADBadTagException) {
-            // Contraseñas guardadas antes de la clave v2 (cifradas con la clave original)
+            // Contraseñas guardadas antes de la clave v2 (cifradas con la clave original): esa clave también
+            // tiene que vivir en hardware seguro para que la Bóveda la use
             if (alias != VAULT_KEY_ALIAS) throw e
+            val legacyKey = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
+                .let { (it.getEntry(APP_KEY_ALIAS, null) as? KeyStore.SecretKeyEntry)?.secretKey } ?: throw e
+            requireSecureHardware(legacyKey, APP_KEY_ALIAS, justGenerated = false)
             cipherFor(Cipher.DECRYPT_MODE, APP_KEY_ALIAS, iv).doFinal(encryptedBytes)
         }
 
@@ -314,7 +360,7 @@ object SendaVaultManager {
      * Ejemplo: "https://login.banco.com.es:8443/auth" -> "banco.com.es"
      * Ejemplo falso: "https://paypal.com.evil-phish.net" -> "evil-phish.net" (detecta discrepancia)
      */
-    fun extractCanonicalDomain(rawUrl: String): String {
+    fun extractCanonicalDomain(rawUrl: String, context: Context? = null): String {
         if (rawUrl.isBlank()) return ""
         return try {
             var clean = rawUrl.trim().lowercase()
@@ -333,25 +379,8 @@ object SendaVaultManager {
             val colonIdx = clean.indexOf(':')
             if (colonIdx != -1) clean = clean.substring(0, colonIdx)
 
-            // Dividir etiquetas
-            val parts = clean.split('.').filter { it.isNotBlank() }
-            if (parts.size <= 2) return clean
-
-            // Lista de sufijos públicos comunes de dos niveles (eTLD conocidos)
-            val multiPartTlds = setOf(
-                "com.es", "nom.es", "org.es", "gob.es", "edu.es",
-                "co.uk", "org.uk", "me.uk", "gov.uk",
-                "com.ar", "com.br", "com.mx", "com.co", "com.pe", "com.ve",
-                "co.jp", "ne.jp", "ac.jp", "go.jp",
-                "com.au", "net.au", "org.au"
-            )
-
-            val lastTwo = "${parts[parts.size - 2]}.${parts.last()}"
-            if (multiPartTlds.contains(lastTwo) && parts.size >= 3) {
-                "${parts[parts.size - 3]}.$lastTwo"
-            } else {
-                "${parts[parts.size - 2]}.${parts.last()}"
-            }
+            val effectiveCtx = context ?: SendaGeckoEngine.appContext
+            PublicSuffixList.getRegistrableDomain(clean, effectiveCtx)
         } catch (e: Exception) {
             rawUrl
         }
@@ -375,10 +404,13 @@ object SendaVaultManager {
      */
     fun getCredentials(context: Context): List<VaultCredential> {
         val file = File(context.filesDir, VAULT_FILE_NAME)
-        if (!file.exists()) return emptyList()
+        val bakFile = File(context.filesDir, "$VAULT_FILE_NAME.bak")
+        if (!file.exists() && !bakFile.exists()) return emptyList()
 
         return try {
-            val content = file.readText()
+            val atomicFile = AtomicFile(file)
+            val bytes = atomicFile.readFully()
+            val content = String(bytes, Charsets.UTF_8)
             val array = JSONArray(content)
             val list = mutableListOf<VaultCredential>()
             for (i in 0 until array.length()) {
@@ -502,8 +534,15 @@ object SendaVaultManager {
                 }
                 array.put(obj)
             }
-            val file = File(context.filesDir, VAULT_FILE_NAME)
-            file.writeText(array.toString(2))
+            val atomicFile = AtomicFile(File(context.filesDir, VAULT_FILE_NAME))
+            val fos = atomicFile.startWrite()
+            try {
+                fos.write(array.toString(2).toByteArray(Charsets.UTF_8))
+                atomicFile.finishWrite(fos)
+            } catch (e: Exception) {
+                atomicFile.failWrite(fos)
+                throw e
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error persistiendo bóveda: ${e.message}")
         }
@@ -606,5 +645,6 @@ class VaultLockedException(cause: Throwable? = null) : Exception("Bóveda bloque
 
 /** La Bóveda no puede usarse: no hay bloqueo de pantalla o la clave quedó invalidada. */
 class VaultUnavailableException(val reason: Reason, cause: Throwable? = null) : Exception(reason.name, cause) {
-    enum class Reason { NO_SCREEN_LOCK, KEY_INVALIDATED }
+    /** NO_SECURE_HARDWARE: el teléfono no puede guardar la clave en StrongBox ni en un TEE. */
+    enum class Reason { NO_SCREEN_LOCK, KEY_INVALIDATED, NO_SECURE_HARDWARE }
 }

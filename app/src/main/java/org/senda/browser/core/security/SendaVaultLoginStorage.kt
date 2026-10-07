@@ -60,10 +60,10 @@ class SendaVaultLoginStorage(context: Context) : Autocomplete.StorageDelegate {
 
     private val appContext = context.applicationContext
 
-    // GeckoView pide por dominio base (eTLD+1), el mismo con el que la Bóveda guarda cada cuenta,
-    // y luego filtra por origen (aceptando subdominios: signon.includeOtherSubdomainsInLookup)
+    // GeckoView pide por dominio base (eTLD+1 resuelto con la Public Suffix List),
+    // y luego filtra estrictamente por origen (signon.includeOtherSubdomainsInLookup deshabilitado)
     override fun onLoginFetch(domain: String): GeckoResult<Array<Autocomplete.LoginEntry>> {
-        val baseDomain = SendaVaultManager.extractCanonicalDomain(domain)
+        val baseDomain = SendaVaultManager.extractCanonicalDomain(domain, appContext)
         val entries = try {
             SendaVaultManager.getCredentials(appContext)
                 .filter { it.domain.equals(baseDomain, ignoreCase = true) }

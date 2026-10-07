@@ -799,6 +799,7 @@ interface SendaStringPack {
     val translate_models_download: String
     val translate_failed: String
     val vault_err_no_lock: String
+    val vault_err_no_secure_hw: String
     val vault_err_key_invalidated: String
     val vault_reset_title: String
     val vault_reset_body: String
@@ -1547,6 +1548,7 @@ object SendaStringsDe : SendaStringPack {
     override val translate_models_download = "Beim ersten Mal werden %s Sprachmodelle von Mozillas Servern geladen; danach funktioniert es offline."
     override val translate_failed = "Die Seite konnte nicht übersetzt werden. Prüfen Sie die Verbindung zum Laden des Sprachmodells."
     override val vault_err_no_lock = "Richten Sie eine PIN, ein Muster oder ein Passwort auf dem Telefon ein, um den Tresor zu nutzen"
+    override val vault_err_no_secure_hw = "Dieses Telefon kann den Schlüssel nicht in sicherer Hardware (StrongBox oder TEE) speichern. Der Tresor wird zu Ihrem Schutz nicht verwendet"
     override val vault_err_key_invalidated = "Android hat den Tresorschlüssel ungültig gemacht, weil die Displaysperre entfernt oder zurückgesetzt wurde. Öffne Einstellungen → Passwörter, um neu zu beginnen"
     override val vault_reset_title = "Gespeicherte Passwörter lassen sich nicht öffnen"
     override val vault_reset_body = "Android hat den Tresorschlüssel ungültig gemacht, weil die Displaysperre des Telefons entfernt oder zurückgesetzt wurde. Die gespeicherten Passwörter lassen sich nicht wiederherstellen: Weder Senda noch sonst jemand kann sie entschlüsseln. Du kannst sie löschen und einen neuen Tresor beginnen."
@@ -2295,6 +2297,7 @@ object SendaStringsEn : SendaStringPack {
     override val translate_models_download = "The first time, %s of language models are downloaded from Mozilla's servers; after that it works offline."
     override val translate_failed = "Couldn't translate the page. Check your connection to download the language model."
     override val vault_err_no_lock = "Set a PIN, pattern or password on your phone to use the vault"
+    override val vault_err_no_secure_hw = "This phone can't keep the key in secure hardware (StrongBox or TEE). To protect you, the vault isn't used"
     override val vault_err_key_invalidated = "Android cancelled the vault key because the screen lock was removed or reset. Open Settings → Passwords to start over"
     override val vault_reset_title = "Saved passwords can’t be opened"
     override val vault_reset_body = "Android cancelled the vault key because the phone’s screen lock was removed or reset. The saved passwords can’t be recovered: neither Senda nor anyone else can decrypt them. You can delete them and start a new vault."
@@ -3043,6 +3046,7 @@ object SendaStringsEs : SendaStringPack {
     override val translate_models_download = "La primera vez se descargan %s de modelos de idioma desde los servidores de Mozilla; después funciona sin conexión."
     override val translate_failed = "No se pudo traducir la página. Comprueba la conexión para descargar el modelo de idioma."
     override val vault_err_no_lock = "Configura un PIN, patrón o contraseña en el teléfono para usar la bóveda"
+    override val vault_err_no_secure_hw = "Este teléfono no puede guardar la clave en hardware seguro (StrongBox o TEE). Para protegerte, la bóveda no se usa"
     override val vault_err_key_invalidated = "Android anuló la clave de la Bóveda porque se quitó o restableció el bloqueo de pantalla. Abre Ajustes → Contraseñas para empezar de nuevo"
     override val vault_reset_title = "No se pueden abrir las contraseñas guardadas"
     override val vault_reset_body = "Android anuló la clave de la Bóveda porque se quitó o restableció el bloqueo de pantalla del teléfono. Las contraseñas guardadas no se pueden recuperar: ni Senda ni nadie puede descifrarlas. Puedes borrarlas y empezar una Bóveda nueva."
@@ -3791,6 +3795,7 @@ object SendaStringsFr : SendaStringPack {
     override val translate_models_download = "La première fois, %s de modèles de langue sont téléchargés depuis les serveurs de Mozilla ; ensuite, cela fonctionne hors ligne."
     override val translate_failed = "Impossible de traduire la page. Vérifiez la connexion pour télécharger le modèle de langue."
     override val vault_err_no_lock = "Configurez un code, un schéma ou un mot de passe sur le téléphone pour utiliser le coffre"
+    override val vault_err_no_secure_hw = "Ce téléphone ne peut pas conserver la clé dans un matériel sécurisé (StrongBox ou TEE). Pour vous protéger, le coffre n'est pas utilisé"
     override val vault_err_key_invalidated = "Android a annulé la clé du coffre car le verrouillage de l’écran a été supprimé ou réinitialisé. Ouvrez Paramètres → Mots de passe pour recommencer"
     override val vault_reset_title = "Impossible d’ouvrir les mots de passe enregistrés"
     override val vault_reset_body = "Android a annulé la clé du coffre car le verrouillage de l’écran du téléphone a été supprimé ou réinitialisé. Les mots de passe enregistrés sont irrécupérables : ni Senda ni personne ne peut les déchiffrer. Vous pouvez les supprimer et créer un nouveau coffre."
@@ -4539,6 +4544,7 @@ object SendaStringsPt : SendaStringPack {
     override val translate_models_download = "Na primeira vez, %s de modelos de idioma são baixados dos servidores da Mozilla; depois funciona offline."
     override val translate_failed = "Não foi possível traduzir a página. Verifique a conexão para baixar o modelo de idioma."
     override val vault_err_no_lock = "Configure um PIN, padrão ou senha no celular para usar o cofre"
+    override val vault_err_no_secure_hw = "Este celular não consegue guardar a chave em hardware seguro (StrongBox ou TEE). Para sua proteção, o cofre não é usado"
     override val vault_err_key_invalidated = "O Android anulou a chave do cofre porque o bloqueio de tela foi removido ou redefinido. Abra Configurações → Senhas para recomeçar"
     override val vault_reset_title = "Não é possível abrir as senhas salvas"
     override val vault_reset_body = "O Android anulou a chave do cofre porque o bloqueio de tela do celular foi removido ou redefinido. As senhas salvas não podem ser recuperadas: nem o Senda nem ninguém consegue decifrá-las. Você pode apagá-las e começar um cofre novo."
@@ -5287,6 +5293,7 @@ object SendaStringsIt : SendaStringPack {
     override val translate_models_download = "La prima volta vengono scaricati %s di modelli linguistici dai server di Mozilla; poi funziona offline."
     override val translate_failed = "Impossibile tradurre la pagina. Controlla la connessione per scaricare il modello linguistico."
     override val vault_err_no_lock = "Imposta un PIN, una sequenza o una password sul telefono per usare la cassaforte"
+    override val vault_err_no_secure_hw = "Questo telefono non può conservare la chiave in hardware sicuro (StrongBox o TEE). Per proteggerti, la cassaforte non viene usata"
     override val vault_err_key_invalidated = "Android ha annullato la chiave della cassaforte perché il blocco schermo è stato rimosso o reimpostato. Apri Impostazioni → Password per ricominciare"
     override val vault_reset_title = "Impossibile aprire le password salvate"
     override val vault_reset_body = "Android ha annullato la chiave della cassaforte perché il blocco schermo del telefono è stato rimosso o reimpostato. Le password salvate non si possono recuperare: né Senda né nessun altro può decifrarle. Puoi eliminarle e iniziare una nuova cassaforte."
@@ -6035,6 +6042,7 @@ object SendaStringsJa : SendaStringPack {
     override val translate_models_download = "初回のみ Mozilla のサーバーから %s の言語モデルをダウンロードします。その後はオフラインで使えます。"
     override val translate_failed = "ページを翻訳できませんでした。言語モデルをダウンロードするため接続を確認してください。"
     override val vault_err_no_lock = "保管庫を使うには、端末に PIN、パターン、またはパスワードを設定してください"
+    override val vault_err_no_secure_hw = "この端末は鍵を安全なハードウェア（StrongBox または TEE）に保存できません。安全のため、保管庫は使用されません"
     override val vault_err_key_invalidated = "画面ロックが解除またはリセットされたため、Android が保管庫の鍵を無効にしました。設定 → パスワード を開いてやり直してください"
     override val vault_reset_title = "保存したパスワードを開けません"
     override val vault_reset_body = "端末の画面ロックが解除またはリセットされたため、Android が保管庫の鍵を無効にしました。保存したパスワードは復元できません。Senda を含め、誰も復号できません。削除して新しい保管庫を始めることができます。"
@@ -6783,6 +6791,7 @@ object SendaStringsZh : SendaStringPack {
     override val translate_models_download = "首次使用时会从 Mozilla 服务器下载 %s 的语言模型，之后可离线使用。"
     override val translate_failed = "无法翻译页面。请检查网络连接以下载语言模型。"
     override val vault_err_no_lock = "请在手机上设置 PIN 码、图案或密码以使用保险库"
+    override val vault_err_no_secure_hw = "此手机无法将密钥保存在安全硬件（StrongBox 或 TEE）中。为保护您，保险库不会被使用"
     override val vault_err_key_invalidated = "由于屏幕锁定被移除或重置，Android 已使保险库密钥失效。请打开 设置 → 密码管理 重新开始"
     override val vault_reset_title = "无法打开已保存的密码"
     override val vault_reset_body = "由于手机的屏幕锁定被移除或重置，Android 已使保险库密钥失效。已保存的密码无法恢复：Senda 和任何人都无法解密。你可以删除它们并新建保险库。"

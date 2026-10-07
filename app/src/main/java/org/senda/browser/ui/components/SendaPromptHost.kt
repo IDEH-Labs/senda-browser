@@ -1167,4 +1167,5 @@ private fun vaultUnavailableMessage(
 ): String = when (e.reason) {
     org.senda.browser.core.security.VaultUnavailableException.Reason.NO_SCREEN_LOCK -> strings.vault_err_no_lock
     org.senda.browser.core.security.VaultUnavailableException.Reason.KEY_INVALIDATED -> strings.vault_err_key_invalidated
+    org.senda.browser.core.security.VaultUnavailableException.Reason.NO_SECURE_HARDWARE -> strings.vault_err_no_secure_hw
 }
