@@ -64,6 +64,16 @@ object PublicSuffixList {
         }
     }
 
+    /** Loads the list from an archive already on disk (JVM tests, which have no Android Context). */
+    @androidx.annotation.VisibleForTesting
+    internal fun initFromFile(file: File) {
+        synchronized(this) {
+            tldRulesCache.clear()
+            cachedZipFile = ZipFile(file)
+            initialized = true
+        }
+    }
+
     // Copy to a temporary file and rename, so a half-written file is never left behind
     private fun copyAsset(context: Context, target: File) {
         val tmp = File(target.parentFile, "$ASSET_NAME.tmp")
@@ -93,9 +103,9 @@ object PublicSuffixList {
         // A numeric IPv4 address is not processed as a domain name
         if (parts.all { it.all { c -> c.isDigit() } }) return cleanHost
 
-        val effectiveContext = context ?: SendaGeckoEngine.appContext
-        if (!initialized && effectiveContext != null) {
-            init(effectiveContext.applicationContext)
+        if (!initialized) {
+            val effectiveContext = context ?: SendaGeckoEngine.appContext
+            if (effectiveContext != null) init(effectiveContext.applicationContext)
         }
 
         val zip = cachedZipFile
