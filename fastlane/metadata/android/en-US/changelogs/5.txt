@@ -1,0 +1,1 @@
+The source tree no longer contains binaries: uBlock Origin is downloaded from its official release and checked during the build, and the Public Suffix List is built from Mozilla's text list. The password vault uses the current list and also recognizes internationalized domains. Tor now comes from Maven Central.
