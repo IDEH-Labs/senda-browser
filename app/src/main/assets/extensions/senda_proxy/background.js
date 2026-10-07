@@ -1,7 +1,7 @@
 let currentConfig = null;
 
-// Ninguna petición sale hasta saber qué proxy usar: si no, al abrir Senda con Tor activado las primeras
-// páginas salían directas (con la IP real) mientras llegaba la configuración desde la app
+// No request goes out until the proxy to use is known: otherwise, when opening Senda with Tor on, the first
+// pages went out directly (with the real IP) while the configuration arrived from the app
 let markReady;
 const configReady = new Promise((resolve) => { markReady = resolve; });
 
@@ -50,7 +50,7 @@ function handleProxyRequest(requestInfo) {
     return configReady.then(() => proxyFor(currentConfig));
 }
 
-// 1. Registrar el listener activo de proxy para todas las URLs
+// 1. Register the active proxy listener for all URLs
 try {
     if (browser.proxy && browser.proxy.onRequest) {
         browser.proxy.onRequest.addListener(handleProxyRequest, { urls: ['<all_urls>'] });
@@ -60,8 +60,8 @@ try {
     console.error('Senda Proxy: Error en onRequest listener:', e);
 }
 
-// WebRTC puede revelar la IP real aunque la web vaya por Tor o un proxy: con proxy activo solo se permite
-// WebRTC a través del proxy
+// WebRTC can reveal the real IP even when the site goes through Tor or a proxy: with a proxy on, WebRTC is
+// only allowed through the proxy
 function applyWebRtcPolicy(config) {
     try {
         const setting = browser.privacy && browser.privacy.network && browser.privacy.network.webRTCIPHandlingPolicy;
@@ -82,7 +82,7 @@ function applyProxy(config) {
     markReady();
     applyWebRtcPolicy(config);
 
-    // 2. Configuración global vía browser.proxy.settings
+    // 2. Global configuration through browser.proxy.settings
     try {
         if (browser.proxy && browser.proxy.settings) {
             if (config.mode === 'OFF') {
@@ -131,7 +131,7 @@ function rememberAndApply(msg) {
     }
 }
 
-// 3. Conexión de puerto nativo continuo
+// 3. Persistent native port connection
 try {
     const port = browser.runtime.connectNative('senda_proxy');
     port.onMessage.addListener(rememberAndApply);
@@ -139,14 +139,14 @@ try {
     console.warn('Senda Proxy: connectNative error', e);
 }
 
-// 4. Última configuración guardada: disponible al instante al arrancar
+// 4. Last saved configuration: available instantly at startup
 browser.storage.local.get('currentProxy').then((res) => {
     if (res && res.currentProxy && !currentConfig) {
         applyProxy(res.currentProxy);
     }
 }).catch(() => {});
 
-// 5. Consulta a la app: la fuente de verdad
+// 5. Ask the app: the source of truth
 try {
     browser.runtime.sendNativeMessage('senda_proxy', { action: 'GET_INITIAL_PROXY' })
         .then(rememberAndApply)
@@ -155,8 +155,8 @@ try {
     console.warn('Senda Proxy: sendNativeMessage error', e);
 }
 
-// Si la app no responde (no debería pasar), no bloquear la navegación para siempre: sin configuración
-// conocida se navega directo, igual que con el proxy apagado
+// If the app does not answer (it should not happen), do not block browsing forever: with no known
+// configuration, browse directly, the same as with the proxy off
 setTimeout(() => {
     if (!currentConfig) {
         applyProxy({ type: 'SET_PROXY', mode: 'OFF' });

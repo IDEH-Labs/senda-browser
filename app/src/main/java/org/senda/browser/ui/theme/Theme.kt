@@ -103,7 +103,7 @@ fun SendaTheme(
     val fontFamily = remember(fontFamilyKey, recomposeKey) { resolveFontFamily(fontFamilyKey) }
     val typography = remember(fontFamily, hinting, recomposeKey) { getSendaTypography(fontFamily, hinting) }
 
-    // La app dibuja detrás de las barras del sistema: sus iconos deben contrastar con el fondo del tema
+    // The app draws behind the system bars: their icons must contrast with the theme background
     val view = androidx.compose.ui.platform.LocalView.current
     if (!view.isInEditMode) {
         SideEffect {

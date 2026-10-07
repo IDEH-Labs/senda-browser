@@ -67,7 +67,7 @@ fun DevToolsSheet(
                 }
             }
 
-            // Información rápida de auditoría
+            // Quick audit information
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -90,7 +90,7 @@ fun DevToolsSheet(
                 }
             }
 
-            // Historial de consola
+            // Console history
             LazyColumn(
                 modifier = Modifier
                     .weight(1f)
@@ -112,7 +112,7 @@ fun DevToolsSheet(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Campo de ejecución de JavaScript
+            // JavaScript execution field
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -184,7 +184,7 @@ fun DevToolsSheet(
 private fun executeJs(tab: BrowserTab, code: String, logs: MutableList<String>, strings: org.senda.browser.core.SendaStringPack) {
     try {
         logs.add(code)
-        // Inyección directa de JavaScript en la pestaña activa
+        // Direct JavaScript injection into the active tab
         tab.session.loadUri("javascript:(function(){ try { let r = eval(${escapeForJs(code)}); console.log(r); } catch(e){ console.error(e); } })();")
         logs.add(strings.devtools_injected_success)
     } catch (e: Exception) {

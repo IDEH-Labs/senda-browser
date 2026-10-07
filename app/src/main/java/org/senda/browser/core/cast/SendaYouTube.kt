@@ -2,10 +2,10 @@ package org.senda.browser.core.cast
 
 import android.net.Uri
 
-/** Reconoce los enlaces de video de YouTube (para el reproductor de TV al duplicar la pantalla). */
+/** Recognizes YouTube video links (for the TV player while mirroring). */
 object SendaYouTube {
 
-    /** Extrae el identificador de video de cualquier enlace de YouTube (watch, youtu.be, shorts, live, embed). */
+    /** Extracts the video identifier from any YouTube link (watch, youtu.be, shorts, live, embed). */
     fun youTubeVideoId(url: String): String? {
         val uri = try { Uri.parse(url) } catch (_: Exception) { return null }
         val host = uri.host?.lowercase() ?: return null

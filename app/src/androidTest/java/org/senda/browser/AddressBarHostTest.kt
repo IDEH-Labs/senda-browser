@@ -7,11 +7,11 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.senda.browser.ui.components.fitHostFromEnd
 
-/** El dominio de la barra se recorta por la izquierda: siempre se ve cómo termina. */
+/** The address bar domain is trimmed from the left: you always see how it ends. */
 @RunWith(AndroidJUnit4::class)
 class AddressBarHostTest {
 
-    // Cada carácter mide 10 px
+    // Each character is 10 px wide
     private fun fit(host: String, maxPx: Int) = fitHostFromEnd(host, maxPx) { it.length * 10 }
 
     @Test
@@ -22,7 +22,7 @@ class AddressBarHostTest {
 
     @Test
     fun lookalikeShowsTheRealEnding() {
-        // Antes se veía «paypal.com.ev…»; ahora el final, que es el dueño real del sitio
+        // Before it showed "paypal.com.ev…"; now it shows the end, which is the real owner of the site
         val shown = fit("paypal.com.evil-phish.net", 150)
         assertEquals("…evil-phish.net", shown)
     }

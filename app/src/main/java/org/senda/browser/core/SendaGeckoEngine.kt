@@ -55,9 +55,9 @@ object SendaGeckoEngine {
         appContext = context.applicationContext
         if (runtime != null) return
 
-        // Configuración estricta de privacidad inspirada en LibreWolf y estándares de privacidad
+        // Strict privacy configuration inspired by LibreWolf and privacy standards
         val settings = GeckoRuntimeSettings.Builder()
-            // 1. Bloqueo estricto de rastreo y aislamiento dinámico de cookies
+            // 1. Strict tracking blocking and dynamic cookie isolation
             .contentBlocking(
                 ContentBlocking.Settings.Builder()
                     .enhancedTrackingProtectionLevel(ContentBlocking.EtpLevel.STRICT)
@@ -69,22 +69,22 @@ object SendaGeckoEngine {
                     .safeBrowsing(if (prefs?.safeBrowsingEnabled != false) ContentBlocking.SafeBrowsing.DEFAULT else ContentBlocking.SafeBrowsing.NONE)
                     .build()
             )
-            // Sin detección de portal cautivo de Firefox: Android ya la hace y así Senda no contacta a Mozilla al arrancar
+            // No Firefox captive portal detection: Android already does it, and this way Senda does not contact Mozilla at startup
             .configFilePath(writeGeckoConfig(context))
-            // 2. Habilitar about:config para que el usuario tenga control técnico
+            // 2. Enable about:config so the user has technical control
             .aboutConfigEnabled(true)
-            // 3. Desactivar logs innecesarios en consola y proteger privacidad
+            // 3. Turn off unnecessary console logs and protect privacy
             .consoleOutput(false)
-            // 4. Modo de depuración web USB controlado por el usuario
+            // 4. USB web debugging mode controlled by the user
             .remoteDebuggingEnabled(prefs?.remoteDebuggingEnabled ?: false)
-            // 5. Global Privacy Control activado por defecto
+            // 5. Global Privacy Control on by default
             .globalPrivacyControlEnabled(true)
-            // 6. Detección proactiva de baja memoria para purgar cachés antes de que el SO mate el proceso
+            // 6. Proactive low-memory detection to purge caches before the OS kills the process
             .lowMemoryDetection(true)
             .build()
 
         runtime = GeckoRuntime.create(context.applicationContext, settings)
-        // Cuentas de la Bóveda en los formularios de inicio de sesión
+        // Vault accounts in sign-in forms
         runtime?.autocompleteStorageDelegate = org.senda.browser.core.security.SendaVaultLoginStorage(context)
 
         if (prefs != null) {
@@ -100,12 +100,12 @@ object SendaGeckoEngine {
             "prefs:\n" +
                 "  network.captive-portal-service.enabled: false\n" +
                 "  network.connectivity-service.enabled: false\n" +
-                // Contraseñas: nada se rellena solo al cargar la página; se elige la cuenta al tocar el campo
+                // Passwords: nothing is filled in on page load; the account is chosen when tapping the field
                 "  signon.autofillForms: false\n" +
-                // Seguridad: restringe el autocompletado al origen exacto y no a cualquier subdominio
+                // Security: restricts autofill to the exact origin, not to any subdomain
                 "  signon.includeOtherSubdomainsInLookup: false\n" +
-                // Control multimedia (MediaSession): sin él Senda no sabe cuándo suena un video ni puede pausarlo
-                // al pasarlo a la TV (podría oírse a la vez en el teléfono y en la TV)
+                // Media control (MediaSession): without it Senda does not know when a video is playing and cannot pause it
+                // when sending it to the TV (it could be heard on the phone and the TV at the same time)
                 "  media.hardwaremediakeys.enabled: true\n"
         )
         return file.absolutePath
@@ -118,25 +118,25 @@ object SendaGeckoEngine {
     }
 
     /**
-     * Aplica en caliente todas las preferencias seleccionadas por el usuario en GeckoView
+     * Applies all the preferences chosen by the user to GeckoView on the fly
      */
     fun applyPreferences(prefs: PreferencesManager) {
         val rt = runtime ?: return
         val s = rt.settings
 
-        // Depuración remota USB
+        // USB remote debugging
         s.setRemoteDebuggingEnabled(prefs.remoteDebuggingEnabled)
 
         s.contentBlocking.setSafeBrowsing(
             if (prefs.safeBrowsingEnabled) ContentBlocking.SafeBrowsing.DEFAULT else ContentBlocking.SafeBrowsing.NONE
         )
 
-        // Accesibilidad: Forzar zoom en sitios rebeldes y factor de tamaño de texto
+        // Accessibility: force zoom on stubborn sites and text size factor
         s.setForceUserScalableEnabled(prefs.forceEnableZoom)
         val effectiveScale = if (prefs.syncWebFontScale) prefs.uiFontScalePercent else prefs.fontScalePercent
         s.setFontSizeFactor((effectiveScale / 100f).coerceIn(0.5f, 2.0f))
 
-        // Modo solo HTTPS
+        // HTTPS-only mode
         val httpsMode = when (prefs.httpsOnlyMode) {
             "ALL_TABS" -> GeckoRuntimeSettings.HTTPS_ONLY
             "PRIVATE_ONLY" -> GeckoRuntimeSettings.HTTPS_ONLY_PRIVATE
@@ -144,7 +144,7 @@ object SendaGeckoEngine {
         }
         s.setAllowInsecureConnections(httpsMode)
 
-        // DNS sobre HTTPS (DoH)
+        // DNS over HTTPS (DoH)
         val dohUrl = when (prefs.dohProvider) {
             "QUAD9" -> "https://dns.quad9.net/dns-query"
             "MULLVAD" -> "https://doh.mullvad.net/dns-query"
@@ -168,7 +168,7 @@ object SendaGeckoEngine {
             }
         }
 
-        // Bloqueo de contenido y aislamiento de cookies
+        // Content blocking and cookie isolation
         val cb = s.contentBlocking
         val etpLevel = when (prefs.trackingProtectionLevel) {
             "STRICT" -> ContentBlocking.EtpLevel.STRICT
@@ -189,21 +189,21 @@ object SendaGeckoEngine {
         cb.setQueryParameterStrippingPrivateBrowsingEnabled(true)
         cb.setCookiePurging(true)
 
-        // Protección contra huellas digitales (la de Firefox: falsea núcleos, zona horaria, lienzo, etc.).
-        // Las pestañas privadas siempre la llevan
+        // Fingerprinting protection (Firefox's: spoofs cores, time zone, canvas, etc.).
+        // Private tabs always have it
         s.setFingerprintingProtection(prefs.blockFingerprinting)
         s.setFingerprintingProtectionPrivateBrowsing(true)
 
-        // Traducciones y control global de privacidad
+        // Translations and Global Privacy Control
         s.setTranslationsOfferPopup(prefs.offerTranslations)
         s.setGlobalPrivacyControl(true)
 
-        // Enrutamiento Tor / proxy seguro
+        // Tor routing / secure proxy
         applyProxy(prefs)
     }
 
     /**
-     * Crea una nueva sesión de Gecko (Pestaña) con configuraciones de seguridad
+     * Creates a new Gecko session (tab) with security settings
      */
     fun createSession(isPrivate: Boolean = true, allowJs: Boolean = true, open: Boolean = true): GeckoSession {
         val sessionSettings = org.mozilla.geckoview.GeckoSessionSettings.Builder()
@@ -214,12 +214,12 @@ object SendaGeckoEngine {
             .build()
 
         val session = GeckoSession(sessionSettings)
-        // Las sesiones para onNewSession deben entregarse sin abrir: las abre Gecko
+        // Sessions for onNewSession must be handed over unopened: Gecko opens them
         if (open) session.open(getRuntime())
         return session
     }
 
-    /** Extensión esperando que el usuario acepte sus permisos (null si no hay ninguna). */
+    /** Extension waiting for the user to accept its permissions (null if there is none). */
     data class ExtensionInstallRequest(
         val extension: WebExtension,
         val permissions: List<String>,
@@ -237,7 +237,7 @@ object SendaGeckoEngine {
     }
 
     /**
-     * Inicializa las extensiones libres integradas por defecto (uBlock Origin)
+     * Initializes the free extensions bundled by default (uBlock Origin)
      */
     fun initializeBuiltInExtensions(context: Context) {
         val rt = runtime ?: return
@@ -253,13 +253,13 @@ object SendaGeckoEngine {
                 fun response(granted: Boolean) = WebExtension.PermissionPromptResponse(
                     granted, // isPermissionsGranted
                     granted, // isPrivateModeGranted
-                    false    // isTechnicalAndInteractionDataGranted: nunca se comparten datos de uso
+                    false    // isTechnicalAndInteractionDataGranted: usage data is never shared
                 )
-                // Solo las extensiones que trae Senda se instalan sin preguntar
+                // Only the extensions Senda ships are installed without asking
                 if (extension.id in EMBEDDED_EXTENSION_IDS) {
                     return org.mozilla.geckoview.GeckoResult.fromValue(response(true))
                 }
-                // Cualquier otra (instalada desde un archivo, un enlace o una web) muestra sus permisos y espera al usuario
+                // Any other one (installed from a file, a link or a website) shows its permissions and waits for the user
                 val result = org.mozilla.geckoview.GeckoResult<WebExtension.PermissionPromptResponse>()
                 android.os.Handler(android.os.Looper.getMainLooper()).post {
                     pendingExtensionInstall?.onDecision?.invoke(false)
@@ -277,9 +277,9 @@ object SendaGeckoEngine {
             { list ->
                 updateFromExtensionList(list)
 
-                // uBlock y el proxy/Tor de Senda deben estar siempre activos (la app no deja desactivarlos). El
-                // 2026-10-05 aparecieron desactivados en un teléfono tras reinstalar (userDisabled en el perfil,
-                // causa sin determinar): sin uBlock no hay bloqueo de rastreadores. Se reactivan y se registra por qué
+                // uBlock and Senda's proxy/Tor must always be enabled (the app does not let you disable them). On
+                // 2026-10-05 they showed up disabled on a phone after reinstalling (userDisabled in the profile,
+                // cause unknown): without uBlock there is no tracker blocking. They are re-enabled and the reason is logged
                 list?.filter { it.id in EMBEDDED_EXTENSION_IDS && !it.metaData.enabled }?.forEach { ext ->
                     android.util.Log.w("Senda", "Extensión integrada desactivada (${ext.id}, disabledFlags=${ext.metaData.disabledFlags}): se reactiva")
                     controller.enable(ext, org.mozilla.geckoview.WebExtensionController.EnableSource.USER).accept(
@@ -300,24 +300,24 @@ object SendaGeckoEngine {
                     }
                 }
 
-                // Refresco asíncrono para asegurar captura de UUIDs y opciones de extensiones
+                // Asynchronous refresh to make sure extension UUIDs and options are captured
                 android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                     refreshExtensions()
                 }, 1000)
 
-                // 2. Senda Proxy & Tor Controller (Built-in folder). ensureBuiltIn la instala o la actualiza
-                // cuando cambia su versión: con installBuiltIn solo, las correcciones nunca llegaban
+                // 2. Senda Proxy & Tor Controller (built-in folder). ensureBuiltIn installs or updates it
+                // when its version changes: with installBuiltIn alone, fixes never arrived
                 installBuiltInFolder("resource://android/assets/extensions/senda_proxy/", "proxy@senda.org") { ext ->
                     setupProxyMessageDelegate(ext)
                     android.util.Log.i("Senda", "Senda Proxy listo: ${ext.id} ${ext.metaData.version}")
                 }
 
-                // 3. Detector de videos para mostrarlos en la TV al duplicar: solo observa la red, no toca las páginas
+                // 3. Video detector to show videos on the TV while mirroring: it only watches the network, it does not touch pages
                 installBuiltInFolder("resource://android/assets/extensions/senda_media/", "media@senda.org") { ext ->
                     ext.setMessageDelegate(org.senda.browser.core.cast.SendaMediaCatalog.messageDelegate, "senda_media")
                 }
 
-                // Retirar el detector de video de Chromecast de una versión de prueba: no debe inyectar nada en las páginas
+                // Remove the Chromecast video detector from a test version: it must not inject anything into pages
                 list?.firstOrNull { it.id == "cast@senda.org" }?.let { controller.uninstall(it) }
             },
             { err ->
@@ -436,7 +436,7 @@ object SendaGeckoEngine {
     }
 
     /**
-     * Permite instalar libremente cualquier extensión .xpi desde un archivo local o URI
+     * Lets the user freely install any .xpi extension from a local file or URI
      */
     fun installExtension(uri: Uri, onSuccess: (WebExtension) -> Unit, onError: (Throwable) -> Unit) {
         val controller = getRuntime().webExtensionController

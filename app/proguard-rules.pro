@@ -2,8 +2,8 @@
 -keep class org.mozilla.geckoview.** { *; }
 -dontwarn org.mozilla.geckoview.**
 
-# Guardian Project Tor & Control. TorService vive en org.torproject.jni y su código nativo lee campos por nombre
-# (torConfiguration): sin esta regla R8 los renombraba y activar Tor cerraba la versión firmada (2026-10-07)
+# Guardian Project Tor & Control. TorService lives in org.torproject.jni and its native code reads fields by name
+# (torConfiguration): without this rule R8 renamed them and turning on Tor crashed the signed build (2026-10-07)
 -keep class org.torproject.jni.** { *; }
 -dontwarn org.torproject.jni.**
 -keep class info.guardianproject.** { *; }
@@ -16,9 +16,9 @@
 -dontwarn org.lsposed.hiddenapibypass.**
 
 
-# GeckoView lee geckoview-config.yaml (prefs de arranque de Senda) con SnakeYAML y lo vuelca por reflexión en
-# DebugConfig. Sin estas reglas R8 reempaqueta SnakeYAML, Package queda null y la versión firmada se cerraba al
-# arrancar (ExceptionInInitializerError en DebugConfig.fromFile, 2026-10-07)
+# GeckoView reads geckoview-config.yaml (Senda's startup prefs) with SnakeYAML and loads it into DebugConfig
+# by reflection. Without these rules R8 repackages SnakeYAML, Package is null and the signed build crashed at
+# startup (ExceptionInInitializerError in DebugConfig.fromFile, 2026-10-07)
 -keep class org.yaml.snakeyaml.** { *; }
 -dontwarn org.yaml.snakeyaml.**
 -keep class org.mozilla.gecko.util.DebugConfig { *; }

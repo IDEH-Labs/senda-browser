@@ -5,8 +5,8 @@ plugins {
 
 import java.util.Properties
 
-// Firma de publicación: variables de entorno (KEYSTORE_PATH, KEY_ALIAS, STORE_PASSWORD, KEY_PASSWORD) o keystore.properties
-// en la raíz del proyecto (no se sube a git). Sin ellas, la release sale SIN FIRMAR, nunca con la clave de depuración
+// Release signing: environment variables (KEYSTORE_PATH, KEY_ALIAS, STORE_PASSWORD, KEY_PASSWORD) or keystore.properties
+// in the project root (not committed). Without them the release build is UNSIGNED, never signed with the debug key
 def signingProperties = new Properties()
 def signingPropertiesFile = rootProject.file('keystore.properties')
 if (signingPropertiesFile.isFile()) signingPropertiesFile.withInputStream { signingProperties.load(it) }
@@ -71,7 +71,7 @@ android {
         compose = true
     }
 
-    // Sin el bloque de dependencias cifrado para Google: el APK no lleva metadatos que el usuario no puede leer
+    // No encrypted dependency block for Google: the APK carries no metadata the user cannot read
     dependenciesInfo {
         includeInApk = false
         includeInBundle = false
@@ -89,7 +89,7 @@ android {
         }
         resources {
             excludes += ['/META-INF/{AL2.0,LGPL2.1}', '/META-INF/DEPENDENCIES']
-            // Avisos de licencia de las dependencias (Apache 2.0 exige distribuirlos): se combinan, no se descartan
+            // License notices of the dependencies (Apache 2.0 requires distributing them): merged, not discarded
             merges += ['/META-INF/LICENSE', '/META-INF/LICENSE.txt', '/META-INF/NOTICE', '/META-INF/NOTICE.txt']
         }
     }
@@ -116,7 +116,7 @@ configurations.all {
 }
 
 dependencies {
-    // GeckoView - Motor web libre de Mozilla
+    // GeckoView - Mozilla's free web engine
     implementation 'org.mozilla.geckoview:geckoview:157.0.20260924084938'
 
     // AndroidX & Kotlin
@@ -133,16 +133,16 @@ dependencies {
     implementation 'androidx.compose.material3:material3'
     implementation 'androidx.compose.material:material-icons-extended'
 
-    // Biometría (Hardware Keystore)
+    // Biometrics (hardware keystore)
     implementation 'androidx.biometric:biometric:1.2.0-alpha05'
 
     // Coroutines
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1'
 
-    // Hidden API bypass para JNI de GeckoView en Android 9-15
+    // Hidden API bypass for GeckoView JNI on Android 9-15
     implementation 'org.lsposed.hiddenapibypass:hiddenapibypass:4.3'
 
-    // Tor Nativo Embebido Soberano (Guardian Project)
+    // Embedded native Tor (Guardian Project)
     implementation 'info.guardianproject:tor-android:0.4.9.13'
     implementation 'info.guardianproject:jtorctl:0.4.5.7'
     implementation 'androidx.localbroadcastmanager:localbroadcastmanager:1.1.0'

@@ -8,9 +8,9 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
- * Archivos que el usuario elige para subir a una página (<input type="file">). GeckoView no siempre puede leer
- * un content:// de otra app, así que, como Firefox para Android, se copian a la caché privada de Senda y se
- * le pasa la copia. Las copias se borran al arrancar la app.
+ * Files the user picks to upload to a page (<input type="file">). GeckoView cannot always read
+ * a content:// URI from another app, so, like Firefox for Android, they are copied to Senda's private cache and
+ * the copy is passed on. The copies are deleted when the app starts.
  */
 object SendaWebUploads {
 
@@ -20,7 +20,7 @@ object SendaWebUploads {
         File(context.cacheDir, DIR).deleteRecursively()
     }
 
-    /** Copia cada archivo a una carpeta propia de esta elección (nombres repetidos no se pisan). */
+    /** Copies each file into a folder of its own for this selection (repeated names do not overwrite each other). */
     suspend fun copyToCache(context: Context, uris: List<Uri>): List<Uri> = withContext(Dispatchers.IO) {
         val dir = File(context.cacheDir, "$DIR/${System.nanoTime()}").apply { mkdirs() }
         uris.mapIndexedNotNull { i, uri ->
@@ -45,7 +45,7 @@ object SendaWebUploads {
         } catch (_: Exception) {
             null
         }
-        // Solo el nombre, sin rutas ni caracteres que el sistema de archivos no admite
+        // Only the name, without paths or characters the file system does not allow
         return raw?.substringAfterLast('/')?.replace(Regex("[\\\\/:*?\"<>|\\u0000]"), "_")?.take(120)
             ?.takeIf { it.isNotBlank() && it != "." && it != ".." } ?: "archivo"
     }

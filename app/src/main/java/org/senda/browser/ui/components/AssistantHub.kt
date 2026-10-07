@@ -34,21 +34,21 @@ import org.senda.browser.core.assistant.ChatGptPlanAuth
 import org.senda.browser.core.assistant.RemoteAiException
 import org.senda.browser.core.assistant.SendaAssistant
 
-/** Texto para cuando no se encontró un modelo que responda o la cuenta no puede usarlo. */
+/** Text for when no model that answers was found or the account cannot use it. */
 private fun connectErrorText(e: Throwable, strings: SendaStringPack, destination: String): String =
     if (e is RemoteAiException && e.kind == RemoteAiException.Kind.BAD_RESPONSE) strings.as_no_model
     else assistantErrorText(e, strings, destination)
 
 /**
- * «Mis IA»: un único lugar para elegir con qué IA habla el asistente. ChatGPT (con el plan del usuario) primero;
- * debajo, las conectadas con clave de API; y «Añadir otra IA (avanzado)». Cada tarjeta muestra solo las
- * capacidades comprobadas. Al conectar, el modelo se elige solo (probado); elegirlo a mano es opcional.
+ * "My AIs": a single place to choose which AI the assistant talks to. ChatGPT (with the user's plan) first;
+ * below, the ones connected with an API key; and "Add another AI (advanced)". Each card shows only the
+ * verified capabilities. On connecting, the model is chosen automatically (tested); choosing it by hand is optional.
  */
 @Composable
 fun AssistantHubDialog(
     prefs: PreferencesManager,
     onDismiss: () -> Unit,
-    // El inicio de sesión con ChatGPT abre la página de OpenAI: hay que quitar de encima lo que la tape
+    // Signing in with ChatGPT opens OpenAI's page: whatever covers it must be removed
     onLeaveForSignIn: () -> Unit = onDismiss
 ) {
     val context = LocalContext.current
@@ -64,10 +64,10 @@ fun AssistantHubDialog(
     var showAdd by remember { mutableStateOf(false) }
     var showWelcome by remember { mutableStateOf(false) }
 
-    /** «En uso» si es la activa y tiene consentimiento (el modelo se elige solo si falta); si no, «Usar». */
+    /** "In use" if it is the active one and has consent (the model is chosen automatically if missing); otherwise "Use". */
     fun ready(id: String) = active == id && prefs.assistantConsentFor(id)
 
-    // Una IA preparándose (aunque este cuadro se haya cerrado y vuelto a abrir mientras tanto)
+    // An AI being prepared (even if this dialog was closed and reopened in the meantime)
     val preparing by SendaAssistant.connecting.collectAsState()
     LaunchedEffect(preparing) {
         working = preparing != null
@@ -76,8 +76,8 @@ fun AssistantHubDialog(
     }
 
     /**
-     * La deja en uso y elige el modelo solo (probándolo). En el ámbito del asistente, no de esta pantalla: cerrar
-     * «Mis IA» antes de que termine ya no lo cancela (pasó el 2026-10-06 y la IA quedó sin modelo).
+     * Puts it in use and picks the model automatically (testing it). In the assistant's scope, not this screen's: closing
+     * "My AIs" before it finishes no longer cancels it (it happened on 2026-10-06 and the AI was left without a model).
      */
     fun finishConnecting(id: String) {
         SendaAssistant.use(prefs, id)
@@ -96,7 +96,7 @@ fun AssistantHubDialog(
 
     if (showWelcome) ChatGptWelcomeDialog { prefs.assistantChatGptWelcomeSeen = true; showWelcome = false }
 
-    // Resultado del inicio de sesión con ChatGPT, aunque el cuadro se haya cerrado y vuelto a abrir mientras tanto
+    // Result of signing in with ChatGPT, even if the dialog was closed and reopened in the meantime
     val signIn by ChatGptPlanAuth.signInState.collectAsState()
     LaunchedEffect(signIn) {
         when (val st = signIn) {
@@ -114,7 +114,7 @@ fun AssistantHubDialog(
         }
     }
 
-    // Consentimiento, una vez por IA: lo que se envíe lo recibe esa empresa
+    // Consent, once per AI: whatever is sent is received by that company
     consentFor?.let { id ->
         AlertDialog(
             onDismissRequest = { consentFor = null },
@@ -153,7 +153,7 @@ fun AssistantHubDialog(
             Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(strings.as_hub_intro, fontSize = 13.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-                // Orden: la que responde ahora, luego las demás conectadas (ChatGPT antes que las de clave)
+                // Order: the one answering now, then the other connected ones (ChatGPT before the key-based ones)
                 val inUse = connected.filter { ready(it) }
                 val others = connected.filterNot { ready(it) }
                 fun cardFor(id: String) = @Composable {
@@ -222,7 +222,7 @@ private fun SectionTitle(text: String) {
     )
 }
 
-/** Marca de cada IA: el logo de ChatGPT (obligatorio en sus pautas) o la inicial en un círculo. */
+/** Each AI's mark: the ChatGPT logo (required by its guidelines) or the initial in a circle. */
 @Composable
 private fun AiMark(id: String) {
     if (id == SendaAssistant.PROVIDER_ID) {
@@ -237,8 +237,8 @@ private fun AiMark(id: String) {
 }
 
 /**
- * Cabecera común: marca, nombre y cómo está conectada (una línea cada uno; lo largo se corta con «…») y, a la
- * derecha, «✓ En uso» si es la que responde.
+ * Shared header: mark, name and how it is connected (one line each; long text is cut with "…") and, on the
+ * right, "✓ In use" if it is the one answering.
  */
 @Composable
 private fun AiHeader(id: String, connection: String, inUse: Boolean = false) {
@@ -290,7 +290,7 @@ private fun AiCard(
                 )
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
-            // Acciones secundarias en su fila; la principal («Usar»), ancha y al final
+            // Secondary actions in their own row; the main one ("Use"), wide and last
             Row(verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = onChangeModel, enabled = !working, contentPadding = PaddingValues(horizontal = 8.dp)) {
                     Text(strings.as_change_model, fontSize = 13.sp, maxLines = 1)
@@ -307,7 +307,7 @@ private fun AiCard(
     }
 }
 
-/** ChatGPT aún sin conectar: la misma tarjeta, con el botón oficial «Continuar con ChatGPT». */
+/** ChatGPT not connected yet: the same card, with the official "Continue with ChatGPT" button. */
 @Composable
 private fun ChatGptConnectCard(enabled: Boolean, onConnect: () -> Unit) {
     val strings = LocalSendaStrings.current
@@ -315,7 +315,7 @@ private fun ChatGptConnectCard(enabled: Boolean, onConnect: () -> Unit) {
         Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             AiHeader(SendaAssistant.PROVIDER_ID, strings.as_conn_plan_offer)
             CapabilityPills(SendaAssistant.PROVIDER_ID)
-            // Botón «Continue with ChatGPT» con el logo, como piden las pautas de OpenAI
+            // "Continue with ChatGPT" button with the logo, as OpenAI's guidelines ask
             Button(enabled = enabled, onClick = onConnect, modifier = Modifier.fillMaxWidth()) {
                 ChatGptLogo(18)
                 Spacer(Modifier.width(8.dp))
@@ -325,7 +325,7 @@ private fun ChatGptConnectCard(enabled: Boolean, onConnect: () -> Unit) {
     }
 }
 
-/** Etiquetas de lo que esa IA tiene comprobado en Senda (bajan de línea si no caben); lo demás no se muestra. */
+/** Labels for what that AI has verified in Senda (wrap if they do not fit); anything else is not shown. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun CapabilityPills(id: String) {
@@ -351,7 +351,7 @@ private fun CapabilityPills(id: String) {
     }
 }
 
-/** Elegir el modelo a mano (opcional): se prueba antes de guardarlo. */
+/** Choose the model by hand (optional): it is tested before saving. */
 @Composable
 private fun ModelPickerDialog(prefs: PreferencesManager, id: String, onDismiss: () -> Unit) {
     val strings = LocalSendaStrings.current
@@ -414,8 +414,8 @@ private fun ModelPickerDialog(prefs: PreferencesManager, id: String, onDismiss: 
 }
 
 /**
- * Añadir una IA con clave de API (avanzado): se paga aparte a cada empresa y la suscripción no cuenta. Un solo
- * botón «Conectar»: prueba la clave, elige el modelo solo y la deja en uso.
+ * Add an AI with an API key (advanced): each company is paid separately and the subscription does not count. A single
+ * "Connect" button: tests the key, picks the model automatically and puts it in use.
  */
 @Composable
 private fun AddApiAiDialog(prefs: PreferencesManager, onDismiss: () -> Unit) {
@@ -448,12 +448,12 @@ private fun AddApiAiDialog(prefs: PreferencesManager, onDismiss: () -> Unit) {
                     }
                 }
                 Spacer(Modifier.height(6.dp))
-                // Paso 1: crear la clave en la página oficial
+                // Step 1: create the key on the official page
                 OutlinedButton(onClick = { openInBrowser(context, provider.keysPage) }, modifier = Modifier.fillMaxWidth()) {
                     Text(strings.as_get_key.format(java.net.URL(provider.keysPage).host), fontSize = 13.sp)
                 }
                 Spacer(Modifier.height(6.dp))
-                // Paso 2: pegarla
+                // Step 2: paste it
                 OutlinedTextField(
                     value = apiKey, onValueChange = { apiKey = it.trim() },
                     label = { Text(strings.as_api_key) },
@@ -463,7 +463,7 @@ private fun AddApiAiDialog(prefs: PreferencesManager, onDismiss: () -> Unit) {
                 )
                 Text(strings.as_key_encrypted.format(provider.host), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (provider == ApiProvider.GEMINI) {
-                    // Condiciones de Google para el nivel gratuito de la API de Gemini
+                    // Google's terms for the Gemini API free tier
                     Text(strings.as_api_gemini_free_note, fontSize = 11.sp, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 4.dp))
                 }
                 Spacer(Modifier.height(6.dp))
@@ -483,7 +483,7 @@ private fun AddApiAiDialog(prefs: PreferencesManager, onDismiss: () -> Unit) {
             }
         },
         confirmButton = {
-            // Paso 3: conectar (prueba la clave, elige el modelo solo y la deja en uso)
+            // Step 3: connect (tests the key, picks the model automatically and puts it in use)
             Button(enabled = !working && accepted && apiKey.isNotBlank(), onClick = {
                 val current = provider
                 working = true; status = strings.as_finding_model

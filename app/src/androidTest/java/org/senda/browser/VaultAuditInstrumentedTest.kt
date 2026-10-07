@@ -38,6 +38,6 @@ class VaultAuditInstrumentedTest {
 
         assertEquals(0, report.failedTests)
         assertTrue(report.passedTests >= 6)
-        assertTrue(report.avgLatencyMs < 150.0) // Límite realista para operaciones en silicio TEE Keystore
+        assertTrue(report.avgLatencyMs < 150.0) // Realistic limit for operations in TEE keystore silicon
     }
 }

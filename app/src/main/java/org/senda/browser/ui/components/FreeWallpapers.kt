@@ -23,10 +23,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Fondo libre: obra real de un proyecto de software libre, con su autor y licencia tal como constan en la
- * fuente oficial (archivo de copyright del paquete, metadatos o página de arte del proyecto).
- * [focusX] es dónde está lo importante de la imagen (0 = izquierda, 1 = derecha): en un teléfono vertical
- * el recorte se centra ahí y no corta, por ejemplo, a la mascota que está en un costado.
+ * Free wallpaper: a real work from a free software project, with its author and license as stated in the
+ * official source (the package's copyright file, metadata or the project's art page).
+ * [focusX] is where the important part of the image is (0 = left, 1 = right): on a phone in portrait
+ * the crop is centered there and does not cut off, for example, the mascot on one side.
  */
 data class FreeWallpaper(
     val id: String,
@@ -43,14 +43,14 @@ data class FreeWallpaper(
 
 object FreeWallpapers {
 
-    // Verificadas el 2026-10-05 en la fuente de cada proyecto. Arch: su política de marca permite usar el logo
-    // sin pedir permiso en usos no comerciales que no sugieran respaldo oficial (si Senda se vendiera, habría
-    // que pedirlo a trademarks@archlinux.org). Sin arte de BSD: FreeBSD, NetBSD, OpenBSD, DragonFly y GhostBSD
-    // lo publican como marca registrada, con permiso previo o sin licencia. Las fotos de Pixabay del paquete
-    // de Arch quedan fuera: su licencia prohíbe redistribuirlas como fondos de pantalla.
-    // Xfce: los 10 fondos de xfdesktop con autor y licencia en backgrounds/README.md (commit d08a94c, SVG
-    // renderizados a 3840 px). Fuera xfce-blue (el propio Xfce dice que su procedencia es desconocida), las
-    // fotos del antiguo paquete xfce4-artwork (sin autor ni licencia publicados) y artwork/public (sin licencia)
+    // Verified on 2026-10-05 at each project's source. Arch: its trademark policy allows using the logo
+    // without asking for permission in non-commercial uses that do not suggest official endorsement (if Senda were sold,
+    // it would have to be requested from trademarks@archlinux.org). No BSD art: FreeBSD, NetBSD, OpenBSD, DragonFly and GhostBSD
+    // publish it as a registered trademark, with prior permission or without a license. The Pixabay photos from the
+    // Arch package are left out: their license forbids redistributing them as wallpapers.
+    // Xfce: the 10 xfdesktop wallpapers with author and license in backgrounds/README.md (commit d08a94c, SVGs
+    // rendered at 3840 px). Left out: xfce-blue (Xfce itself says its origin is unknown), the
+    // photos from the old xfce4-artwork package (no published author or license) and artwork/public (no license)
     val items = listOf(
         FreeWallpaper(
             id = "debian_ceratopsian", name = "Ceratopsian (Debian 13)", category = "Debian", author = "Elise Couper", license = "GPL-2.0+",
@@ -375,8 +375,8 @@ object FreeWallpapers {
     )
 
     /**
-     * Elegir un fondo. Con la rotación activa, la rotación sigue desde el elegido (si no, tocar un fondo no
-     * cambiaba nada a la vista); elegir la imagen propia detiene la rotación para que no la tape.
+     * Choose a wallpaper. With rotation on, rotation continues from the chosen one (otherwise tapping a wallpaper
+     * changed nothing visible); choosing your own image stops the rotation so it does not cover it.
      */
     fun choose(prefs: org.senda.browser.core.PreferencesManager, id: String) {
         prefs.selectedWallpaperId = id
@@ -388,7 +388,7 @@ object FreeWallpapers {
         }
     }
 
-    /** Otro fondo al azar, distinto del actual, para la rotación. */
+    /** Another random wallpaper, different from the current one, for the rotation. */
     fun nextRandom(currentId: String?): FreeWallpaper =
         items.filter { it.id != currentId }.random()
 
@@ -409,7 +409,7 @@ object FreeWallpapers {
     }
 }
 
-/** Recorta centrando [focusX] (0 = izquierda, 1 = derecha) sin dejar bordes vacíos. */
+/** Crops centered on [focusX] (0 = left, 1 = right) without leaving empty borders. */
 private class FocusAlignment(private val focusX: Float) : Alignment {
     override fun align(size: IntSize, space: IntSize, layoutDirection: LayoutDirection): IntOffset {
         val x = if (size.width > space.width) {
@@ -420,9 +420,9 @@ private class FocusAlignment(private val focusX: Float) : Alignment {
 }
 
 /**
- * Las obras vienen en alta resolución (hasta 5120 px) para PC, tableta o visores; se decodifican al tamaño
- * del espacio donde se muestran, así una pantalla de teléfono no carga ~60 MB por fondo y cada miniatura
- * del selector ocupa lo que se ve.
+ * The works come in high resolution (up to 5120 px) for PCs, tablets or viewers; they are decoded at the size
+ * of the space where they are shown, so a phone screen does not load ~60 MB per wallpaper and each picker
+ * thumbnail takes only what is visible.
  */
 private fun decodeToFit(open: () -> java.io.InputStream, width: Int, height: Int): android.graphics.Bitmap? {
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -430,7 +430,7 @@ private fun decodeToFit(open: () -> java.io.InputStream, width: Int, height: Int
     val srcW = bounds.outWidth
     val srcH = bounds.outHeight
     if (srcW <= 0 || srcH <= 0) return null
-    // Escala de «recortar para llenar», nunca por encima del original
+    // "Crop to fill" scale, never above the original
     val scale = if (width > 0 && height > 0) minOf(1f, maxOf(width.toFloat() / srcW, height.toFloat() / srcH)) else 1f
     val targetW = maxOf(1, (srcW * scale).toInt())
     val targetH = maxOf(1, (srcH * scale).toInt())
@@ -461,8 +461,8 @@ fun FreeWallpaperBackground(
         val file = wallpaper.filePath
         imageBitmap = withContext(Dispatchers.IO) {
             try {
-                // En espacios pequeños (miniaturas del selector) se usa la copia de 320 px, no el original de
-                // hasta 5120 px: decodificar 54 originales al desplazar la fila la hacía ir a tirones
+                // In small spaces (picker thumbnails) the 320 px copy is used, not the original of
+                // up to 5120 px: decoding 54 originals while scrolling the row made it stutter
                 val thumb = asset?.let { "wallpapers/thumbs/" + it.substringAfterLast('/') }
                 if (asset != null && thumb != null && targetH in 1..400) {
                     decodeToFit({ context.assets.open(thumb) }, targetW, targetH)?.asImageBitmap()
@@ -494,7 +494,7 @@ fun FreeWallpaperBackground(
                 val width = size.width
                 val height = size.height
 
-                // Fondo gradiente base
+                // Base gradient background
                 drawRect(
                     brush = Brush.verticalGradient(
                         colors = wallpaper.colors,
@@ -503,7 +503,7 @@ fun FreeWallpaperBackground(
                     )
                 )
 
-            // Resplandor atmosférico superior suave
+            // Soft atmospheric glow at the top
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
@@ -517,7 +517,7 @@ fun FreeWallpaperBackground(
                 radius = width * 0.85f
             )
 
-            // Resplandor sutil inferior para contraste
+            // Subtle glow at the bottom for contrast
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(

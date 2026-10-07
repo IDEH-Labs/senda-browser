@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <lint>
-    <!-- Opt-in explícito a APIs experimentales de GeckoView utilizadas legítimamente por el navegador -->
+    <!-- Explicit opt-in to experimental GeckoView APIs that the browser uses on purpose -->
     <issue id="UnsafeOptInUsageError">
         <option name="opt-in" value="org.mozilla.geckoview.ExperimentalGeckoViewApi" />
     </issue>

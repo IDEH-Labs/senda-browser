@@ -47,7 +47,7 @@ fun SettingsAutofillDialog(
                 Button(
                     onClick = {
                         try {
-                            // Pantalla de Android para elegir gestor de contraseñas (Android 14+)
+                            // Android screen to choose the password manager (Android 14+)
                             context.startActivity(
                                 Intent(
                                     if (android.os.Build.VERSION.SDK_INT >= 34) "android.settings.CREDENTIAL_PROVIDER"
@@ -111,7 +111,7 @@ fun SettingsTorDialog(
                 )
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // 1. Tor Integrado / Orbot
+                // 1. Built-in Tor / Orbot
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -145,7 +145,7 @@ fun SettingsTorDialog(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // 2. SOCKS5 Personalizado
+                // 2. Custom SOCKS5
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -174,7 +174,7 @@ fun SettingsTorDialog(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // 3. Desactivado (Directo)
+                // 3. Off (direct)
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()

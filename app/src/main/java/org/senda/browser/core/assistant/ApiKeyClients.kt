@@ -10,9 +10,9 @@ import org.senda.browser.core.SendaNet
 import java.io.IOException
 import java.net.HttpURLConnection
 
-/** Lo que el chat necesita de cualquier IA conectada: ChatGPT con el plan o una IA con clave de API. */
+/** What the chat needs from any connected AI: ChatGPT with the plan or an AI with an API key. */
 interface AssistantBackend {
-    /** Capacidades comprobadas con una cuenta real: solo esas se ofrecen en el chat. */
+    /** Capabilities verified with a real account: only those are offered in the chat. */
     val canSearchWeb: Boolean
     val canAttach: Boolean
     val canThinkDeep: Boolean
@@ -22,19 +22,19 @@ interface AssistantBackend {
 }
 
 /**
- * IA conectadas con clave de API (para usuarios avanzados; se paga aparte a cada empresa). Investigado el
- * 2026-10-06: Anthropic prohíbe usar la suscripción de Claude en apps de terceros (desde el 19-02-2026), Google
- * no ofrece forma permitida para Gemini, xAI no documenta oficialmente su acceso por suscripción para apps de
- * terceros (zona gris: no se usa) y la de Mistral solo sirve en Le Chat: con todas ellas, la vía oficial es la clave.
+ * AIs connected with an API key (for advanced users; each company is paid separately). Researched on
+ * 2026-10-06: Anthropic forbids using the Claude subscription in third-party apps (since 2026-02-19), Google
+ * offers no permitted way for Gemini, xAI does not officially document subscription access for third-party
+ * apps (gray area: not used) and Mistral's only works in Le Chat: for all of them, the official route is the key.
  */
 enum class ApiProvider(
     val id: String,
     val displayName: String,
-    /** Base de la API oficial (siempre https). */
+    /** Base of the official API (always https). */
     val baseUrl: String,
-    /** Página oficial donde se crea la clave. */
+    /** Official page where the key is created. */
     val keysPage: String,
-    /** Página oficial donde se ve el uso y los límites (la que indica cada empresa en sus errores de cuota). */
+    /** Official page showing usage and limits (the one each company points to in its quota errors). */
     val usagePage: String
 ) {
     ANTHROPIC("anthropic", "Claude (Anthropic)", "https://api.anthropic.com/v1", "https://console.anthropic.com/settings/keys", "https://console.anthropic.com/settings/limits"),
@@ -46,11 +46,11 @@ enum class ApiProvider(
 
     fun client(apiKey: String): AssistantBackend = clientAt(baseUrl, apiKey)
 
-    /** Con otra dirección base: solo para las pruebas (servidor simulado en el teléfono). */
+    /** With a different base address: only for tests (simulated server on the phone). */
     internal fun clientAt(base: String, apiKey: String): AssistantBackend = when (this) {
         ANTHROPIC -> AnthropicClient(base, apiKey)
-        // Medido con una clave real el 2026-10-06 (SendaGeminiCapabilitiesTest): fotos, PDF y razonamiento sí;
-        // búsqueda en Google no se pudo comprobar (el plan gratuito responde «cuota superada»)
+        // Measured with a real key on 2026-10-06 (SendaGeminiCapabilitiesTest): photos, PDF and reasoning work;
+        // Google search could not be verified (the free tier answers "quota exceeded")
         GEMINI -> OpenAiCompatibleClient(base, apiKey, attachments = true, deep = true, modelFilter = ::isGeminiChatModel)
         else -> OpenAiCompatibleClient(base, apiKey)
     }
@@ -61,8 +61,8 @@ enum class ApiProvider(
 }
 
 /**
- * Gemini lista también modelos que no sirven para conversar (voz, música, imágenes, especiales «Interactions API»):
- * fuera de la lista. El primero, el «flash» más reciente (rápido y con nivel gratuito).
+ * Gemini also lists models that are not for chatting (voice, music, images, special "Interactions API" ones):
+ * they are left out. First comes the newest "flash" (fast and with a free tier).
  */
 private fun isGeminiChatModel(id: String): Boolean =
     id.startsWith("gemini-") && listOf("tts", "image", "transcribe", "embedding", "live", "audio", "customtools", "robotics", "computer-use", "banana", "omni")
@@ -74,8 +74,8 @@ private fun geminiOrder(ids: List<String>): List<String> {
 }
 
 /**
- * Por defecto solo conversación por texto: búsqueda, adjuntos y razonamiento dependen de cada empresa y solo se
- * ofrecen los comprobados con una clave real (no se promete lo que no está verificado).
+ * By default only text chat: search, attachments and reasoning depend on each company and only the ones
+ * verified with a real key are offered (nothing unverified is promised).
  */
 private abstract class TextOnlyApiClient(protected val base: String, protected val apiKey: String) : AssistantBackend {
     override val canSearchWeb = false
@@ -95,14 +95,14 @@ private abstract class TextOnlyApiClient(protected val base: String, protected v
             throw RemoteAiException(RemoteAiException.Kind.NETWORK, e.javaClass.simpleName)
         }
         if (code in 200..299) return conn.inputStream.bufferedReader().use { it.readText() }
-        // Solo el código y un fragmento del error (nunca contiene la clave enviada)
+        // Only the code and a fragment of the error (it never contains the key that was sent)
         val err = try { conn.errorStream?.bufferedReader()?.use { it.readText() }?.take(200) } catch (_: IOException) { null }.orEmpty()
         throw RemoteAiException(
             when {
                 code == 401 || code == 403 -> RemoteAiException.Kind.AUTH
-                // Cuota del plan agotada (p. ej. el nivel gratuito de Gemini): no se arregla esperando un momento
+                // Plan quota exhausted (e.g. Gemini's free tier): waiting a moment does not fix it
                 code == 429 && err.contains("quota", ignoreCase = true) -> RemoteAiException.Kind.USAGE_LIMIT
-                // 429 por ritmo y 503 «demasiada demanda»: pasajeros
+                // 429 for rate and 503 "too much demand": temporary
                 code == 429 || code == 503 -> RemoteAiException.Kind.RATE_LIMIT
                 else -> RemoteAiException.Kind.BAD_RESPONSE
             },
@@ -111,8 +111,8 @@ private abstract class TextOnlyApiClient(protected val base: String, protected v
     }
 
     /**
-     * Recorre un flujo de eventos (SSE) y entrega cada línea «data:». Con «demasiada demanda» (503) antes de
-     * empezar a responder se reintenta una vez a los 2 s: suele pasar enseguida.
+     * Walks through an event stream (SSE) and delivers each "data:" line. With "too much demand" (503) before
+     * the answer starts, it retries once after 2 s: it usually clears quickly.
      */
     protected suspend fun streamPost(url: String, payload: JSONObject, onData: (String) -> Boolean) {
         try {
@@ -150,7 +150,7 @@ private abstract class TextOnlyApiClient(protected val base: String, protected v
     }
 }
 
-/** Gemini, Grok y Mistral: /models y /chat/completions (formato compatible con OpenAI, documentado por cada una). */
+/** Gemini, Grok and Mistral: /models and /chat/completions (OpenAI-compatible format, documented by each one). */
 private class OpenAiCompatibleClient(
     base: String,
     apiKey: String,
@@ -168,7 +168,7 @@ private class OpenAiCompatibleClient(
         try {
             val data = JSONObject(readOrThrow(conn)).optJSONArray("data") ?: JSONArray()
             (0 until data.length()).mapNotNull { data.optJSONObject(it)?.optString("id")?.takeIf { id -> id.isNotBlank() } }
-                // Gemini responde «models/gemini-…»; en /chat/completions se usa sin el prefijo
+                // Gemini answers "models/gemini-…"; /chat/completions uses it without the prefix
                 .map { it.removePrefix("models/") }.distinct().sorted()
                 .let { ids -> modelFilter?.let { f -> geminiOrder(ids.filter(f)) } ?: ids }
         } finally {
@@ -184,7 +184,7 @@ private class OpenAiCompatibleClient(
                 if (t.attachments.isEmpty() || !canAttach) {
                     messages.put(JSONObject().put("role", role).put("content", t.text))
                 } else {
-                    // Fotos y PDF como image_url con datos (Gemini acepta así los PDF; el tipo «file» lo rechaza)
+                    // Photos and PDFs as image_url with data (that is how Gemini accepts PDFs; it rejects the "file" type)
                     val parts = JSONArray().put(JSONObject().put("type", "text").put("text", t.text))
                     t.attachments.forEach { a ->
                         parts.put(JSONObject().put("type", "image_url").put("image_url", JSONObject().put("url", "data:${a.mime};base64,${a.base64}")))
@@ -209,7 +209,7 @@ private class OpenAiCompatibleClient(
         }
 }
 
-/** Claude: /v1/models y /v1/messages de Anthropic (con x-api-key y anthropic-version, según su documentación). */
+/** Claude: Anthropic's /v1/models and /v1/messages (with x-api-key and anthropic-version, per its documentation). */
 private class AnthropicClient(base: String, apiKey: String) : TextOnlyApiClient(base, apiKey) {
 
     override fun authorize(conn: HttpURLConnection) {

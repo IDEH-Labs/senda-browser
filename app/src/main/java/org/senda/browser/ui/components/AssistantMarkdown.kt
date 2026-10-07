@@ -15,9 +15,9 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.sp
 
 /**
- * El Markdown básico con que responde ChatGPT (títulos, listas, **negrita**, *cursiva*, `código` y [enlaces](https://…))
- * como texto con formato, en vez de mostrar los símbolos. Los enlaces solo si son https y se abren en una pestaña
- * de Senda ([onLink]). No interpreta HTML ni nada que pueda ejecutar código.
+ * The basic Markdown ChatGPT answers with (headings, lists, **bold**, *italic*, `code` and [links](https://…))
+ * as formatted text, instead of showing the symbols. Links only if they are https, and they open in a Senda
+ * tab ([onLink]). It does not interpret HTML or anything that could run code.
  */
 fun assistantMarkdown(text: String, linkColor: Color, onLink: (String) -> Unit): AnnotatedString = buildAnnotatedString {
     val lines = text.replace("\r\n", "\n").split('\n')
@@ -40,14 +40,14 @@ fun assistantMarkdown(text: String, linkColor: Color, onLink: (String) -> Unit):
     }
 }
 
-/** Texto sin los símbolos de formato (para copiar). */
+/** Text without the formatting symbols (for copying). */
 fun assistantPlainText(text: String): String = assistantMarkdown(text, Color.Unspecified) {}.text
 
 private val INLINE = Regex(
-    "\\*\\*(.+?)\\*\\*" +                                  // 1: negrita
-        "|`([^`\\n]+)`" +                                  // 2: código
-        "|\\[([^\\]\\n]+)]\\((https://[^)\\s]+)\\)" +      // 3, 4: enlace
-        "|(?<![*\\w])\\*([^*\\n]+)\\*(?![*\\w])"           // 5: cursiva
+    "\\*\\*(.+?)\\*\\*" +                                  // 1: bold
+        "|`([^`\\n]+)`" +                                  // 2: code
+        "|\\[([^\\]\\n]+)]\\((https://[^)\\s]+)\\)" +      // 3, 4: link
+        "|(?<![*\\w])\\*([^*\\n]+)\\*(?![*\\w])"           // 5: italic
 )
 
 private fun AnnotatedString.Builder.inline(text: String, linkColor: Color, onLink: (String) -> Unit) {

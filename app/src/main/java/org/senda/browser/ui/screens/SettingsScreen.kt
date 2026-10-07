@@ -60,13 +60,13 @@ fun SettingsScreen(
     val context = LocalContext.current
     val strings = LocalSendaStrings.current
 
-    // Estados reactivos de preferencias
+    // Reactive preference states
     var isSearchActive by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
 
-    // Diálogos activos (guardado persistente para no cerrarse en cambios de tema o configuración)
+    // Active dialogs (saved persistently so they do not close on theme or configuration changes)
     var activeDialog by rememberSaveable { mutableStateOf<String?>(null) }
-    // Comprobador y lanzador de navegador predeterminado
+    // Default browser checker and launcher
     var isDefaultBrowserApp by remember {
         mutableStateOf(checkIsDefaultBrowser(context))
     }
@@ -111,7 +111,7 @@ fun SettingsScreen(
         )
     }
 
-    // Filtrado de búsqueda en tiempo real
+    // Real-time search filtering
     val filteredSettings = remember(searchQuery, allSettings) {
         if (searchQuery.isBlank()) {
             allSettings
@@ -205,7 +205,7 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // TARJETA SUPERIOR: SINCRONIZACIÓN ÉTICA & IDENTIDAD (si no está buscando activamente)
+            // TOP CARD: SYNC & IDENTITY (if not actively searching)
             if (!isSearchActive || searchQuery.isBlank()) {
                 item {
                     Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
@@ -269,7 +269,7 @@ fun SettingsScreen(
                 }
             }
 
-            // CONTENIDO DE AJUSTES (POR CATEGORÍAS O RESULTADOS DE BÚSQUEDA)
+            // SETTINGS CONTENT (BY CATEGORY OR SEARCH RESULTS)
             if (isSearchActive && searchQuery.isNotBlank()) {
                 if (filteredSettings.isEmpty()) {
                     item {
@@ -316,9 +316,9 @@ fun SettingsScreen(
         }
     }
 
-    // ==================== DIÁLOGOS DE CONFIGURACIÓN ====================
+    // ==================== SETTINGS DIALOGS ====================
 
-    // DIÁLOGO: MOTOR DE BÚSQUEDA
+    // DIALOG: SEARCH ENGINE
     if (activeDialog == "search") {
         org.senda.browser.ui.screens.settings.SettingsSearchDialog(
             prefs = prefs,
@@ -328,7 +328,7 @@ fun SettingsScreen(
         )
     }
 
-    // DIÁLOGO: GESTIÓN DE PESTAÑAS
+    // DIALOG: TAB MANAGEMENT
     if (activeDialog == "tabs") {
         org.senda.browser.ui.screens.settings.SettingsTabsDialog(
             prefs = prefs,
@@ -338,7 +338,7 @@ fun SettingsScreen(
         )
     }
 
-    // DIÁLOGO: PÁGINA DE INICIO (ZEN)
+    // DIALOG: HOME PAGE (ZEN)
     if (activeDialog == "home") {
         org.senda.browser.ui.screens.settings.SettingsHomeDialog(
             context = context,
@@ -349,7 +349,7 @@ fun SettingsScreen(
         )
     }
 
-    // DIÁLOGO: APARIENCIA Y TEMA VISUAL
+    // DIALOG: APPEARANCE AND VISUAL THEME
     if (activeDialog == "customize") {
         org.senda.browser.ui.screens.settings.SettingsAppearanceDialog(
             prefs = prefs,
@@ -359,7 +359,7 @@ fun SettingsScreen(
         )
     }
 
-    // DIÁLOGO: PERSONALIZAR BARRA DE HERRAMIENTAS
+    // DIALOG: CUSTOMIZE TOOLBAR
     if (activeDialog == "toolbar_customization") {
         ToolbarCustomizationDialog(
             prefs = prefs,
@@ -368,7 +368,7 @@ fun SettingsScreen(
         )
     }
 
-    // DIÁLOGO: BÓVEDA SOBERANA DE CONTRASEÑAS & AUDITORÍA
+    // DIALOG: PASSWORD VAULT & AUDIT
     if (activeDialog == "passwords") {
         SendaVaultDialog(
             prefs = prefs,
@@ -380,7 +380,7 @@ fun SettingsScreen(
         )
     }
 
-    // DIÁLOGO: AUTOCOMPLETADO
+    // DIALOG: AUTOFILL
     if (activeDialog == "autofill") {
         SettingsAutofillDialog(
             context = context,
@@ -389,7 +389,7 @@ fun SettingsScreen(
         )
     }
 
-    // DIÁLOGO: ACCESIBILIDAD VISUAL
+    // DIALOG: VISUAL ACCESSIBILITY
     if (activeDialog == "accessibility") {
         SettingsAccessibilityDialog(
             prefs = prefs,
@@ -400,7 +400,7 @@ fun SettingsScreen(
         )
     }
 
-    // DIÁLOGO: TIPOGRAFÍAS Y RENDERIZADO
+    // DIALOG: TYPEFACES AND RENDERING
     if (activeDialog == "gnome_typography") {
         SettingsGnomeTypographyDialog(
             prefs = prefs,
@@ -410,7 +410,7 @@ fun SettingsScreen(
         )
     }
 
-    // DIÁLOGO: IDIOMA
+    // DIALOG: LANGUAGE
     if (activeDialog == "language") {
         SettingsLanguageDialog(
             context = context,
@@ -421,7 +421,7 @@ fun SettingsScreen(
         )
     }
 
-    // DIÁLOGO: TRADUCCIONES
+    // DIALOG: TRANSLATIONS
     if (activeDialog == "translations") {
         SettingsTranslationsDialog(
             prefs = prefs,
@@ -431,7 +431,7 @@ fun SettingsScreen(
         )
     }
 
-    // DIÁLOGO: MODO LECTURA Y RESÚMENES
+    // DIALOG: READER MODE AND SUMMARIES
     if (activeDialog == "reader_mode" || activeDialog == "summaries") {
         SettingsReaderModeDialog(
             prefs = prefs,
@@ -441,12 +441,12 @@ fun SettingsScreen(
         )
     }
 
-    // DIÁLOGO: MIS IA (ChatGPT y, para avanzados, otras IA con clave)
+    // DIALOG: MY AIs (ChatGPT and, for advanced users, other AIs with a key)
     if (activeDialog == "assistant") {
         org.senda.browser.ui.components.AssistantHubDialog(prefs = prefs, onDismiss = { activeDialog = null })
     }
 
-    // DIÁLOGO: ENRUTAMIENTO TOR & PROXY SOCKS5
+    // DIALOG: TOR & SOCKS5 PROXY ROUTING
     if (activeDialog == "tor_proxy") {
         SettingsTorDialog(
             context = context,
@@ -457,7 +457,7 @@ fun SettingsScreen(
         )
     }
 
-    // DIÁLOGO: NAVEGACIÓN PRIVADA
+    // DIALOG: PRIVATE BROWSING
     if (activeDialog == "private_browsing") {
         SettingsPrivateBrowsingDialog(
             prefs = prefs,
@@ -467,7 +467,7 @@ fun SettingsScreen(
         )
     }
 
-    // DIÁLOGO: MODO SOLO HTTPS
+    // DIALOG: HTTPS-ONLY MODE
     if (activeDialog == "https_only") {
         SettingsHttpsOnlyDialog(
             prefs = prefs,
@@ -477,7 +477,7 @@ fun SettingsScreen(
         )
     }
 
-    // DIÁLOGO: DNS SOBRE HTTPS (DOH)
+    // DIALOG: DNS OVER HTTPS (DOH)
     if (activeDialog == "dns_over_https") {
         SettingsDohDialog(
             prefs = prefs,
@@ -487,7 +487,7 @@ fun SettingsScreen(
         )
     }
 
-    // DIÁLOGO: PROTECCIÓN CONTRA RASTREO MEJORADA
+    // DIALOG: ENHANCED TRACKING PROTECTION
     if (activeDialog == "tracking_protection") {
         SettingsTrackingProtectionDialog(
             prefs = prefs,
@@ -497,7 +497,7 @@ fun SettingsScreen(
         )
     }
 
-    // DIÁLOGO: UBLOCK ORIGIN (SOBERANÍA Y FILTROS)
+    // DIALOG: UBLOCK ORIGIN (FILTERS)
     if (activeDialog == "ublock_origin") {
         UBlockOriginDialog(
             onNavigate = { url ->
@@ -508,7 +508,7 @@ fun SettingsScreen(
         )
     }
 
-    // DIÁLOGO: BÓVEDA BIOMÉTRICA & ANTI-ESPIONAJE
+    // DIALOG: BIOMETRIC LOCK & ANTI-SNOOPING
     if (activeDialog == "security_vault") {
         SettingsSecurityVaultDialog(
             prefs = prefs,
@@ -518,7 +518,7 @@ fun SettingsScreen(
         )
     }
 
-    // DIÁLOGO: CONFIGURACIÓN DEL SITIO & PERMISOS
+    // DIALOG: SITE SETTINGS & PERMISSIONS
     if (activeDialog == "site_permissions") {
         SettingsSitePermissionsDialog(
             prefs = prefs,
@@ -528,7 +528,7 @@ fun SettingsScreen(
         )
     }
 
-    // DIÁLOGO: RECOPILACIÓN DE DATOS & PRIVACIDAD
+    // DIALOG: DATA COLLECTION & PRIVACY
     if (activeDialog == "data_collection") {
         SettingsDataCollectionDialog(
             strings = strings,
@@ -536,14 +536,14 @@ fun SettingsScreen(
         )
     }
 
-    // DIÁLOGO: COMPLEMENTOS Y EXTENSIONES
+    // DIALOG: ADD-ONS AND EXTENSIONS
     if (activeDialog == "extensions") {
         ExtensionsManagerDialog(
             onDismiss = { activeDialog = null }
         )
     }
 
-    // DIÁLOGO: ABRIR ENLACES EN APLICACIONES
+    // DIALOG: OPEN LINKS IN APPS
     if (activeDialog == "open_in_apps") {
         SettingsOpenInAppsDialog(
             prefs = prefs,
@@ -553,7 +553,7 @@ fun SettingsScreen(
         )
     }
 
-    // DIÁLOGO: AJUSTES DE DESCARGA
+    // DIALOG: DOWNLOAD SETTINGS
     if (activeDialog == "download_settings") {
         SettingsDownloadSettingsDialog(
             prefs = prefs,
@@ -563,7 +563,7 @@ fun SettingsScreen(
         )
     }
 
-    // DIÁLOGO: SENDA LABS (FUNCIONES EXPERIMENTALES)
+    // DIALOG: SENDA LABS (EXPERIMENTAL FEATURES)
     if (activeDialog == "senda_labs") {
         SettingsSendaLabsDialog(
             prefs = prefs,
@@ -573,7 +573,7 @@ fun SettingsScreen(
         )
     }
 
-    // DIÁLOGO: SOBRE SENDA & MANIFIESTO
+    // DIALOG: ABOUT SENDA & MANIFESTO
     if (activeDialog == "about_senda" || activeDialog == "ethical_manifesto" || activeDialog == "third_party_licenses") {
         SettingsAboutDialog(
             activeDialog = activeDialog ?: "about_senda",
@@ -582,7 +582,7 @@ fun SettingsScreen(
         )
     }
 
-    // DIÁLOGO: SINCRONIZACIÓN Y RESPALDO (WEBDAV & NETSCAPE HTML)
+    // DIALOG: SYNC AND BACKUP (WEBDAV & NETSCAPE HTML)
     if (activeDialog == "sync_ethical") {
         SovereignSyncDialog(
             prefs = prefs,
@@ -590,7 +590,7 @@ fun SettingsScreen(
         )
     }
 
-    // DIÁLOGO: TRANSMISIÓN Y CHROMECAST
+    // DIALOG: CASTING
     if (activeDialog == "chromecast_settings") {
         SettingsChromecastDialog(
             context = context,

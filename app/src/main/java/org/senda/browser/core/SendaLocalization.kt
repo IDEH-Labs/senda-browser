@@ -8,7 +8,7 @@ import androidx.compose.runtime.compositionLocalOf
 import java.util.Locale
 
 /**
- * Representa una opción de idioma seleccionable por el usuario.
+ * A language option the user can select.
  */
 data class LanguageOption(
     val code: String,
@@ -17,8 +17,8 @@ data class LanguageOption(
 )
 
 /**
- * Gestor de localización y locales para Senda.
- * Soporta cambio dinámico de idioma en la UI y sincronización con el sistema Android.
+ * Localization and locale manager for Senda.
+ * Supports changing the UI language on the fly and syncing with the Android system.
  */
 object SendaLocaleManager {
 
@@ -139,7 +139,7 @@ object SendaLocaleManager {
 }
 
 /**
- * Interfaz unificada de cadenas de texto de Senda.
+ * Unified interface for Senda's text strings.
  */
 interface SendaStringPack {
     val system_default: String
@@ -782,7 +782,7 @@ interface SendaStringPack {
     val page_print_failed: String
     val page_add_to_home: String
     val page_shortcut_unsupported: String
-    /** Etiqueta BCP 47 del idioma de este paquete, para nombrar idiomas con java.util.Locale */
+    /** BCP 47 tag of this pack's language, to name languages with java.util.Locale */
     val ui_language_tag: String
     val translate_menu: String
     val translate_menu_translated: String
@@ -6884,7 +6884,7 @@ object SendaStringsZh : SendaStringPack {
 }
 
 object SendaStrings {
-    /** Textos en el idioma elegido en Senda (no el del sistema), para avisos fuera de Compose. */
+    /** Texts in the language chosen in Senda (not the system's), for notices outside Compose. */
     fun forApp(context: Context): SendaStringPack = get(PreferencesManager(context).appLanguage, context)
 
     fun get(langCode: String, context: Context? = null): SendaStringPack {

@@ -23,14 +23,14 @@ class VaultVerificationEndToEndTest {
 
         val testSecret = "SuperWebDavSecretPass_2026_@#"
 
-        // 1. Guardar la contraseña
+        // 1. Save the password
         prefs.webdavPassword = testSecret
 
-        // 2. Verificar que NO esté en texto plano en SharedPreferences
+        // 2. Check that it is NOT in plain text in SharedPreferences
         val plaintextInDisk = rawPrefs.getString("webdav_password", null)
         assertNull("La contraseña WebDAV NO debe existir en texto plano en el disco", plaintextInDisk)
 
-        // 3. Verificar que los campos cifrados existan
+        // 3. Check that the encrypted fields exist
         val encryptedBase64 = rawPrefs.getString("webdav_password_enc", null)
         val ivBase64 = rawPrefs.getString("webdav_password_iv", null)
         assertNotNull("Debe existir el payload cifrado en disco", encryptedBase64)
@@ -38,11 +38,11 @@ class VaultVerificationEndToEndTest {
         assertTrue("El payload cifrado no debe estar vacío", encryptedBase64!!.isNotBlank())
         assertTrue("El IV no debe estar vacío", ivBase64!!.isNotBlank())
 
-        // 4. Verificar que se descifre correctamente
+        // 4. Check that it decrypts correctly
         val retrieved = prefs.webdavPassword
         assertEquals("La contraseña descifrada con hardware debe ser idéntica", testSecret, retrieved)
 
-        // 5. Limpieza
+        // 5. Cleanup
         prefs.webdavPassword = ""
         assertNull(rawPrefs.getString("webdav_password_enc", null))
         assertNull(rawPrefs.getString("webdav_password_iv", null))
@@ -64,7 +64,7 @@ class VaultVerificationEndToEndTest {
 
     @Test
     fun testZeroRemoteCatalogInCode() {
-        // Verificar que SendaVaultManager y la lista de credenciales operen 100% offline
+        // Check that SendaVaultManager and the credential list work 100% offline
         val context = ApplicationProvider.getApplicationContext<Context>()
         val creds = SendaVaultManager.getCredentials(context)
         assertNotNull(creds)

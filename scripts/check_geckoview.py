@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""¿Está el motor de Senda al día en seguridad?
+"""Is Senda's engine up to date on security?
 
-Compara la GeckoView de app/build.gradle con la última publicada por Mozilla y con los avisos de seguridad
-de Firefox (MFSA). Sale con código 1 si hay una versión más nueva que corrige vulnerabilidades: un navegador
-con el motor atrasado expone a sus usuarios a fallos ya públicos aunque todo lo demás esté bien.
+Compares the GeckoView version in app/build.gradle with the latest one published by Mozilla and with Firefox's
+security advisories (MFSA). Exits with code 1 if there is a newer version that fixes vulnerabilities: a browser
+with an outdated engine exposes its users to already public flaws even if everything else is fine.
 
-Uso: python3 scripts/check_geckoview.py      (solo biblioteca estándar; necesita red)
+Usage: python3 scripts/check_geckoview.py      (standard library only; needs network access)
 """
 import re
 import sys
@@ -31,7 +31,7 @@ def version_key(v: str):
 def main() -> int:
     m = re.search(r"org\.mozilla\.geckoview:geckoview:([\d.]+)", GRADLE.read_text())
     if not m:
-        print("No encuentro la versión de GeckoView en app/build.gradle")
+        print("Could not find the GeckoView version in app/build.gradle")
         return 2
     current = m.group(1)
 
@@ -39,7 +39,7 @@ def main() -> int:
     latest = max(versions, key=version_key)
     newer = sorted((v for v in versions if version_key(v) > version_key(current)), key=version_key)
 
-    # Avisos «fixed in Firefox N» con N mayor que la versión actual (incluye N.0.x)
+    # "fixed in Firefox N" advisories with N greater than the current version (includes N.0.x)
     cur_major = version_key(current)[:2]
     pending = []
     for mfsa, level, fixed in re.findall(
@@ -50,19 +50,19 @@ def main() -> int:
         if (parts + (0,))[:2] > cur_major or (len(parts) > 2 and parts[:2] == cur_major):
             pending.append((mfsa.upper(), level, fixed))
 
-    print(f"GeckoView en Senda: {current}")
-    print(f"Última publicada:   {latest}")
+    print(f"GeckoView in Senda: {current}")
+    print(f"Latest published: {latest}")
     if pending:
-        print("Avisos de seguridad de Firefox posteriores a la versión de Senda:")
+        print("Firefox security advisories newer than Senda's version:")
         for mfsa, level, fixed in pending:
-            print(f"  {mfsa} (impacto {level}): corregido en Firefox {fixed} — {ADVISORIES}{mfsa.lower()}/")
+            print(f"  {mfsa} ({level} impact): fixed in Firefox {fixed} — {ADVISORIES}{mfsa.lower()}/")
     if newer and pending:
-        print(f"ACTUALIZAR: hay {len(newer)} versión(es) más nueva(s) y avisos sin corregir en Senda.")
+        print(f"UPDATE NEEDED: there are {len(newer)} newer version(s) and advisories not yet fixed in Senda.")
         return 1
     if newer:
-        print(f"Hay {len(newer)} versión(es) más nueva(s) sin avisos de seguridad asociados todavía: revisar.")
+        print(f"There are {len(newer)} newer version(s) with no associated security advisories yet: review them.")
         return 0
-    print("Al día.")
+    print("Up to date.")
     return 0
 
 

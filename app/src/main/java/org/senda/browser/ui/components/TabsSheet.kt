@@ -56,7 +56,7 @@ fun TabsOverview(
     val strings = LocalSendaStrings.current
 
     var showConfirmCloseAllDialog by remember { mutableStateOf(false) }
-    // Privadas y normales van por separado; se abre la sección de la pestaña activa
+    // Private and normal tabs are kept separate; the active tab's section is opened
     var showPrivate by remember { mutableStateOf(tabs.firstOrNull { it.id == activeTabId }?.isPrivate == true) }
     val sectionTabs = tabs.filter { it.isPrivate == showPrivate }
     val privateCount = tabs.count { it.isPrivate }
@@ -99,7 +99,7 @@ fun TabsOverview(
                     }
                 },
                 actions = {
-                    // Botón + exactamente como en el ejemplo: limpio, elegante y bien posicionado
+                    // + button exactly as in the example: clean, elegant and well placed
                     IconButton(onClick = newTabInSection) {
                         Icon(
                             imageVector = Icons.Default.Add,
@@ -109,7 +109,7 @@ fun TabsOverview(
                         )
                     }
 
-                    // Menú de opciones (tres puntos verticales ⋮): Pestaña privada y Cerrar todas las pestañas
+                    // Options menu (three vertical dots ⋮): Private tab and Close all tabs
                     var showMoreMenu by remember { mutableStateOf(false) }
                     Box {
                         IconButton(onClick = { showMoreMenu = true }) {
@@ -235,7 +235,7 @@ fun TabsOverview(
                 val columns = if (isGrid) GridCells.Fixed(2) else GridCells.Fixed(1)
                 val gridState = rememberLazyGridState()
 
-                // Al abrir, mostrar la pestaña activa; al crear una nueva, ir hasta ella
+                // On open, show the active tab; when creating a new one, scroll to it
                 LaunchedEffect(showPrivate) {
                     val index = sectionTabs.indexOfFirst { it.id == activeTabId }
                     if (index >= 0) gridState.scrollToItem(index)
@@ -256,7 +256,7 @@ fun TabsOverview(
                 ) {
                     items(sectionTabs, key = { it.id }) { tab ->
                         val isSelected = tab.id == activeTabId
-                        // Deslizar a un lado cierra la pestaña (el botón ✕ sigue disponible)
+                        // Swiping sideways closes the tab (the ✕ button is still available)
                         val dismissState = rememberSwipeToDismissBoxState(
                             confirmValueChange = { value ->
                                 if (value != SwipeToDismissBoxValue.Settled) {
@@ -300,7 +300,7 @@ fun TabsOverview(
                 TextButton(
                     onClick = {
                         showConfirmCloseAllDialog = false
-                        // Si son todas las pestañas, el cierre completo; si no, solo las de esta sección
+                        // If it is every tab, the full close; otherwise, only the ones in this section
                         if (sectionTabs.size == tabs.size) onCloseAll() else sectionTabs.toList().forEach(onCloseTab)
                     }
                 ) {
@@ -345,7 +345,7 @@ private fun TabCardItem(
                 shape = RoundedCornerShape(14.dp)
             ),
         colors = CardDefaults.cardColors(
-            // Opaco: con transparencia la sombra de la tarjeta se veía como un recuadro gris encima del título
+            // Opaque: with transparency the card's shadow looked like a gray box over the title
             containerColor = if (isSelected) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface
         ),
         shape = RoundedCornerShape(14.dp)
@@ -356,7 +356,7 @@ private fun TabCardItem(
                 .padding(horizontal = 10.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Cabecera de la tarjeta: Título + Botón Cerrar
+            // Card header: title + close button
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -383,7 +383,7 @@ private fun TabCardItem(
                         lineHeight = 16.sp
                     )
                 }
-                // Zona táctil de 36 dp (antes 24 dp, difícil de acertar con el dedo)
+                // 36 dp touch target (it used to be 24 dp, hard to hit with a finger)
                 IconButton(
                     onClick = onClose,
                     modifier = Modifier
@@ -399,7 +399,7 @@ private fun TabCardItem(
                 }
             }
 
-            // Miniatura de la página (solo en memoria; nunca se guarda en disco)
+            // Page thumbnail (memory only; never stored on disk)
             if (isGrid) {
                 val thumbnail = tab.thumbnail
                 Box(
@@ -430,7 +430,7 @@ private fun TabCardItem(
                 }
             }
 
-            // Pie de la tarjeta: URL y Badge de Activa / Reposo / Privada
+            // Card footer: URL and Active / Idle / Private badge
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,

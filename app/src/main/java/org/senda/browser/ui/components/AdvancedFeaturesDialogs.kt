@@ -47,7 +47,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 // =========================================================================
-// 1. GESTOR DE DESCARGAS AVANZADO
+// 1. ADVANCED DOWNLOAD MANAGER
 // =========================================================================
 
 @Composable
@@ -267,7 +267,7 @@ fun DownloadsManagerDialog(
 }
 
 // =========================================================================
-// 2. SOPORTE VISUAL DE COMPLEMENTOS (ADD-ONS / EXTENSIONES)
+// 2. VISUAL SUPPORT FOR ADD-ONS (EXTENSIONS)
 // =========================================================================
 
 @Composable
@@ -284,7 +284,7 @@ fun ExtensionsManagerDialog(
         SendaGeckoEngine.installedExtensions.filter { it.id !in SendaGeckoEngine.EMBEDDED_EXTENSION_IDS }
     }
 
-    // Selector de archivos .xpi local
+    // Local .xpi file picker
     val xpiPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
@@ -449,7 +449,7 @@ fun ExtensionsManagerDialog(
 }
 
 // =========================================================================
-// 3. COPIA DE MARCADORES (WEBDAV & HTML EXPORT)
+// 3. BOOKMARK BACKUP (WEBDAV & HTML EXPORT)
 // =========================================================================
 
 @Composable
@@ -468,10 +468,10 @@ fun SovereignSyncDialog(
     var password by rememberSaveable { mutableStateOf(prefs.webdavPassword) }
     var syncStatus by remember { mutableStateOf<String?>(null) }
     var isSyncing by remember { mutableStateOf(false) }
-    // Con http:// la contraseña viaja legible: se avisa una vez y hay que pulsar de nuevo.
+    // With http:// the password travels readable: the user is warned once and has to tap again.
     var plainHttpAcknowledged by remember { mutableStateOf(false) }
 
-    // Launcher para importar HTML estándar
+    // Launcher to import standard HTML
     val importHtmlLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
@@ -526,7 +526,7 @@ fun SovereignSyncDialog(
                 Spacer(modifier = Modifier.height(14.dp))
 
                 if (selectedTab == 0) {
-                    // TAB 0: COPIA EN NUBE PROPIA WEBDAV
+                    // TAB 0: BACKUP TO YOUR OWN WEBDAV CLOUD
                     Text(
                         text = strings.sync_webdav_title,
                         fontWeight = FontWeight.Bold,
@@ -666,7 +666,7 @@ fun SovereignSyncDialog(
                     }
 
                 } else {
-                    // TAB 1: RESPALDO HTML UNIVERSAL & LOCAL
+                    // TAB 1: UNIVERSAL LOCAL HTML BACKUP
                     Text(
                         text = strings.sync_html_title,
                         fontWeight = FontWeight.Bold,

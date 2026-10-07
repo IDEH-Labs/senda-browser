@@ -28,8 +28,8 @@ import java.io.InputStream
 import java.util.concurrent.Executors
 
 /**
- * Acciones sobre la página actual que necesitan a Android: imprimir o guardar como PDF y añadir un acceso
- * directo a la pantalla de inicio.
+ * Actions on the current page that need Android: print or save as PDF and add a shortcut
+ * to the home screen.
  */
 object SendaPageActions {
 
@@ -37,14 +37,14 @@ object SendaPageActions {
     private val mainHandler = Handler(Looper.getMainLooper())
 
     /**
-     * Abre el diálogo de impresión de Android con el PDF que generó Gecko. Desde ahí se imprime o se elige
-     * «Guardar como PDF». El PDF temporal vive en la caché privada de Senda y se borra al cerrar el diálogo.
+     * Opens Android's print dialog with the PDF Gecko generated. From there you print or choose
+     * "Save as PDF". The temporary PDF lives in Senda's private cache and is deleted when the dialog closes.
      */
     fun print(activity: Activity, pdf: InputStream, title: String) {
         val strings = SendaStrings.forApp(activity)
         ioExecutor.execute {
             val dir = File(activity.cacheDir, "print").apply { mkdirs() }
-            // Restos de una impresión anterior que no llegó a cerrarse
+            // Leftovers from an earlier print job that never finished
             dir.listFiles()?.forEach { it.delete() }
             val file = File(dir, "senda_${System.currentTimeMillis()}.pdf")
             val ok = try {
@@ -112,8 +112,8 @@ object SendaPageActions {
     }
 
     /**
-     * Pide a Android anclar un acceso directo que abre [url] en Senda. Android muestra su propia
-     * confirmación; Senda no añade nada sin que el usuario la acepte.
+     * Asks Android to pin a shortcut that opens [url] in Senda. Android shows its own
+     * confirmation; Senda adds nothing unless the user accepts it.
      */
     fun addToHomeScreen(context: Context, url: String, title: String, icon: Bitmap?) {
         val strings = SendaStrings.forApp(context)
@@ -139,7 +139,7 @@ object SendaPageActions {
         if (!requested) Toast.makeText(context, strings.page_shortcut_unsupported, Toast.LENGTH_LONG).show()
     }
 
-    /** Icono adaptable con la inicial del sitio: no se descarga ningún favicon para crearlo. */
+    /** Adaptive icon with the site's initial: no favicon is downloaded to create it. */
     private fun letterIcon(label: String): Bitmap {
         val size = 216
         val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)

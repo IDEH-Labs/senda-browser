@@ -149,8 +149,8 @@ fun SettingsTabsDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-                        // Este interruptor controla openLinksInBackground; antes decía «Cerrar pestañas al salir»,
-                        // que ya es una de las opciones de arriba
+                        // This switch controls openLinksInBackground; it used to say "Close tabs on exit",
+                        // which is already one of the options above
                         Text(text = strings.tabs_open_background, style = MaterialTheme.typography.bodyMedium)
                         Text(
                             text = strings.tabs_open_background_sub,
@@ -280,7 +280,7 @@ fun SettingsHomeDialog(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Fondo fijo o rotativo
+                    // Fixed or rotating wallpaper
                     var rotation by remember { mutableIntStateOf(prefs.wallpaperRotationMinutes) }
                     Text(text = strings.wp_rotation_title, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                     @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
@@ -298,7 +298,7 @@ fun SettingsHomeDialog(
                                 onClick = {
                                     rotation = minutes
                                     prefs.wallpaperRotationMinutes = minutes
-                                    // Al activar la rotación se empieza por el fondo elegido
+                                    // When rotation is turned on it starts with the chosen wallpaper
                                     if (minutes != 0) FreeWallpapers.choose(prefs, selectedWp.takeIf { it != "custom_user" } ?: FreeWallpapers.items.first().id)
                                     onSettingsChanged()
                                 },

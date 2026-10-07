@@ -9,18 +9,18 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.zip.ZipFile
 
 /**
- * Resolución de dominios canónicos (eTLD+1) y sufijos públicos mediante la
- * Mozilla Public Suffix List oficial (MPL 2.0).
+ * Canonical domain (eTLD+1) and public suffix resolution using the
+ * official Mozilla Public Suffix List (MPL 2.0).
  *
- * Previene ataques de cruce de credenciales y phishing en dominios multi-inquilino
- * (como github.io, pages.dev, vercel.app, etc.).
+ * Prevents credential crossover and phishing attacks on multi-tenant domains
+ * (such as github.io, pages.dev, vercel.app, etc.).
  */
 object PublicSuffixList {
     private const val TAG = "PublicSuffixList"
     private const val ASSET_NAME = "public_suffix_list.dat"
 
-    // Fallback estático con sufijos multipartes comunes y plataformas compartidas habituales
-    // si el archivo de recursos aún no se ha inicializado
+    // Static fallback with common multi-part suffixes and common shared platforms
+    // in case the resource file has not been initialized yet
     private val FALLBACK_SUFFIXES = setOf(
         "com.es", "nom.es", "org.es", "gob.es", "edu.es",
         "co.uk", "org.uk", "me.uk", "gov.uk", "ac.uk",
@@ -41,7 +41,7 @@ object PublicSuffixList {
             if (initialized) return
             try {
                 val cacheFile = File(context.cacheDir, ASSET_NAME)
-                // Una actualización de la app puede traer una lista más nueva: la copia se rehace
+                // An app update may bring a newer list: the copy is rebuilt
                 val installedAt = try {
                     context.packageManager.getPackageInfo(context.packageName, 0).lastUpdateTime
                 } catch (_: Exception) {
@@ -53,7 +53,7 @@ object PublicSuffixList {
                 cachedZipFile = try {
                     ZipFile(cacheFile)
                 } catch (_: Exception) {
-                    // Copia dañada (p. ej. cierre a mitad de escritura): se rehace una vez
+                    // Damaged copy (e.g. killed in the middle of writing): rebuilt once
                     copyAsset(context, cacheFile)
                     ZipFile(cacheFile)
                 }
@@ -64,7 +64,7 @@ object PublicSuffixList {
         }
     }
 
-    // Copia a un temporal y renombra, para no dejar nunca un archivo a medias
+    // Copy to a temporary file and rename, so a half-written file is never left behind
     private fun copyAsset(context: Context, target: File) {
         val tmp = File(target.parentFile, "$ASSET_NAME.tmp")
         context.assets.open(ASSET_NAME).use { input ->
@@ -80,17 +80,17 @@ object PublicSuffixList {
     }
 
     /**
-     * Obtiene el dominio registrable (eTLD+1) de un host.
-     * Ejemplo: "alice.github.io" -> "alice.github.io"
-     * Ejemplo: "login.banco.com.es" -> "banco.com.es"
-     * Ejemplo: "es.wikipedia.org" -> "wikipedia.org"
+     * Gets the registrable domain (eTLD+1) of a host.
+     * Example: "alice.github.io" -> "alice.github.io"
+     * Example: "login.banco.com.es" -> "banco.com.es"
+     * Example: "es.wikipedia.org" -> "wikipedia.org"
      */
     fun getRegistrableDomain(host: String, context: Context? = null): String {
         if (host.isBlank() || !host.contains('.')) return host.trim().lowercase()
         val cleanHost = host.trim().lowercase().trimEnd('.')
         val parts = cleanHost.split('.').filter { it.isNotBlank() }
         if (parts.size <= 1) return cleanHost
-        // Si es una dirección IPv4 numérica no se procesa como nombre de dominio
+        // A numeric IPv4 address is not processed as a domain name
         if (parts.all { it.all { c -> c.isDigit() } }) return cleanHost
 
         val effectiveContext = context ?: SendaGeckoEngine.appContext
@@ -113,7 +113,7 @@ object PublicSuffixList {
                 }
 
                 if (rules.isNotEmpty()) {
-                    // 1. Reglas de excepción (!)
+                    // 1. Exception rules (!)
                     for (rule in rules) {
                         if (rule.startsWith('!')) {
                             val exParts = rule.substring(1).split('.')
@@ -125,8 +125,8 @@ object PublicSuffixList {
                         }
                     }
 
-                    // 2. Reglas comodín y exactas
-                    var matchedRuleLabels = 1 // Por defecto el TLD (1 etiqueta)
+                    // 2. Wildcard and exact rules
+                    var matchedRuleLabels = 1 // By default the TLD (1 label)
                     for (rule in rules) {
                         if (rule.startsWith('!')) continue
                         if (rule.startsWith("*.")) {
@@ -152,7 +152,7 @@ object PublicSuffixList {
             }
         }
 
-        // Fallback robusto con lista estática si el zip no está disponible
+        // Robust fallback with the static list if the zip is not available
         val lastTwo = "${parts[parts.size - 2]}.${parts.last()}"
         if (FALLBACK_SUFFIXES.contains(lastTwo) && parts.size >= 3) {
             return "${parts[parts.size - 3]}.$lastTwo"

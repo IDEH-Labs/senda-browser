@@ -15,16 +15,16 @@ import org.senda.browser.core.SendaNet
 import org.senda.browser.core.assistant.ChatGptPlanAuth
 
 /**
- * Qué acepta OpenAI con «Sign in with ChatGPT» además del texto (su guía no lo documenta). Con la sesión real del
- * usuario: una petición corta por capacidad, y se registra lo que responde. Uso: am instrument -e class ... ; ver
- * logcat SendaGptCaps. No falla: es una medición.
+ * What OpenAI accepts with "Sign in with ChatGPT" besides text (its guide does not document it). With the user's
+ * real session: one short request per capability, logging what it answers. Usage: am instrument -e class ... ; see
+ * logcat SendaGptCaps. It does not fail: it is a measurement.
  */
 @RunWith(AndroidJUnit4::class)
 class SendaChatGptCapabilitiesTest {
 
     private fun log(msg: String) = Log.i("SendaGptCaps", msg)
 
-    // PNG rojo con la palabra MANGO en blanco: debe decir «rojo, MANGO»
+    // Red PNG with the word MANGO in white: it should say "red, MANGO"
     private val redPng: String by lazy {
         val bmp = android.graphics.Bitmap.createBitmap(400, 200, android.graphics.Bitmap.Config.ARGB_8888)
         bmp.eraseColor(android.graphics.Color.rgb(220, 0, 0))
@@ -34,7 +34,7 @@ class SendaChatGptCapabilitiesTest {
         Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP)
     }
 
-    // PDF mínimo con el texto «SENDA42»
+    // Minimal PDF with the text "SENDA42"
     private val tinyPdf: String by lazy {
         val doc = android.graphics.pdf.PdfDocument()
         val page = doc.startPage(android.graphics.pdf.PdfDocument.PageInfo.Builder(200, 100, 1).create())
@@ -128,7 +128,7 @@ class SendaChatGptCapabilitiesTest {
             .put("input", user("Genera una imagen simple: un círculo azul sobre fondo blanco.")))
     }
 
-    /** El cliente de Senda tal como lo usa el chat: búsqueda con fuentes, foto adjunta y razonamiento alto. */
+    /** Senda's client as the chat uses it: search with sources, attached photo and high reasoning. */
     @Test
     fun sendaClientEndToEnd() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext

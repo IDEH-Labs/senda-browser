@@ -32,49 +32,49 @@ import androidx.core.util.AtomicFile
 import org.senda.browser.core.SendaGeckoEngine
 
 /**
- * Modelo inmutable de credencial almacenada en la Bóveda de Senda.
- * La contraseña se almacena cifrada con AES-256-GCM y su propio Nonce/IV único.
+ * Immutable model of a credential stored in Senda's vault.
+ * The password is stored encrypted with AES-256-GCM and its own unique nonce/IV.
  */
 data class VaultCredential(
     val id: String = UUID.randomUUID().toString(),
-    val domain: String,             // Dominio canónico verificado (eTLD+1)
-    val originUrl: String,          // URL completa de origen
-    val username: String,           // Nombre de usuario o correo
-    val encryptedPasswordBase64: String, // Texto cifrado en Base64
-    val ivBase64: String,           // Nonce/IV único de 12 bytes en Base64
+    val domain: String,             // Verified canonical domain (eTLD+1)
+    val originUrl: String,          // Full origin URL
+    val username: String,           // Username or email
+    val encryptedPasswordBase64: String, // Ciphertext in Base64
+    val ivBase64: String,           // Unique 12-byte nonce/IV in Base64
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
     val notes: String = ""
 )
 
 /**
- * Gestor criptográfico de la Bóveda de Contraseñas de Senda. Cada punto es comprobable en este archivo:
- * - Clave AES-256 no exportable, generada y usada solo dentro del hardware seguro del teléfono
- *   (StrongBox si existe, si no el TEE). Sin hardware seguro, la Bóveda no se abre (NO_SECURE_HARDWARE).
- * - La clave solo se usa tras huella o PIN de los últimos 30 s y con el teléfono desbloqueado.
- * - Cifrado autenticado AES-256-GCM (IV aleatorio de 96 bits por contraseña, etiqueta de 128 bits).
- *   AES-256 es el algoritmo simétrico que exige la NSA en CNSA 2.0 para información clasificada.
- * - Contraseñas en CharArray/ByteArray que se sobrescriben tras su uso (mejor esfuerzo: la JVM puede
- *   haber hecho copias que no controlamos).
- * - Dominios canónicos (eTLD+1) con la Public Suffix List de Mozilla.
- * - Guardado atómico con AtomicFile (archivo temporal, fsync y renombrado).
- * - Portapapeles marcado como sensible (Android 13+) y borrado a los 30 s.
+ * Cryptographic manager of Senda's password vault. Every point can be checked in this file:
+ * - Non-exportable AES-256 key, generated and used only inside the phone's secure hardware
+ *   (StrongBox if present, otherwise the TEE). Without secure hardware, the vault does not open (NO_SECURE_HARDWARE).
+ * - The key is only used after a fingerprint or PIN within the last 30 s and with the phone unlocked.
+ * - Authenticated AES-256-GCM encryption (random 96-bit IV per password, 128-bit tag).
+ *   AES-256 is the symmetric algorithm the NSA requires in CNSA 2.0 for classified information.
+ * - Passwords in CharArray/ByteArray that are overwritten after use (best effort: the JVM may
+ *   have made copies we do not control).
+ * - Canonical domains (eTLD+1) with Mozilla's Public Suffix List.
+ * - Atomic saving with AtomicFile (temporary file, fsync and rename).
+ * - Clipboard marked as sensitive (Android 13+) and cleared after 30 s.
  *
- * Diseñada siguiendo los controles OWASP MASVS-CRYPTO, MASVS-AUTH y MASVS-STORAGE.
- * No ha tenido auditoría externa: no se afirma el cumplimiento de ningún perfil MASVS.
+ * Designed following the OWASP MASVS-CRYPTO, MASVS-AUTH and MASVS-STORAGE controls.
+ * It has not had an external audit: compliance with any MASVS profile is not claimed.
  */
 object SendaVaultManager {
 
     private const val TAG = "SendaVault"
     private const val ANDROID_KEYSTORE = "AndroidKeyStore"
-    /** Clave de las contraseñas de la Bóveda: exige huella o PIN reciente y el teléfono desbloqueado. */
+    /** Key for the vault passwords: requires a recent fingerprint or PIN and the phone unlocked. */
     const val VAULT_KEY_ALIAS = "senda_vault_master_key_v2"
     /**
-     * Clave para secretos que Senda usa sin preguntar (contraseña de WebDAV) y para las pruebas de la
-     * auditoría. Es la clave original (v1): en el chip, pero sin exigir autenticación.
+     * Key for secrets Senda uses without asking (WebDAV password) and for the audit
+     * tests. It is the original key (v1): on the chip, but without requiring authentication.
      */
     const val APP_KEY_ALIAS = "senda_vault_master_key_v1"
-    /** Segundos que la clave queda disponible tras identificarse con huella o PIN. */
+    /** Seconds the key stays available after authenticating with fingerprint or PIN. */
     const val AUTH_VALIDITY_SECONDS = 30
     private const val GCM_TAG_LENGTH_BITS = 128
     private const val VAULT_FILE_NAME = "senda_vault_store.json"
@@ -82,10 +82,10 @@ object SendaVaultManager {
     private val secureRandom = SecureRandom()
     private val scope = CoroutineScope(Dispatchers.Default)
 
-    /** Alias cuya clave ya se comprobó que vive en hardware seguro (evita repetir la consulta en cada uso). */
+    /** Aliases whose key was already verified to live in secure hardware (avoids repeating the query on every use). */
     private val verifiedHardwareAliases = java.util.Collections.synchronizedSet(mutableSetOf<String>())
 
-    /** Nivel real de la clave según el Keystore: "STRONGBOX", "TEE", "SOFTWARE" o "DESCONOCIDO". */
+    /** Real level of the key according to the keystore: "STRONGBOX", "TEE", "SOFTWARE" or "DESCONOCIDO" (unknown). */
     private fun securityLevelOf(key: SecretKey): String {
         val keyInfo = SecretKeyFactory.getInstance(key.algorithm, ANDROID_KEYSTORE)
             .getKeySpec(key, KeyInfo::class.java) as KeyInfo
@@ -103,9 +103,9 @@ object SendaVaultManager {
     }
 
     /**
-     * Las contraseñas solo se cifran con una clave que vive en hardware seguro (StrongBox o TEE).
-     * Si Android solo ofrece una clave en software, o no se puede confirmar dónde vive, la Bóveda no se usa.
-     * Una clave recién creada que resulta estar en software se borra; una ya existente no se toca.
+     * Passwords are only encrypted with a key that lives in secure hardware (StrongBox or TEE).
+     * If Android only offers a software key, or where it lives cannot be confirmed, the vault is not used.
+     * A newly created key that turns out to be in software is deleted; an existing one is not touched.
      */
     private fun requireSecureHardware(key: SecretKey, alias: String, justGenerated: Boolean): SecretKey {
         if (alias in verifiedHardwareAliases) return key
@@ -127,8 +127,8 @@ object SendaVaultManager {
     }
 
     /**
-     * Obtiene o genera la clave maestra AES-256 en el Android Keystore. Para la Bóveda, además, exige
-     * que la clave viva en hardware seguro (StrongBox o TEE).
+     * Gets or generates the AES-256 master key in the Android Keystore. For the vault it also requires
+     * the key to live in secure hardware (StrongBox or TEE).
      */
     @Synchronized
     private fun getOrCreateKey(alias: String): SecretKey {
@@ -146,7 +146,7 @@ object SendaVaultManager {
 
     private fun generateKey(alias: String): SecretKey {
 
-        // Generar nueva clave AES-256 anclada a hardware
+        // Generate a new hardware-backed AES-256 key
         val keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
         fun spec(strongBox: Boolean): KeyGenParameterSpec {
             val builder = KeyGenParameterSpec.Builder(
@@ -158,7 +158,7 @@ object SendaVaultManager {
                 .setKeySize(256)
                 .setRandomizedEncryptionRequired(true)
             if (alias == VAULT_KEY_ALIAS) {
-                // El chip solo usa la clave si el usuario se identificó (huella o PIN) hace menos de 30 s
+                // The chip only uses the key if the user authenticated (fingerprint or PIN) less than 30 s ago
                 builder.setUserAuthenticationRequired(true)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                     builder.setUserAuthenticationParameters(
@@ -169,10 +169,10 @@ object SendaVaultManager {
                     @Suppress("DEPRECATION")
                     builder.setUserAuthenticationValidityDurationSeconds(AUTH_VALIDITY_SECONDS)
                 }
-                // Ojo: con una validez de 30 s Android ignora esta opción (solo vale para claves sin validez, de un
-                // solo uso con huella). Lo que sí anula la clave es quitar o restablecer el bloqueo de pantalla
+                // Note: with a 30 s validity Android ignores this option (it only applies to keys without validity, used
+                // once with a fingerprint). What does invalidate the key is removing or resetting the screen lock
                 builder.setInvalidatedByBiometricEnrollment(true)
-                // Inutilizable mientras la pantalla está bloqueada
+                // Unusable while the screen is locked
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                     builder.setUnlockedDeviceRequired(true)
                 }
@@ -183,7 +183,7 @@ object SendaVaultManager {
             return builder.build()
         }
 
-        // Si el hardware soporta StrongBox (módulo de seguridad dedicado), se intenta usar
+        // If the hardware supports StrongBox (dedicated security module), try to use it
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             try {
                 keyGenerator.init(spec(strongBox = true))
@@ -197,7 +197,7 @@ object SendaVaultManager {
             keyGenerator.init(spec(strongBox = false))
             keyGenerator.generateKey()
         } catch (e: Exception) {
-            // Sin PIN, patrón ni contraseña en el teléfono no se puede crear una clave que exija autenticación
+            // Without a PIN, pattern or password on the phone, a key that requires authentication cannot be created
             if (alias == VAULT_KEY_ALIAS) throw VaultUnavailableException(VaultUnavailableException.Reason.NO_SCREEN_LOCK, e)
             throw e
         }
@@ -217,8 +217,8 @@ object SendaVaultManager {
     }
 
     /**
-     * ¿Android anuló la clave de la Bóveda? Pasa si se quita o restablece el bloqueo de pantalla. Las contraseñas
-     * cifradas con ella ya no se pueden descifrar. No crea la clave si aún no existe.
+     * Did Android invalidate the vault key? It happens when the screen lock is removed or reset. Passwords
+     * encrypted with it can no longer be decrypted. Does not create the key if it does not exist yet.
      */
     fun isVaultKeyInvalidated(): Boolean = try {
         val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
@@ -234,18 +234,18 @@ object SendaVaultManager {
     } catch (_: android.security.keystore.KeyPermanentlyInvalidatedException) {
         true
     } catch (_: Exception) {
-        // Bloqueada (falta huella o PIN reciente) u otro motivo: no está anulada
+        // Locked (no recent fingerprint or PIN) or another reason: it is not invalidated
         false
     }
 
-    /** Borra la clave anulada y las contraseñas que ya no se pueden descifrar, para empezar una Bóveda nueva. */
+    /** Deletes the invalidated key and the passwords that can no longer be decrypted, to start a new vault. */
     fun resetInvalidatedVaultKey(context: Context) {
         KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }.deleteEntry(VAULT_KEY_ALIAS)
         verifiedHardwareAliases.remove(VAULT_KEY_ALIAS)
         saveAll(context, emptyList())
     }
 
-    /** ¿La clave de la Bóveda exige autenticación del usuario? (lo informa el propio Keystore) */
+    /** Does the vault key require user authentication? (reported by the keystore itself) */
     fun vaultKeyRequiresAuth(): Boolean = try {
         val key = getOrCreateKey(VAULT_KEY_ALIAS)
         val info = SecretKeyFactory.getInstance(key.algorithm, ANDROID_KEYSTORE).getKeySpec(key, KeyInfo::class.java) as KeyInfo
@@ -255,8 +255,8 @@ object SendaVaultManager {
     }
 
     /**
-     * Dónde vive realmente la clave maestra, según el propio Keystore: "STRONGBOX", "TEE", "SOFTWARE"
-     * o "DESCONOCIDO" si Android no lo informa. Si la Bóveda rechaza la clave por estar en software, lo dice.
+     * Where the master key really lives, according to the keystore itself: "STRONGBOX", "TEE", "SOFTWARE"
+     * or "DESCONOCIDO" (unknown) if Android does not report it. If the vault rejects the key for being in software, it says so.
      */
     fun keySecurityLevel(alias: String = VAULT_KEY_ALIAS): String {
         return try {
@@ -275,28 +275,28 @@ object SendaVaultManager {
             level == "STRONGBOX" || level == "TEE"
         } catch (e: Exception) {
             Log.w(TAG, "No se pudo consultar el estado de hardware seguro: ${e.message}")
-            false // Si no se puede comprobar, no se afirma que esté en hardware
+            false // If it cannot be checked, it is not claimed to be in hardware
         }
     }
 
     /**
-     * Cifra una contraseña en memoria RAM viva utilizando AES-256-GCM.
-     * Inmediatamente después de cifrar, el buffer de entrada se destruye (Zeroization).
+     * Encrypts a password in live RAM using AES-256-GCM.
+     * Right after encrypting, the input buffer is wiped (zeroization).
      */
     @Synchronized
     fun encryptPassword(passwordChars: CharArray, alias: String = VAULT_KEY_ALIAS): Pair<String, String> {
-        // El Keystore de hardware genera obligatoriamente el IV aleatorio en modo ENCRYPT_MODE
+        // The hardware keystore always generates the random IV in ENCRYPT_MODE
         val cipher = cipherFor(Cipher.ENCRYPT_MODE, alias)
         val iv = cipher.iv
 
-        // Convertir temporalmente a bytes para el Cipher y destruirlo de inmediato
+        // Temporarily convert to bytes for the Cipher and wipe it immediately
         val byteBuffer = java.nio.charset.StandardCharsets.UTF_8.encode(java.nio.CharBuffer.wrap(passwordChars))
         val passwordBytes = ByteArray(byteBuffer.remaining())
         byteBuffer.get(passwordBytes)
 
         val encryptedBytes = cipher.doFinal(passwordBytes)
 
-        // ZEROIZATION ACTIVA: sobreescribir bytes en memoria RAM
+        // ACTIVE ZEROIZATION: overwrite bytes in RAM
         Arrays.fill(passwordBytes, 0.toByte())
 
         val encryptedBase64 = Base64.encodeToString(encryptedBytes, Base64.NO_WRAP)
@@ -306,8 +306,8 @@ object SendaVaultManager {
     }
 
     /**
-     * Descifra una credencial directamente a un array de caracteres mutable (`CharArray`).
-     * Nunca devuelve un `String` inmutable para prevenir fugas en el Garbage Collector.
+     * Decrypts a credential directly into a mutable character array (`CharArray`).
+     * Never returns an immutable `String`, to prevent leaks through the garbage collector.
      */
     @Synchronized
     fun decryptPassword(encryptedBase64: String, ivBase64: String, alias: String = VAULT_KEY_ALIAS): CharArray {
@@ -317,8 +317,8 @@ object SendaVaultManager {
         val decryptedBytes = try {
             cipherFor(Cipher.DECRYPT_MODE, alias, iv).doFinal(encryptedBytes)
         } catch (e: javax.crypto.AEADBadTagException) {
-            // Contraseñas guardadas antes de la clave v2 (cifradas con la clave original): esa clave también
-            // tiene que vivir en hardware seguro para que la Bóveda la use
+            // Passwords saved before the v2 key (encrypted with the original key): that key must also
+            // live in secure hardware for the vault to use it
             if (alias != VAULT_KEY_ALIAS) throw e
             val legacyKey = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
                 .let { (it.getEntry(APP_KEY_ALIAS, null) as? KeyStore.SecretKeyEntry)?.secretKey } ?: throw e
@@ -326,39 +326,39 @@ object SendaVaultManager {
             cipherFor(Cipher.DECRYPT_MODE, APP_KEY_ALIAS, iv).doFinal(encryptedBytes)
         }
 
-        // Decodificar a CharArray
+        // Decode to CharArray
         val charBuffer = java.nio.charset.StandardCharsets.UTF_8.decode(java.nio.ByteBuffer.wrap(decryptedBytes))
         val resultChars = CharArray(charBuffer.remaining())
         charBuffer.get(resultChars)
 
-        // ZEROIZATION del buffer intermedio de bytes
+        // ZEROIZATION of the intermediate byte buffer
         Arrays.fill(decryptedBytes, 0.toByte())
 
         return resultChars
     }
 
     /**
-     * Higiene de Memoria: Limpieza activa de caracteres confidenciales.
+     * Memory hygiene: actively wipes confidential characters.
      */
     fun wipe(chars: CharArray) {
         Arrays.fill(chars, '\u0000')
     }
 
     /**
-     * Higiene de Memoria: Limpieza activa de bytes confidenciales.
+     * Memory hygiene: actively wipes confidential bytes.
      */
     fun wipe(bytes: ByteArray) {
         Arrays.fill(bytes, 0.toByte())
     }
 
     // =========================================================================
-    // ANTI-PHISHING Y CANONICALIZACIÓN DE DOMINIOS (eTLD+1)
+    // ANTI-PHISHING AND DOMAIN CANONICALIZATION (eTLD+1)
     // =========================================================================
 
     /**
-     * Extrae el dominio raíz canónico estricto de una URL para evitar ataques de subdominio.
-     * Ejemplo: "https://login.banco.com.es:8443/auth" -> "banco.com.es"
-     * Ejemplo falso: "https://paypal.com.evil-phish.net" -> "evil-phish.net" (detecta discrepancia)
+     * Extracts the strict canonical root domain of a URL to prevent subdomain attacks.
+     * Example: "https://login.banco.com.es:8443/auth" -> "banco.com.es"
+     * Fake example: "https://paypal.com.evil-phish.net" -> "evil-phish.net" (detects the mismatch)
      */
     fun extractCanonicalDomain(rawUrl: String, context: Context? = null): String {
         if (rawUrl.isBlank()) return ""
@@ -367,15 +367,15 @@ object SendaVaultManager {
             if (clean.startsWith("http://")) clean = clean.substring(7)
             if (clean.startsWith("https://")) clean = clean.substring(8)
 
-            // Quitar credenciales user:pass@
+            // Remove user:pass@ credentials
             val atIdx = clean.indexOf('@')
             if (atIdx != -1) clean = clean.substring(atIdx + 1)
 
-            // Quitar path y query
+            // Remove path and query
             val slashIdx = clean.indexOf('/')
             if (slashIdx != -1) clean = clean.substring(0, slashIdx)
 
-            // Quitar puerto :8080
+            // Remove port :8080
             val colonIdx = clean.indexOf(':')
             if (colonIdx != -1) clean = clean.substring(0, colonIdx)
 
@@ -387,7 +387,7 @@ object SendaVaultManager {
     }
 
     /**
-     * Valida si una URL actual coincide exactamente con el dominio de la credencial registrada.
+     * Checks whether a current URL matches exactly the domain of the stored credential.
      */
     fun matchesDomain(currentUrl: String, credentialDomain: String): Boolean {
         val currentDomain = extractCanonicalDomain(currentUrl)
@@ -396,11 +396,11 @@ object SendaVaultManager {
     }
 
     // =========================================================================
-    // PERSISTENCIA Y ALMACENAMIENTO DE LA BÓVEDA
+    // VAULT PERSISTENCE AND STORAGE
     // =========================================================================
 
     /**
-     * Carga todas las credenciales guardadas en la bóveda local.
+     * Loads all the credentials saved in the local vault.
      */
     fun getCredentials(context: Context): List<VaultCredential> {
         val file = File(context.filesDir, VAULT_FILE_NAME)
@@ -437,7 +437,7 @@ object SendaVaultManager {
     }
 
     /**
-     * Guarda una credencial en la bóveda (añade o actualiza si ya existe para ese dominio y usuario).
+     * Saves a credential in the vault (adds it, or updates it if one already exists for that domain and user).
      */
     fun saveCredential(
         context: Context,
@@ -478,8 +478,8 @@ object SendaVaultManager {
     }
 
     /**
-     * Modifica una credencial existente (sitio, usuario y contraseña). Devuelve false si ya hay otra cuenta
-     * con el mismo sitio y usuario, para no dejar dos entradas iguales.
+     * Edits an existing credential (site, username and password). Returns false if there is already another account
+     * with the same site and username, so two identical entries are not left.
      */
     fun updateCredential(
         context: Context,
@@ -510,7 +510,7 @@ object SendaVaultManager {
     }
 
     /**
-     * Elimina una credencial por su identificador único.
+     * Deletes a credential by its unique identifier.
      */
     fun deleteCredential(context: Context, credentialId: String) {
         val currentList = getCredentials(context).filter { it.id != credentialId }
@@ -549,19 +549,19 @@ object SendaVaultManager {
     }
 
     // =========================================================================
-    // HIGIENE DE PORTAPAPELES (ANTI-SNOOPING & AUTO-DESTRUCCIÓN A 30s)
+    // CLIPBOARD HYGIENE (ANTI-SNOOPING & AUTO-CLEAR AFTER 30 s)
     // =========================================================================
 
     /**
-     * Copia una contraseña al portapapeles con bandera de contenido sensible (Android 13+)
-     * e inicia un temporizador de autodestrucción a los 30 segundos.
+     * Copies a password to the clipboard with the sensitive-content flag (Android 13+)
+     * and starts a timer that clears it after 30 seconds.
      */
     fun copyToClipboardSecurely(context: Context, label: String, passwordChars: CharArray) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return
         val passString = String(passwordChars)
         val clip = ClipData.newPlainText(label, passString)
 
-        // Notificar a Android 13+ que el contenido es confidencial (oculta previsualización visual)
+        // Tell Android 13+ the content is confidential (hides the visual preview)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             clip.description.extras = PersistableBundle().apply {
                 putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true)
@@ -570,12 +570,12 @@ object SendaVaultManager {
 
         clipboard.setPrimaryClip(clip)
 
-        // Programar destrucción en 30 segundos
+        // Schedule clearing in 30 seconds
         scope.launch {
             delay(30_000L)
             try {
-                // Desde Android 10 una app en segundo plano no puede leer el portapapeles (devuelve null).
-                // En ese caso se borra igualmente: es preferible perder una copia posterior que dejar la contraseña
+                // Since Android 10 a background app cannot read the clipboard (it returns null).
+                // In that case it is cleared anyway: losing a later copy is better than leaving the password
                 val currentClip = clipboard.primaryClip
                 val stillOurs = currentClip == null ||
                     (currentClip.itemCount > 0 && currentClip.getItemAt(0)?.text?.toString() == passString)
@@ -591,11 +591,11 @@ object SendaVaultManager {
     }
 
     // =========================================================================
-    // GENERADOR DE CONTRASEÑAS DE ALTA ENTROPÍA
+    // HIGH-ENTROPY PASSWORD GENERATOR
     // =========================================================================
 
     /**
-     * Genera una contraseña criptográficamente fuerte con entropía verificable.
+     * Generates a cryptographically strong password with verifiable entropy.
      */
     fun generateStrongPassword(
         length: Int = 18,
@@ -604,9 +604,9 @@ object SendaVaultManager {
         includeDigits: Boolean = true,
         includeSymbols: Boolean = true
     ): Pair<CharArray, Double> {
-        val upper = "ABCDEFGHJKLMNPQRSTUVWXYZ" // Sin I, O confusos
-        val lower = "abcdefghijkmnopqrstuvwxyz" // Sin l confuso
-        val digits = "23456789"                  // Sin 0, 1 confusos
+        val upper = "ABCDEFGHJKLMNPQRSTUVWXYZ" // Without the confusing I, O
+        val lower = "abcdefghijkmnopqrstuvwxyz" // Without the confusing l
+        val digits = "23456789"                  // Without the confusing 0, 1
         val symbols = "!@#$%^&*()-_=+[]{}|;:,.<>?"
 
         val pool = StringBuilder()
@@ -621,8 +621,8 @@ object SendaVaultManager {
         ).ifEmpty { listOf(lower, digits) }
         if (pool.isEmpty()) pool.append(lower).append(digits)
 
-        // Al azar puro, ~13 % de las claves de 20 salían sin dígito: se garantiza uno de cada clase elegida
-        // y luego se mezcla todo para que esas posiciones no sean predecibles
+        // Purely at random, ~13 % of 20-character keys had no digit: one of each chosen class is guaranteed
+        // and then everything is shuffled so those positions are not predictable
         val result = CharArray(length)
         for (i in 0 until length) {
             val source = if (i < classes.size) classes[i] else pool
@@ -633,18 +633,18 @@ object SendaVaultManager {
             val tmp = result[i]; result[i] = result[j]; result[j] = tmp
         }
 
-        // Entropía de Shannon: E = L * log2(poolSize)
+        // Shannon entropy: E = L * log2(poolSize)
         val entropyBits = length * (Math.log(pool.length.toDouble()) / Math.log(2.0))
 
         return Pair(result, entropyBits)
     }
 }
 
-/** La clave de la Bóveda necesita que el usuario se identifique (huella o PIN) antes de usarse. */
+/** The vault key needs the user to authenticate (fingerprint or PIN) before it can be used. */
 class VaultLockedException(cause: Throwable? = null) : Exception("Bóveda bloqueada: identifícate con huella o PIN", cause)
 
-/** La Bóveda no puede usarse: no hay bloqueo de pantalla o la clave quedó invalidada. */
+/** The vault cannot be used: there is no screen lock or the key was invalidated. */
 class VaultUnavailableException(val reason: Reason, cause: Throwable? = null) : Exception(reason.name, cause) {
-    /** NO_SECURE_HARDWARE: el teléfono no puede guardar la clave en StrongBox ni en un TEE. */
+    /** NO_SECURE_HARDWARE: the phone cannot keep the key in StrongBox or a TEE. */
     enum class Reason { NO_SCREEN_LOCK, KEY_INVALIDATED, NO_SECURE_HARDWARE }
 }

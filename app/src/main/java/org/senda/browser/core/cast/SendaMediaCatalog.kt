@@ -8,12 +8,12 @@ import org.mozilla.geckoview.GeckoResult
 import org.mozilla.geckoview.WebExtension
 
 /**
- * Videos que cada página descargó (MP4, WebM, HLS), según la extensión integrada media@senda.org, que solo
- * observa la red. Es lo que se muestra en la TV al duplicar la pantalla ([SendaTvPlayer]): hace falta la dirección
- * del archivo de video, no la de la página.
+ * Videos each page downloaded (MP4, WebM, HLS), according to the built-in media@senda.org extension, which only
+ * watches the network. It is what is shown on the TV while mirroring ([SendaTvPlayer]): it needs the address
+ * of the video file, not of the page.
  *
- * Los videos que la web arma por trozos en el navegador (blob:, MSE: YouTube, Netflix y la mayoría de plataformas)
- * no aparecen aquí porque no existe un archivo que reproducir (YouTube usa su reproductor oficial).
+ * Videos the site assembles in chunks inside the browser (blob:, MSE: YouTube, Netflix and most platforms)
+ * do not show up here because there is no file to play (YouTube uses its official player).
  */
 object SendaMediaCatalog {
 
@@ -28,7 +28,7 @@ object SendaMediaCatalog {
             get() = mime.contains("mpegurl", ignoreCase = true) ||
                 url.substringBefore('?').endsWith(".m3u8", ignoreCase = true)
 
-        /** Tipo para la TV: el servidor a veces responde con uno genérico (application/octet-stream). */
+        /** Type for the TV: the server sometimes answers with a generic one (application/octet-stream). */
         val tvMime: String
             get() = when {
                 isHls -> "application/vnd.apple.mpegurl"
@@ -44,15 +44,15 @@ object SendaMediaCatalog {
 
     private const val MAX_PAGES = 30
     private const val MAX_PER_PAGE = 12
-    // Avances de un video en otro anuncio o vista previa: lo más corto no es lo que el usuario está viendo
+    // Previews of a video in another ad or preview: the shortest one is not what the user is watching
     private const val MIN_FILE_BYTES = 512 * 1024L
 
-    // Página (sin #fragmento) → videos, el más reciente al final. Solo en memoria: nunca se guarda en disco
+    // Page (without #fragment) → videos, the newest last. Memory only: never stored on disk
     private val byPage = LinkedHashMap<String, MutableList<Media>>(MAX_PAGES, 0.75f, true)
 
     private fun pageKey(url: String) = url.substringBefore('#')
 
-    /** Cambia con cada video nuevo: la interfaz lo lee para enterarse (el catálogo en sí no es estado de Compose). */
+    /** Changes with each new video: the UI reads it to find out (the catalog itself is not Compose state). */
     var version by mutableIntStateOf(0)
         private set
 
@@ -68,12 +68,12 @@ object SendaMediaCatalog {
     }
 
     /**
-     * El video que conviene enviar para la página: primero una lista HLS (incluye todas las calidades) y si no el
-     * archivo más grande; con igual prioridad, el más reciente (el que el usuario acaba de poner).
+     * The video worth sending for the page: first an HLS playlist (includes every quality) and otherwise the
+     * largest file; with equal priority, the newest one (the one the user just started).
      */
     @Synchronized
     fun bestFor(pageUrl: String): Media? {
-        // La pestaña muestra directamente un archivo de video: Gecko lo carga como página y no pasa por el detector
+        // The tab shows a video file directly: Gecko loads it as a page and it does not go through the detector
         if ((pageUrl.startsWith("https://") || pageUrl.startsWith("http://")) &&
             Regex("\\.(mp4|m4v|webm|mov|mkv|m3u8)$", RegexOption.IGNORE_CASE).containsMatchIn(pageUrl.substringBefore('?').substringBefore('#'))
         ) {

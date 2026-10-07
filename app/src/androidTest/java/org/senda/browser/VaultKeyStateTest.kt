@@ -9,8 +9,8 @@ import org.senda.browser.core.security.SendaVaultManager
 import java.security.KeyStore
 
 /**
- * Comprobación de la clave de la Bóveda sin tocar nada: no crea, no borra y no descifra.
- * La anulación real (quitar el bloqueo de pantalla) no se puede provocar desde una prueba.
+ * Checks the vault key without changing anything: it does not create, delete or decrypt.
+ * Real invalidation (removing the screen lock) cannot be triggered from a test.
  */
 @RunWith(AndroidJUnit4::class)
 class VaultKeyStateTest {
@@ -27,7 +27,7 @@ class VaultKeyStateTest {
 
     @Test
     fun validKeyIsNotReportedAsInvalidated() {
-        // En un teléfono con bloqueo de pantalla la clave es válida: no debe ofrecerse borrar la Bóveda
+        // On a phone with a screen lock the key is valid: deleting the vault must not be offered
         assertFalse(SendaVaultManager.isVaultKeyInvalidated())
     }
 }

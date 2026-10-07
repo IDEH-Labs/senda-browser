@@ -52,7 +52,7 @@ object SendaTorManager {
                 }
                 TorService.STATUS_ON -> {
                     state = TorState.CONNECTED
-                    // tor-android 0.4.9 ya no expone el puerto como campo estático: es el fijado en ensureTorrc()
+                    // tor-android 0.4.9 no longer exposes the port as a static field: it is the one set in ensureTorrc()
                     socksPort = TOR_SOCKS_PORT
                     statusMessage = "Conectado a la Red Tor (127.0.0.1:$socksPort)"
                     Log.i(TAG, "Tor conectado exitosamente en puerto $socksPort")
@@ -111,7 +111,7 @@ object SendaTorManager {
 
             scope.launch {
                 var waitMs = 0
-                // El receptor pasa a CONNECTED con STATUS_ON
+                // The receiver switches to CONNECTED with STATUS_ON
                 while (state != TorState.CONNECTED && waitMs < 35000) {
                     delay(500)
                     waitMs += 500

@@ -38,7 +38,7 @@ object CastHelper {
         )
         for (intent in intents) {
             try {
-                // Limpio: si Ajustes quedó abierto en otra pantalla, Android lo traía tal cual en vez de «Enviar pantalla»
+                // Clean: if Settings was left open on another screen, Android brought it back as is instead of "Cast screen"
                 intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                 context.startActivity(intent)
                 return true
@@ -51,13 +51,13 @@ object CastHelper {
 }
 
 /**
- * Una sola función de transmisión: con la TV ya conectada (el botón de transmitir abre el panel de Android si no lo
- * está), aquí solo están el video que se ve en la TV y «Desconectar TV». Todo lo demás es automático.
+ * A single casting feature: with the TV already connected (the cast button opens Android's panel if it is
+ * not), this only has the video shown on the TV and "Disconnect TV". Everything else is automatic.
  */
 @Composable
 fun CastDialog(onDismiss: () -> Unit) {
     val strings = org.senda.browser.core.LocalSendaStrings.current
-    // Si la TV se desconecta con el diálogo abierto, no queda nada que mostrar
+    // If the TV disconnects with the dialog open, there is nothing left to show
     LaunchedEffect(org.senda.browser.core.cast.SendaTvMode.tvConnected) {
         if (!org.senda.browser.core.cast.SendaTvMode.tvConnected) onDismiss()
     }

@@ -6,16 +6,16 @@ import java.net.Proxy
 import java.net.URL
 
 /**
- * Conexiones que Senda hace por su cuenta, fuera de Gecko (noticias, iconos, IA, sincronización).
- * Usan el mismo Tor o proxy que la navegación: si no, con Tor activado estas peticiones salían
- * directas, con la IP real. Si Tor no está listo la conexión falla, nunca sale sin protección.
+ * Connections Senda makes on its own, outside Gecko (news, icons, AI, sync).
+ * They use the same Tor or proxy as browsing: otherwise, with Tor on, these requests went out
+ * directly, with the real IP. If Tor is not ready the connection fails; it never goes out unprotected.
  *
- * Las direcciones de la red local (TV o WebDAV en casa) van directas: un proxy
- * externo no puede alcanzarlas.
+ * Local network addresses (a TV or WebDAV at home) go direct: an external
+ * proxy cannot reach them.
  */
 object SendaNet {
 
-    /** User-Agent genérico de Firefox para Android: uno propio de Senda identificaría a sus usuarios. */
+    /** Generic Firefox for Android User-Agent: one specific to Senda would identify its users. */
     const val USER_AGENT = "Mozilla/5.0 (Android 15; Mobile; rv:157.0) Gecko/157.0 Firefox/157.0"
 
     fun open(url: String): HttpURLConnection {
@@ -25,12 +25,12 @@ object SendaNet {
         return conn
     }
 
-    /** El mismo Tor o proxy que la navegación (directo en la red local). También lo usa el cliente de Anthropic. */
+    /** The same Tor or proxy as browsing (direct on the local network). The Anthropic client uses it too. */
     fun proxyFor(host: String?): Proxy {
         val prefs = SendaGeckoEngine.appContext?.let { PreferencesManager(it) } ?: return Proxy.NO_PROXY
         if (host == null || isLocal(host)) return Proxy.NO_PROXY
         return when (prefs.proxyMode) {
-            // Dirección sin resolver: el nombre lo resuelve el proxy (DNS remoto, sin fugas)
+            // Unresolved address: the proxy resolves the name (remote DNS, no leaks)
             "TOR_ORBOT" -> Proxy(Proxy.Type.SOCKS, InetSocketAddress.createUnresolved("127.0.0.1", 9050))
             "CUSTOM_SOCKS5" -> Proxy(Proxy.Type.SOCKS, InetSocketAddress.createUnresolved(prefs.proxyHost, prefs.proxyPort))
             "CUSTOM_HTTP" -> Proxy(Proxy.Type.HTTP, InetSocketAddress.createUnresolved(prefs.proxyHost, prefs.proxyPort))

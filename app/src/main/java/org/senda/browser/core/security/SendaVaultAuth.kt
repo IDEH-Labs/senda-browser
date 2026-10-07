@@ -7,7 +7,7 @@ import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 
-/** Pide huella o PIN para que la clave de la Bóveda quede disponible ([SendaVaultManager.AUTH_VALIDITY_SECONDS]). */
+/** Asks for fingerprint or PIN so the vault key becomes available ([SendaVaultManager.AUTH_VALIDITY_SECONDS]). */
 object SendaVaultAuth {
     fun request(context: Context, title: String, callback: (Boolean) -> Unit) {
         val activity = context as? FragmentActivity
@@ -15,15 +15,15 @@ object SendaVaultAuth {
             callback(true)
             return
         }
-        // Huella o PIN/patrón del teléfono: sin huella registrada la bóveda quedaba inaccesible
-        // La clave de la Bóveda solo se desbloquea con huella «fuerte» o PIN (Android 11+)
+        // Fingerprint or the phone's PIN/pattern: with no enrolled fingerprint the vault was inaccessible
+        // The vault key is only unlocked with a "strong" fingerprint or PIN (Android 11+)
         val authenticators = (if (Build.VERSION.SDK_INT >= 30)
             BiometricManager.Authenticators.BIOMETRIC_STRONG
         else
             BiometricManager.Authenticators.BIOMETRIC_WEAK) or
             BiometricManager.Authenticators.DEVICE_CREDENTIAL
         if (BiometricManager.from(activity).canAuthenticate(authenticators) != BiometricManager.BIOMETRIC_SUCCESS) {
-            // Sin ningún bloqueo en el teléfono no hay con qué verificar
+            // With no lock at all on the phone there is nothing to verify with
             callback(true)
             return
         }

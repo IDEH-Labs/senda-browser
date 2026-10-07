@@ -8,22 +8,22 @@ import androidx.compose.runtime.setValue
 import org.senda.browser.ui.model.BrowserTab
 
 /**
- * Video en la TV como pantalla secundaria: mientras el teléfono se duplica en una TV (Miracast), el video que
- * suena en Senda pasa a la TV a pantalla completa, en 16:9 y a la resolución de la TV, desde el mismo segundo.
- * El teléfono no cambia (sigue en vertical y se puede seguir navegando): Android muestra en la TV lo que Senda
- * dibuja para ella ([org.senda.browser.ui.components.TvPresentationHost]) en vez del espejo del teléfono.
+ * Video on the TV as a secondary display: while the phone is mirrored to a TV (Miracast), the video
+ * playing in Senda moves to the TV full screen, in 16:9 and at the TV's resolution, from the same second.
+ * The phone does not change (it stays in portrait and you can keep browsing): Android shows on the TV what Senda
+ * draws for it ([org.senda.browser.ui.components.TvPresentationHost]) instead of the phone's mirror.
  *
- * YouTube no entrega un archivo: se usa su reproductor oficial (youtube-nocookie.com) en una sesión propia, sin
- * inyectar nada en las páginas. Los demás videos (MP4, HLS…) se reproducen con el reproductor de Android a partir
- * del archivo que detectó [SendaMediaCatalog]. Al terminar, el video sigue en la pestaña donde quedó.
+ * YouTube does not deliver a file: its official player (youtube-nocookie.com) is used in a separate session, without
+ * injecting anything into pages. Other videos (MP4, HLS…) play with Android's player from
+ * the file [SendaMediaCatalog] detected. When it ends, the video continues in the tab where it left off.
  */
 object SendaTvPlayer {
 
     private const val TAG = "SendaTvPlayer"
 
     /**
-     * YouTube exige que quien muestra su reproductor se identifique con un Referer; para apps, con
-     * https://<paquete>. Sin él responde «Error 153». Es la identificación real de Senda, no una suplantación.
+     * YouTube requires whoever shows its player to identify itself with a Referer; for apps, with
+     * https://<package>. Without it, it answers "Error 153". It is Senda's real identity, not an impersonation.
      */
     const val REFERRER = "https://org.senda.browser"
 
@@ -59,7 +59,7 @@ object SendaTvPlayer {
         }
     }
 
-    /** Lo que el teléfono puede pedirle al reproductor de la TV (lo registra el reproductor que se muestra). */
+    /** What the phone can ask of the TV player (registered by the player being shown). */
     interface Controls {
         fun play()
         fun pause()
@@ -70,28 +70,28 @@ object SendaTvPlayer {
     var paused by mutableStateOf(false)
     var controls: Controls? = null
 
-    // Video que el usuario devolvió al teléfono o que la TV no pudo mostrar: no volver a pasarlo solo
+    // A video the user returned to the phone or that the TV could not show: do not move it on its own again
     private var skippedKey: String? = null
-    // Dónde iba en la TV un video que se retiró al salir de Senda: al volver sigue desde ahí
+    // Where a video was on the TV when it was removed on leaving Senda: on return it continues from there
     private val resumeAt = HashMap<String, Int>()
     private var starting = false
 
     /**
-     * Duplicando en una TV, el video de la página pasa solo a la TV en cuanto existe (al abrir un video de YouTube o
-     * cuando la página carga su archivo), sin botones: para eso se conectó la TV. No espera a que suene en el
-     * teléfono porque Gecko no siempre lo informa (MediaSession). No vuelve a pasar un video que el usuario
-     * devolvió al teléfono.
+     * While mirroring to a TV, the page's video moves to the TV on its own as soon as it exists (when opening a YouTube video or
+     * when the page loads its file), without buttons: that is why the TV was connected. It does not wait for it to play on the
+     * phone because Gecko does not always report it (MediaSession). It does not move again a video the user
+     * returned to the phone.
      */
     fun autoStart(tab: BrowserTab?, enabled: Boolean) {
         if (!SendaTvMode.tvConnected) {
             skippedKey = null
             return
         }
-        // Las pestañas privadas no pasan solas a la TV: Senda también las oculta al duplicar la pantalla
+        // Private tabs do not move to the TV on their own: Senda also hides them while mirroring
         if (!enabled || tab == null || tab.isPrivate) return
         val key = SendaYouTube.youTubeVideoId(tab.url) ?: SendaMediaCatalog.bestFor(tab.url)?.url ?: return
         if (key == skippedKey || key == playback?.key) return
-        // Otro video mientras la TV muestra uno: el nuevo lo reemplaza
+        // Another video while the TV is showing one: the new one replaces it
         if (playback != null) {
             requestReturn?.invoke()
             if (playback != null) return
@@ -99,14 +99,14 @@ object SendaTvPlayer {
         start(tab)
     }
 
-    /** Muestra en la TV el video de [tab] desde donde va (lo pidió el usuario o empezó a sonar). */
+    /** Shows [tab]'s video on the TV from where it is (the user asked for it or it started playing). */
     fun start(tab: BrowserTab) {
         if (!SendaTvMode.tvConnected || playback != null || starting) return
         val videoId = SendaYouTube.youTubeVideoId(tab.url)
         val media = if (videoId == null) SendaMediaCatalog.bestFor(tab.url) else null
         val key = videoId ?: media?.url ?: return
         starting = true
-        // Pausar y tomar la posición exacta en la que quedó: la TV sigue justo desde ahí
+        // Pause and take the exact position where it stopped: the TV continues right from there
         tab.pauseMediaAndGetPosition { start ->
             starting = false
             if (!SendaTvMode.tvConnected) {
@@ -126,9 +126,9 @@ object SendaTvPlayer {
     }
 
     /**
-     * Cierra el video de la TV y lo devuelve a la pestaña. [positionSeconds] y [durationSeconds] son los del
-     * reproductor de la TV (null si nunca llegó a reproducir). [userExit]: el usuario lo pidió; no se vuelve a pasar.
-     * [resumeOnPhone]: false al salir de Senda (queda en pausa).
+     * Closes the video on the TV and returns it to the tab. [positionSeconds] and [durationSeconds] come from the
+     * TV player (null if it never played). [userExit]: the user asked for it; it is not moved again.
+     * [resumeOnPhone]: false when leaving Senda (it stays paused).
      */
     fun finish(positionSeconds: Double?, durationSeconds: Double?, userExit: Boolean, resumeOnPhone: Boolean = true) {
         val current = playback ?: return
@@ -142,21 +142,21 @@ object SendaTvPlayer {
             tab.resumeMedia()
             return
         }
-        // Con lista de reproducción la TV pudo pasar a otro video: solo se salta si sigue siendo el mismo
+        // With a playlist the TV may have moved to another video: it only seeks if it is still the same one
         val sameVideo = durationSeconds != null && current.tabDurationSeconds > 0.0 &&
             kotlin.math.abs(durationSeconds - current.tabDurationSeconds) < 1.5
         if (sameVideo) tab.seekMedia(positionSeconds)
-        // Al salir de Senda el video no debe sonar en el teléfono mientras se usa otra app
+        // When leaving Senda the video must not play on the phone while another app is in use
         if (resumeOnPhone) tab.resumeMedia()
         Log.i(TAG, "Video de vuelta al teléfono en ${positionSeconds.toInt()}s (mismo video: $sameVideo)")
     }
 
-    /** Pide al reproductor de la TV que devuelva el video al teléfono (con su posición). */
+    /** Asks the TV player to return the video to the phone (with its position). */
     var requestReturn: (() -> Unit)? = null
 
     /**
-     * Senda pasó a segundo plano: la TV vuelve a mostrar el teléfono (otra app, p. ej. Telegram). Se recuerda dónde
-     * iba el video para seguir desde ahí al volver a Senda.
+     * Senda went to the background: the TV shows the phone again (another app, e.g. Telegram). Where the video
+     * was is remembered, to continue from there when returning to Senda.
      */
     var requestLeave: (() -> Unit)? = null
 

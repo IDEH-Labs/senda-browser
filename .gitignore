@@ -15,7 +15,7 @@ local.properties
 *.aab
 *.png
 
-# Claves de firma: nunca en el repositorio
+# Signing keys: never in the repository
 keystore.properties
 *.jks
 *.keystore
