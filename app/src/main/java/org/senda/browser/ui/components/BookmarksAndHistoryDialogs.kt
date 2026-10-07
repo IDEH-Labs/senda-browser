@@ -40,6 +40,20 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 /**
+ * Dirección legible solo para mostrar: «García» en vez de «Garc%C3%ADa». Si al decodificar aparecen caracteres
+ * invisibles o de control (que podrían disfrazar la dirección) se muestra tal cual, codificada.
+ */
+fun displayUrl(url: String): String {
+    if ('%' !in url) return url
+    val decoded = android.net.Uri.decode(url)
+    val hidden = decoded.any {
+        val type = Character.getType(it)
+        type == Character.CONTROL.toInt() || type == Character.FORMAT.toInt() || it == '\uFFFD'
+    }
+    return if (hidden) url else decoded
+}
+
+/**
  * Barra horizontal de marcadores / favoritos estilo GNOME Libadwaita.
  */
 @OptIn(ExperimentalFoundationApi::class)
@@ -315,7 +329,7 @@ fun BookmarksManagerDialog(
                                             overflow = TextOverflow.Ellipsis
                                         )
                                         Text(
-                                            text = item.url,
+                                            text = displayUrl(item.url),
                                             fontSize = 11.sp,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             maxLines = 1,
@@ -623,7 +637,7 @@ fun HistoryManagerDialog(
                                             horizontalArrangement = Arrangement.SpaceBetween
                                         ) {
                                             Text(
-                                                text = item.url,
+                                                text = displayUrl(item.url),
                                                 fontSize = 11.sp,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 maxLines = 1,

@@ -44,7 +44,6 @@ import org.senda.browser.ui.components.NewTabZenView
 import org.senda.browser.ui.components.BookmarksBar
 import org.senda.browser.ui.components.SendaPromptHost
 import org.senda.browser.ui.components.SendaToolbar
-import org.senda.browser.ui.components.SovereignSyncDialog
 import org.senda.browser.ui.components.TabsOverview
 import org.senda.browser.ui.model.BrowserTab
 import org.senda.browser.ui.model.SendaPrompt
@@ -69,13 +68,11 @@ fun BrowserScreen(
     var showTabsSheet by remember { mutableStateOf(false) }
     var showDevToolsSheet by remember { mutableStateOf(false) }
     var showAssistant by remember { mutableStateOf(false) }
-    var showFireConfirmDialog by remember { mutableStateOf(false) }
     var showCastDialog by remember { mutableStateOf(false) }
     var showBookmarksDialog by remember { mutableStateOf(false) }
     var showHistoryDialog by remember { mutableStateOf(false) }
     var showClearDataDialog by remember { mutableStateOf(false) }
     var showDownloadsDialog by remember { mutableStateOf(false) }
-    var showSyncDialog by remember { mutableStateOf(false) }
     var isAddressBarEditing by remember { mutableStateOf(false) }
     var showFindBar by remember { mutableStateOf(false) }
 
@@ -201,7 +198,6 @@ fun BrowserScreen(
     }
 
     val toolbarPos = prefs.toolbarPosition
-    val showFire = prefs.showFireButton
     val showDevTools = prefs.showDevToolsButton
     val showCast = prefs.showCastButton
     val isFullWidth = prefs.toolbarFullWidth
@@ -237,7 +233,6 @@ fun BrowserScreen(
                         onOpenHistory = { showHistoryDialog = true },
                         onOpenDownloads = { showDownloadsDialog = true },
                         onFindInPage = { showFindBar = true },
-                        onOpenSync = { showSyncDialog = true },
                         onGoHome = { activeTab?.loadUri("about:blank") },
                         onSwitchNextTab = {
                             val idx = tabs.indexOf(activeTab)
@@ -285,7 +280,6 @@ fun BrowserScreen(
                         onOpenHistory = { showHistoryDialog = true },
                         onOpenDownloads = { showDownloadsDialog = true },
                         onFindInPage = { showFindBar = true },
-                        onOpenSync = { showSyncDialog = true },
                         onGoHome = { activeTab?.loadUri("about:blank") },
                         onSwitchNextTab = {
                             val idx = tabs.indexOf(activeTab)
@@ -500,14 +494,6 @@ fun BrowserScreen(
             DownloadsManagerDialog(
                 prefs = prefs,
                 onDismiss = { showDownloadsDialog = false }
-            )
-        }
-
-        // Diálogo de sincronización soberana (WebDAV + Netscape HTML)
-        if (showSyncDialog) {
-            SovereignSyncDialog(
-                prefs = prefs,
-                onDismiss = { showSyncDialog = false }
             )
         }
 

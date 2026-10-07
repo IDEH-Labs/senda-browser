@@ -356,26 +356,23 @@ class SendaTvModeService : Service() {
             SendaTvMode.disconnect(applicationContext)
             return START_NOT_STICKY
         }
-        val isSpanish = resources.configuration.locales[0].language == "es"
+        val strings = org.senda.browser.core.SendaStrings.forApp(this)
         val manager = getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
-            NotificationChannel(CHANNEL, if (isSpanish) "Modo TV" else "TV mode", NotificationManager.IMPORTANCE_LOW)
+            NotificationChannel(CHANNEL, strings.dlg_tv_mode, NotificationManager.IMPORTANCE_LOW)
         )
         val openSenda = PendingIntent.getActivity(
             this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE
         )
         val notification = Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_senda_monochrome)
-            .setContentTitle(if (isSpanish) "Modo TV activo" else "TV mode on")
-            .setContentText(
-                if (isSpanish) "Al girar el teléfono la imagen se adapta a la TV. Todo vuelve a la normalidad al desconectar."
-                else "When you rotate the phone the picture adapts to the TV. Everything returns to normal when you disconnect."
-            )
+            .setContentTitle(strings.tv_notif_title)
+            .setContentText(strings.tv_notif_text)
             .setContentIntent(openSenda)
             .addAction(
                 Notification.Action.Builder(
                     android.graphics.drawable.Icon.createWithResource(this, R.drawable.ic_senda_monochrome),
-                    if (isSpanish) "Detener transmisión" else "Stop casting",
+                    strings.cast_disconnect_tv,
                     PendingIntent.getService(
                         this, 1, Intent(this, SendaTvModeService::class.java).setAction(ACTION_STOP),
                         PendingIntent.FLAG_IMMUTABLE

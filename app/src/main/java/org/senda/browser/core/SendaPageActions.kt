@@ -41,7 +41,7 @@ object SendaPageActions {
      * «Guardar como PDF». El PDF temporal vive en la caché privada de Senda y se borra al cerrar el diálogo.
      */
     fun print(activity: Activity, pdf: InputStream, title: String) {
-        val strings = SendaStrings.get("SYSTEM", activity)
+        val strings = SendaStrings.forApp(activity)
         ioExecutor.execute {
             val dir = File(activity.cacheDir, "print").apply { mkdirs() }
             // Restos de una impresión anterior que no llegó a cerrarse
@@ -116,7 +116,7 @@ object SendaPageActions {
      * confirmación; Senda no añade nada sin que el usuario la acepte.
      */
     fun addToHomeScreen(context: Context, url: String, title: String, icon: Bitmap?) {
-        val strings = SendaStrings.get("SYSTEM", context)
+        val strings = SendaStrings.forApp(context)
         if (!ShortcutManagerCompat.isRequestPinShortcutSupported(context)) {
             Toast.makeText(context, strings.page_shortcut_unsupported, Toast.LENGTH_LONG).show()
             return

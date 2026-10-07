@@ -1,18 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Senda</string>
-    <string name="search_hint">検索またはURLを入力…</string>
-    <string name="dissolve_tab">タブを閉じる</string>
-    <string name="panic_burn_all">すべてのタブを閉じる</string>
-    <string name="new_tab">新しいタブ</string>
-    <string name="tabs_open">開いているタブ</string>
-    <string name="settings">設定</string>
-    <string name="trackers_blocked">トラッカーをブロック</string>
-    <string name="devtools_title">開発者コンソール</string>
-    <string name="install_extension">拡張機能をインストール (.xpi)</string>
     <string name="biometric_prompt_title">Senda のロック解除</string>
     <string name="biometric_prompt_desc">保護されたセッションにアクセスするため認証してください</string>
-    <string name="biometric_cancel">キャンセル</string>
     <string name="biometric_unlock_button">ロック解除</string>
     <string name="biometric_no_device_lock">この端末にはPIN・パターン・指紋が設定されていないため、Sendaのロックでは保護できません。</string>
 </resources>

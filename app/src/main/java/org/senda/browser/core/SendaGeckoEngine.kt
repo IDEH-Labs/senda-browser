@@ -456,41 +456,6 @@ object SendaGeckoEngine {
             )
     }
 
-    fun installExtensionFromUrl(
-        context: Context,
-        downloadUrl: String,
-        onSuccess: (WebExtension) -> Unit,
-        onError: (Throwable) -> Unit
-    ) {
-        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
-            try {
-                val tempFile = java.io.File(context.cacheDir, "temp_ext_${System.currentTimeMillis()}.xpi")
-                SendaNet.open(downloadUrl).inputStream.use { input ->
-                    java.io.FileOutputStream(tempFile).use { output ->
-                        input.copyTo(output)
-                    }
-                }
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    installExtension(
-                        Uri.fromFile(tempFile),
-                        onSuccess = { ext ->
-                            tempFile.delete()
-                            onSuccess(ext)
-                        },
-                        onError = { err ->
-                            tempFile.delete()
-                            onError(err)
-                        }
-                    )
-                }
-            } catch (e: Throwable) {
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    onError(e)
-                }
-            }
-        }
-    }
-
     fun uninstallExtension(extension: WebExtension, onComplete: () -> Unit) {
         if (extension.id in EMBEDDED_EXTENSION_IDS) {
             onComplete()

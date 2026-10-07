@@ -11,7 +11,6 @@ import android.security.keystore.KeyInfo
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import android.util.Log
-import androidx.biometric.BiometricPrompt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -68,7 +67,6 @@ object SendaVaultManager {
     const val APP_KEY_ALIAS = "senda_vault_master_key_v1"
     /** Segundos que la clave queda disponible tras identificarse con huella o PIN. */
     const val AUTH_VALIDITY_SECONDS = 30
-    private const val GCM_IV_LENGTH_BYTES = 12
     private const val GCM_TAG_LENGTH_BITS = 128
     private const val VAULT_FILE_NAME = "senda_vault_store.json"
 
@@ -111,7 +109,8 @@ object SendaVaultManager {
                     @Suppress("DEPRECATION")
                     builder.setUserAuthenticationValidityDurationSeconds(AUTH_VALIDITY_SECONDS)
                 }
-                // Una huella nueva registrada en el teléfono invalida la clave: un intruso no puede añadir la suya
+                // Ojo: con una validez de 30 s Android ignora esta opción (solo vale para claves sin validez, de un
+                // solo uso con huella). Lo que sí anula la clave es quitar o restablecer el bloqueo de pantalla
                 builder.setInvalidatedByBiometricEnrollment(true)
                 // Inutilizable mientras la pantalla está bloqueada
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -157,7 +156,29 @@ object SendaVaultManager {
         return cipher
     }
 
-    /** Borra la clave de la Bóveda invalidada (p. ej. tras registrar una huella nueva) para poder crear otra. */
+    /**
+     * ¿Android anuló la clave de la Bóveda? Pasa si se quita o restablece el bloqueo de pantalla. Las contraseñas
+     * cifradas con ella ya no se pueden descifrar. No crea la clave si aún no existe.
+     */
+    fun isVaultKeyInvalidated(): Boolean = try {
+        val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
+        if (!keyStore.containsAlias(VAULT_KEY_ALIAS)) {
+            false
+        } else {
+            val key = (keyStore.getEntry(VAULT_KEY_ALIAS, null) as? KeyStore.SecretKeyEntry)?.secretKey
+            if (key == null) false else {
+                Cipher.getInstance("AES/GCM/NoPadding").init(Cipher.ENCRYPT_MODE, key)
+                false
+            }
+        }
+    } catch (_: android.security.keystore.KeyPermanentlyInvalidatedException) {
+        true
+    } catch (_: Exception) {
+        // Bloqueada (falta huella o PIN reciente) u otro motivo: no está anulada
+        false
+    }
+
+    /** Borra la clave anulada y las contraseñas que ya no se pueden descifrar, para empezar una Bóveda nueva. */
     fun resetInvalidatedVaultKey(context: Context) {
         KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }.deleteEntry(VAULT_KEY_ALIAS)
         saveAll(context, emptyList())
@@ -282,18 +303,6 @@ object SendaVaultManager {
      */
     fun wipe(bytes: ByteArray) {
         Arrays.fill(bytes, 0.toByte())
-    }
-
-    /**
-     * Crea un objeto CryptoObject para autenticación biométrica vinculada a hardware.
-     */
-    fun createBiometricCryptoObject(mode: Int): BiometricPrompt.CryptoObject? {
-        return try {
-            BiometricPrompt.CryptoObject(cipherFor(mode, VAULT_KEY_ALIAS))
-        } catch (e: Exception) {
-            Log.e(TAG, "Error creando Biometric CryptoObject: ${e.message}")
-            null
-        }
     }
 
     // =========================================================================

@@ -28,12 +28,14 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.AddToHomeScreen
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.text.rememberTextMeasurer
 import org.senda.browser.core.LocalSendaStrings
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -77,17 +79,14 @@ fun SendaToolbar(
     activeTab: BrowserTab?,
     tabsCount: Int,
     position: ToolbarPosition,
-    showFireButton: Boolean = false,
     showDevToolsButton: Boolean,
     showCastButton: Boolean = true,
     isFullWidth: Boolean = true,
     prefs: PreferencesManager? = null,
-    onOpenToolbarCustomization: (() -> Unit)? = null,
     onNavigate: (String) -> Unit,
     onBack: () -> Unit,
     onForward: () -> Unit,
     onRefresh: () -> Unit,
-    onDissolveCurrentTab: () -> Unit = {},
     onOpenTabsOverview: () -> Unit,
     onOpenAssistant: (() -> Unit)? = null,
     onOpenDevTools: () -> Unit,
@@ -97,8 +96,6 @@ fun SendaToolbar(
     onOpenHistory: () -> Unit = {},
     onOpenDownloads: () -> Unit = {},
     onFindInPage: () -> Unit = {},
-    onOpenExtensions: () -> Unit = {},
-    onOpenSync: () -> Unit = {},
     onGoHome: (() -> Unit)? = null,
     onSwitchNextTab: (() -> Unit)? = null,
     onSwitchPrevTab: (() -> Unit)? = null,
@@ -829,19 +826,28 @@ fun SendaToolbar(
                                 }
 
                                 // Texto de URL
-                                Text(
-                                    text = if (isHomeTab) strings.search_or_type_url else formatDisplayHost(activeTab?.displayUrl ?: ""),
-                                    style = TextStyle(
-                                        fontFamily = MaterialTheme.typography.bodyLarge.fontFamily,
-                                        color = if (isHomeTab) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
-                                        fontSize = addressBarFontSize,
-                                        fontWeight = if (isHomeTab) FontWeight.Normal else FontWeight.SemiBold,
-                                        letterSpacing = (-0.15).sp
-                                    ),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.weight(1f)
+                                val urlTextStyle = TextStyle(
+                                    fontFamily = MaterialTheme.typography.bodyLarge.fontFamily,
+                                    color = if (isHomeTab) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                                    fontSize = addressBarFontSize,
+                                    fontWeight = if (isHomeTab) FontWeight.Normal else FontWeight.SemiBold,
+                                    letterSpacing = (-0.15).sp
                                 )
+                                if (isHomeTab) {
+                                    Text(
+                                        text = strings.search_or_type_url,
+                                        style = urlTextStyle,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                } else {
+                                    HostText(
+                                        host = formatDisplayHost(activeTab?.displayUrl ?: ""),
+                                        style = urlTextStyle,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
 
                                 // Acciones dentro de la barra
                                 if (!isHomeTab) {
@@ -1156,16 +1162,18 @@ fun SendaToolbar(
                                     )
                                 }
 
+                                // Igual que el botón de la barra: «Detener» mientras carga (la barra ya no lo trae por
+                                // defecto, para dejar sitio al dominio)
                                 IconButton(
                                     onClick = {
                                         showMenu = false
-                                        onRefresh()
+                                        if (isLoading) activeTab?.stop() else onRefresh()
                                     },
                                     modifier = Modifier.size(36.dp)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.Refresh,
-                                        contentDescription = strings.tb_reload,
+                                        imageVector = if (isLoading) Icons.Default.Close else Icons.Default.Refresh,
+                                        contentDescription = if (isLoading) strings.tb_stop_loading else strings.tb_reload,
                                         tint = MaterialTheme.colorScheme.onSurface,
                                         modifier = Modifier.size(20.dp)
                                     )
@@ -1282,52 +1290,53 @@ fun SendaToolbar(
                                 }
                             )
 
-                            // Compartir
-                            DropdownMenuItem(
-                                text = { Text("${strings.tb_share}...") },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Default.Share,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                },
-                                onClick = {
-                                    showMenu = false
-                                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                        putExtra(Intent.EXTRA_TEXT, activeTab?.url ?: "")
-                                        putExtra(Intent.EXTRA_SUBJECT, activeTab?.title ?: "Senda Browser")
-                                        type = "text/plain"
-                                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                                    }
-                                    context.startActivity(Intent.createChooser(shareIntent, "${strings.tb_share}...").apply {
-                                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                                    })
-                                }
-                            )
-
-                            // Copiar enlace
-                            DropdownMenuItem(
-                                text = { Text(strings.ctx_copy_link) },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Default.ContentCopy,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                },
-                                onClick = {
-                                    showMenu = false
-                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                    clipboard.setPrimaryClip(ClipData.newPlainText("URL", activeTab?.url ?: ""))
-                                    Toast.makeText(context, strings.general_copied, Toast.LENGTH_SHORT).show()
-                                }
-                            )
-
-                            // Buscar en la página
+                            // Compartir, copiar y demás acciones de página: en la pestaña de inicio no hay página
                             if (!isHomeTab) {
+                                // Compartir
+                                DropdownMenuItem(
+                                    text = { Text("${strings.tb_share}...") },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.Share,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    },
+                                    onClick = {
+                                        showMenu = false
+                                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                            putExtra(Intent.EXTRA_TEXT, activeTab?.url ?: "")
+                                            putExtra(Intent.EXTRA_SUBJECT, activeTab?.title ?: "Senda Browser")
+                                            type = "text/plain"
+                                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                        }
+                                        context.startActivity(Intent.createChooser(shareIntent, "${strings.tb_share}...").apply {
+                                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                        })
+                                    }
+                                )
+
+                                // Copiar enlace
+                                DropdownMenuItem(
+                                    text = { Text(strings.ctx_copy_link) },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.ContentCopy,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    },
+                                    onClick = {
+                                        showMenu = false
+                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                        clipboard.setPrimaryClip(ClipData.newPlainText("URL", activeTab?.url ?: ""))
+                                        Toast.makeText(context, strings.general_copied, Toast.LENGTH_SHORT).show()
+                                    }
+                                )
+
+                                // Buscar en la página
                                 DropdownMenuItem(
                                     text = { Text(strings.find_in_page) },
                                     leadingIcon = {
@@ -1391,7 +1400,7 @@ fun SendaToolbar(
                                     text = { Text(strings.page_add_to_home) },
                                     leadingIcon = {
                                         Icon(
-                                            imageVector = Icons.Default.AddToHomeScreen,
+                                            imageVector = Icons.AutoMirrored.Filled.AddToHomeScreen,
                                             contentDescription = null,
                                             tint = MaterialTheme.colorScheme.onSurface,
                                             modifier = Modifier.size(20.dp)
@@ -1399,8 +1408,7 @@ fun SendaToolbar(
                                     },
                                     onClick = {
                                         showMenu = false
-                                        val tab = activeTab
-                                        if (tab != null) {
+                                        activeTab?.let { tab ->
                                             org.senda.browser.core.SendaPageActions.addToHomeScreen(context, tab.url, tab.title, null)
                                         }
                                     }
@@ -1783,8 +1791,38 @@ fun SendaToolbar(
     }
 }
 
+/**
+ * Dominio de la barra. Si no cabe, se recorta por la IZQUIERDA (…wikipedia.org) y nunca por la derecha: el final
+ * del dominio es lo que distingue la web real de una falsa (banco.com.otro-sitio.net). Antes se veía «es.wiki…».
+ */
+@Composable
+private fun HostText(host: String, style: TextStyle, modifier: Modifier = Modifier) {
+    val measurer = rememberTextMeasurer()
+    BoxWithConstraints(modifier = modifier, contentAlignment = Alignment.CenterStart) {
+        val maxPx = constraints.maxWidth
+        val shown = remember(host, style, maxPx) { fitHostFromEnd(host, maxPx) { t ->
+            measurer.measure(t, style, maxLines = 1, softWrap = false).size.width
+        } }
+        Text(text = shown, style = style, maxLines = 1, softWrap = false)
+    }
+}
+
+/** Texto más largo que cabe en [maxPx]: el dominio entero, o quitando subdominios por la izquierda, o letras. */
+internal fun fitHostFromEnd(host: String, maxPx: Int, widthOf: (String) -> Int): String {
+    if (host.isEmpty() || widthOf(host) <= maxPx) return host
+    val labels = host.split('.')
+    // Primero se quitan subdominios enteros, dejando al menos dominio y terminación (wikipedia.org)
+    for (drop in 1..(labels.size - 2).coerceAtLeast(0)) {
+        val candidate = "…" + labels.drop(drop).joinToString(".")
+        if (widthOf(candidate) <= maxPx) return candidate
+    }
+    var keep = host.length - 1
+    while (keep > 1 && widthOf("…" + host.takeLast(keep)) > maxPx) keep--
+    return "…" + host.takeLast(keep)
+}
+
 private fun formatDisplayHost(raw: String): String {
-    if (raw.isBlank() || raw == "about:blank") return "Buscar o ingresar URL…"
+    if (raw.isBlank() || raw == "about:blank") return ""
     if (raw.startsWith("moz-extension://")) return "uBlock Origin"
     return try {
         val uri = android.net.Uri.parse(raw)

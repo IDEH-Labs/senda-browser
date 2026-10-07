@@ -551,8 +551,8 @@ fun ToolbarCustomizationDialog(
                         prefs.showDevToolsButton = false
                         showReader = true
                         prefs.showReaderButton = true
-                        showReload = true
-                        prefs.showReloadButton = true
+                        showReload = false
+                        prefs.showReloadButton = false
                         showSecurity = true
                         prefs.showSecurityIndicator = true
                         onChanged()

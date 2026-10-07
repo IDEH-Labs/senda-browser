@@ -311,6 +311,16 @@ class BrowserTab(
     }
 
     companion object {
+        /** Tiempo para que la página aplique el desplegado antes de extraer el texto. */
+        private const val UNFOLD_DELAY_MS = 350L
+
+        /** Quita el plegado de secciones (atributo hidden, <details> cerrados, bloques plegables de Wikipedia). */
+        private const val UNFOLD_SECTIONS_JS = "(function(){try{" +
+            "document.querySelectorAll('[hidden=\"until-found\"]').forEach(function(e){e.removeAttribute('hidden');});" +
+            "document.querySelectorAll('details:not([open])').forEach(function(d){d.open=true;});" +
+            "document.querySelectorAll('.collapsible-block').forEach(function(e){e.classList.add('open-block');});" +
+            "}catch(e){}})();"
+
         // Esquemas que Gecko carga por sí mismo; el resto se entrega a otras apps
         private val GECKO_SCHEMES = setOf(
             "http", "https", "about", "data", "blob", "file", "content", "javascript",
@@ -367,7 +377,7 @@ class BrowserTab(
             val print = printer
             if (stream != null && print != null) print(stream, title)
         }, {
-            android.widget.Toast.makeText(context, org.senda.browser.core.SendaStrings.get("SYSTEM", context).page_print_failed, android.widget.Toast.LENGTH_SHORT).show()
+            android.widget.Toast.makeText(context, org.senda.browser.core.SendaStrings.forApp(context).page_print_failed, android.widget.Toast.LENGTH_SHORT).show()
         })
     }
 
@@ -1182,7 +1192,11 @@ class BrowserTab(
         val currentUrl = url
         originalArticleUrl = currentUrl
         readerSourceSecure = isSecure
-        val articleTitle = title.takeIf { it.isNotBlank() && it != "about:blank" } ?: "Artículo"
+        val context = SendaGeckoEngine.appContext
+        val rs = org.senda.browser.core.SendaStrings.get(prefs?.appLanguage ?: "SYSTEM", context)
+        val readerLang = org.senda.browser.core.SendaLocaleManager.getEffectiveLanguage(prefs?.appLanguage ?: "SYSTEM", context).lowercase()
+        val readerTexts = readerTextsJson(rs, readerLang)
+        val articleTitle = title.takeIf { it.isNotBlank() && it != "about:blank" } ?: rs.rd_article
 
         val themeBg = when (prefs?.readerTheme) {
             "OLED_BLACK" -> "#000000"
@@ -1201,6 +1215,10 @@ class BrowserTab(
         }
         val fontScale = (prefs?.readerFontSizePercent ?: 100) / 100.0
 
+        // Wikipedia móvil y otras webs pliegan secciones al cargar. El extractor de GeckoView descarta lo que no se
+        // ve, y el lector perdía hasta el 95 % del artículo: se despliegan antes de extraer
+        session.loadUri("javascript:" + URLEncoder.encode(UNFOLD_SECTIONS_JS, "UTF-8").replace("+", "%20"))
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
         val extractor = session.sessionPageExtractor
         extractor.getPageContent(PageExtractionController.ContentParams(true, false)).accept(
             { extractedHtml ->
@@ -1218,7 +1236,7 @@ class BrowserTab(
 
                     val readerHtml = """
                     <!DOCTYPE html>
-                    <html lang="es">
+                    <html lang="$readerLang">
                     <head>
                         <meta charset="utf-8">
                         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=2.0">
@@ -1302,6 +1320,8 @@ class BrowserTab(
                             }
                         </style>
                         <script>
+                            var SR = $readerTexts;
+
                             function toggleSendaSummary() {
                                 var box = document.getElementById('senda-summary-box');
                                 if (!box) return;
@@ -1313,28 +1333,35 @@ class BrowserTab(
 
                                     var rawText = (article.innerText || article.textContent || '').trim();
                                     if (rawText.length < 40) {
-                                        content.innerHTML = '<p style=\"margin:0;opacity:0.8;\">El artículo es demasiado breve para generar una síntesis.</p>';
+                                        content.innerHTML = '<p style=\"margin:0;opacity:0.8;\">' + SR.tooShort + '</p>';
                                         return;
                                     }
 
-                                    // Extraer oraciones sustantivas
-                                    var cleanText = rawText.replace(/\s+/g, ' ');
-                                    var sentences = cleanText.split(/(?<=[.!?])\s+/)
-                                        .map(function(s){ return s.trim(); })
-                                        .filter(function(s){ return s.length > 30 && !s.startsWith('http') && !s.includes('©'); });
-
-                                    if (sentences.length === 0) {
-                                        sentences = rawText.split(/\n+/).map(function(s){ return s.trim(); }).filter(function(s){ return s.length > 30; });
+                                    // Frases de texto corrido: fuera referencias, enlaces, ISBN, fechas de consulta y listas
+                                    // de datos. Antes se tomaban la primera, la del medio y la última de todo el texto, y
+                                    // en Wikipedia dos de tres salían de la bibliografía («Consultado el 19 de mayo…»)
+                                    function isProse(s) {
+                                        if (s.length < 60 || s.length > 400) return false;
+                                        if (/https?:|www\.|isbn|doi:|^[↑^\[]/i.test(s)) return false;
+                                        var digits = (s.match(/\d/g) || []).length;
+                                        return digits / s.length < 0.12;
                                     }
+                                    var cleanText = rawText.replace(/\s+/g, ' ');
+                                    var allSentences = cleanText.split(/(?<=[.!?。！？])\s*/)
+                                        .map(function(s){ return s.trim(); })
+                                        .filter(function(s){ return s.length > 30 && !s.includes('©'); });
+                                    var sentences = allSentences.filter(isProse);
+                                    if (sentences.length === 0) sentences = allSentences;
 
+                                    // La primera y otras dos repartidas por el 70 % inicial, donde está el cuerpo del texto
                                     var selectedPoints = [];
                                     if (sentences.length <= 3) {
                                         selectedPoints = sentences;
                                     } else {
+                                        var span = Math.max(3, Math.floor(sentences.length * 0.7));
                                         selectedPoints.push(sentences[0]);
-                                        var midIdx = Math.floor(sentences.length / 2);
-                                        selectedPoints.push(sentences[midIdx]);
-                                        selectedPoints.push(sentences[sentences.length - 1]);
+                                        selectedPoints.push(sentences[Math.floor(span / 3)]);
+                                        selectedPoints.push(sentences[Math.floor(span * 2 / 3)]);
                                     }
 
                                     var wordCount = rawText.split(/\s+/).length;
@@ -1346,8 +1373,8 @@ class BrowserTab(
 
                                     content.innerHTML = '<ul style=\"margin:0;padding-left:18px;\">' + bullets + '</ul>' +
                                         '<div style=\"margin-top:10px;display:flex;justify-content:space-between;align-items:center;font-size:11px;opacity:0.8;border-top:1px solid rgba(128,128,128,0.2);padding-top:6px;\">' +
-                                        '<span>📊 ' + selectedPoints.length + ' puntos clave • ' + wordCount + ' palabras analizadas</span>' +
-                                        '<button onclick=\"navigator.clipboard.writeText(Array.from(document.querySelectorAll(\\\'#senda-summary-content li\\\')).map(function(l){return \\\'• \\\' + l.innerText;}).join(\\\'\\\\n\\\')); this.innerText=\\\'✓ Copiado\\\';\" style=\"background:rgba(128,128,128,0.25);border:none;color:inherit;padding:3px 8px;border-radius:4px;font-size:10px;cursor:pointer;font-weight:600;\">📋 Copiar</button>' +
+                                        '<span>📊 ' + SR.points.replace('{n}', selectedPoints.length).replace('{w}', wordCount) + '</span>' +
+                                        '<button onclick=\"navigator.clipboard.writeText(Array.from(document.querySelectorAll(\'#senda-summary-content li\')).map(function(l){return \'• \' + l.innerText;}).join(\'\\n\')); this.innerText=\'✓ \' + SR.copied;\" style=\"background:rgba(128,128,128,0.25);border:none;color:inherit;padding:3px 8px;border-radius:4px;font-size:10px;cursor:pointer;font-weight:600;\">📋 ' + SR.copy + '</button>' +
                                         '</div>';
                                 } else {
                                     box.style.display = 'none';
@@ -1382,7 +1409,7 @@ class BrowserTab(
                                 if (!terms || terms.length === 0) return escapeHtml(text);
                                 var normTerms = terms.map(function(t){ return stripAccents(t.toLowerCase()); });
                                 // split con grupo: los índices impares son palabras, los pares lo que hay entre ellas
-                                return text.split(/([\wÀ-ÿ]+)/).map(function(part, idx) {
+                                return text.split(/([\p{L}\p{N}_]+)/u).map(function(part, idx) {
                                     if (idx % 2 === 1) {
                                         var normToken = stripAccents(part.toLowerCase());
                                         for (var i = 0; i < normTerms.length; i++) {
@@ -1404,12 +1431,12 @@ class BrowserTab(
                                 if (!query) return;
 
                                 res.style.display = 'block';
-                                res.innerHTML = '<span style=\"opacity:0.7;\">🔍 Buscando en el artículo...</span>';
+                                res.innerHTML = '<span style=\"opacity:0.7;\">🔍 ' + SR.searching + '</span>';
 
                                 setTimeout(function() {
                                     var article = document.querySelector('article.reader-body, .reader-body');
                                     if (!article) {
-                                        res.innerHTML = '<em>No se encontró el texto del artículo.</em>';
+                                        res.innerHTML = '<em>' + SR.noText + '</em>';
                                         return;
                                     }
 
@@ -1425,28 +1452,21 @@ class BrowserTab(
                                     });
 
                                     if (sentences.length === 0) {
-                                        res.innerHTML = '<em>El artículo no contiene texto suficiente para consultar.</em>';
+                                        res.innerHTML = '<em>' + SR.notEnough + '</em>';
                                         return;
                                     }
 
-                                    var stopWords = new Set([
-                                        'el','la','los','las','un','una','unos','unas',
-                                        'de','del','a','al','en','con','por','para','hacia','desde','sin','sobre','entre','tras','hasta','durante','mediante',
-                                        'que','quien','quienes','cual','cuales','como','cuando','donde','porque',
-                                        'y','e','ni','o','u','pero','sino','si','no',
-                                        'es','son','era','eran','fue','fueron','ser','sido','siendo',
-                                        'ha','han','habia','hay','hubo','tener','tiene','tienen','tuvo',
-                                        'se','su','sus','lo','le','les','me','nos','te'
-                                    ]);
+                                    // Palabras vacías del idioma de Senda (antes solo español)
+                                    var stopWords = new Set(SR.stop);
 
                                     var normQuery = stripAccents(query.toLowerCase());
                                     var queryTerms = normQuery
-                                        .replace(/[^a-z0-9\s]/g, ' ')
+                                        .replace(/[^\p{L}\p{N}\s]/gu, ' ')
                                         .split(/\s+/)
                                         .filter(function(w){ return w.length > 2 && !stopWords.has(w); });
 
                                     if (queryTerms.length === 0) {
-                                        queryTerms = normQuery.replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(function(w){ return w.length > 1; });
+                                        queryTerms = normQuery.replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(function(w){ return w.length > 1; });
                                     }
 
                                     var matches = [];
@@ -1478,9 +1498,8 @@ class BrowserTab(
 
                                     if (matches.length === 0) {
                                         res.innerHTML = '<div style=\"color:inherit;\">' +
-                                            '<strong>ℹ️ Información no encontrada:</strong> ' +
-                                            'Este dato no se menciona explícitamente en el texto del artículo.<br>' +
-                                            '<span style=\"font-size:11px;opacity:0.7;\">Senda solo busca frases del artículo que contengan tus palabras; no interpreta la pregunta.</span>' +
+                                            '<strong>ℹ️</strong> ' + SR.notFound + '<br>' +
+                                            '<span style=\"font-size:11px;opacity:0.7;\">' + SR.notFoundNote + '</span>' +
                                             '</div>';
                                         return;
                                     }
@@ -1492,7 +1511,7 @@ class BrowserTab(
                                     if (best.item.fullParagraph && best.item.fullParagraph.length > best.item.text.length + 15) {
                                         var highlightedContext = highlightMatches(best.item.fullParagraph, best.matchedWords);
                                         contextHtml = '<details style=\"margin-top:8px;font-size:0.9em;opacity:0.9;cursor:pointer;\">' +
-                                            '<summary style=\"font-size:11px;font-weight:600;color:#00B0FF;user-select:none;outline:none;\">🔎 Ver contexto completo del párrafo ' + best.item.paragraphNum + '</summary>' +
+                                            '<summary style=\"font-size:11px;font-weight:600;color:#00B0FF;user-select:none;outline:none;\">🔎 ' + SR.context.replace('{n}', best.item.paragraphNum) + '</summary>' +
                                             '<div style=\"margin-top:6px;padding:8px 10px;background:rgba(128,128,128,0.1);border-left:2px solid #00B0FF;border-radius:4px;line-height:1.55;\">' + highlightedContext + '</div>' +
                                             '</details>';
                                     }
@@ -1502,19 +1521,19 @@ class BrowserTab(
                                         var second = matches[1];
                                         var highlightedSecond = highlightMatches(second.item.text, second.matchedWords);
                                         secondaryHtml = '<div style=\"margin-top:10px;padding-top:8px;border-top:1px dashed rgba(128,128,128,0.25);font-size:0.92em;\">' +
-                                            '<strong style=\"font-size:11px;opacity:0.75;\">📌 Otra mención relevante (Párrafo ' + second.item.paragraphNum + '):</strong>' +
+                                            '<strong style=\"font-size:11px;opacity:0.75;\">📌 ' + SR.otherMatch.replace('{n}', second.item.paragraphNum) + '</strong>' +
                                             '<div style=\"margin-top:4px;\">' + highlightedSecond + '</div>' +
                                             '</div>';
                                     }
 
-                                    var citation = '📌 <em>Encontrado en el Párrafo ' + best.item.paragraphNum + ' de la noticia.</em>';
+                                    var citation = '📌 <em>' + SR.foundIn.replace('{n}', best.item.paragraphNum) + '</em>';
 
                                     res.innerHTML = '<div style=\"margin-bottom:6px;line-height:1.6;\">' + highlighted + '</div>' +
                                         contextHtml +
                                         secondaryHtml +
                                         '<div style=\"display:flex;justify-content:space-between;align-items:center;font-size:11px;opacity:0.8;border-top:1px solid rgba(128,128,128,0.2);padding-top:6px;margin-top:10px;\">' +
                                         '<span>' + citation + '</span>' +
-                                        '<button onclick=\"navigator.clipboard.writeText(document.getElementById(\\\'senda-ask-result\\\').innerText); this.innerText=\\\'✓ Copiado\\\';\" style=\"background:rgba(128,128,128,0.25);border:none;color:inherit;padding:3px 8px;border-radius:4px;font-size:10px;cursor:pointer;font-weight:600;\">📋 Copiar respuesta</button>' +
+                                        '<button onclick=\"navigator.clipboard.writeText(document.getElementById(\'senda-ask-result\').innerText); this.innerText=\'✓ \' + SR.copied;\" style=\"background:rgba(128,128,128,0.25);border:none;color:inherit;padding:3px 8px;border-radius:4px;font-size:10px;cursor:pointer;font-weight:600;\">📋 ' + SR.copyResult + '</button>' +
                                         '</div>';
                                 }, 120);
                             }
@@ -1525,36 +1544,36 @@ class BrowserTab(
                             <div class="reader-header">
                                 <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
                                     <div>
-                                        <span class="reader-domain">📖 $domain</span> · <span>$readTime min de lectura</span>
+                                        <span class="reader-domain">📖 $domain</span> · <span>${escapeHtml(rs.rd_reading_time.replace("{n}", readTime.toString()))}</span>
                                     </div>
                                     <div style="display:flex;align-items:center;gap:6px;">
-                                        <button onclick="toggleSendaSummary()" style="background:rgba(0,210,160,0.15);border:1px solid #00D2A0;color:inherit;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">⚡ Frases clave</button>
-                                        <button onclick="toggleSendaAsk()" style="background:rgba(0,180,255,0.15);border:1px solid #00B0FF;color:inherit;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">💬 Preguntar al texto</button>
+                                        <button onclick="toggleSendaSummary()" style="background:rgba(0,210,160,0.15);border:1px solid #00D2A0;color:inherit;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">⚡ ${escapeHtml(rs.rd_key_sentences)}</button>
+                                        <button onclick="toggleSendaAsk()" style="background:rgba(0,180,255,0.15);border:1px solid #00B0FF;color:inherit;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">🔎 ${escapeHtml(rs.rd_ask)}</button>
                                     </div>
                                 </div>
                             </div>
                             <div id="senda-summary-box" style="display:none;background:rgba(128,128,128,0.12);border-left:3px solid #00D2A0;border-radius:8px;padding:12px 14px;margin-bottom:14px;">
                                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-                                    <strong style="font-size:12px;color:#00D2A0;">⚡ FRASES CLAVE DEL ARTÍCULO</strong>
+                                    <strong style="font-size:12px;color:#00D2A0;">⚡ ${escapeHtml(rs.rd_key_sentences_header.uppercase())}</strong>
                                     <button onclick="document.getElementById('senda-summary-box').style.display='none'" style="background:none;border:none;color:inherit;font-size:14px;cursor:pointer;opacity:0.6;">✕</button>
                                 </div>
                                 <div id="senda-summary-content" style="font-size:0.92em;line-height:1.55;"></div>
                                 <div style="margin-top:8px;font-size:10px;opacity:0.6;border-top:1px solid rgba(128,128,128,0.2);padding-top:4px;">
-                                    🔒 Cero telemetría • Procesado localmente en tu dispositivo
+                                    🔒 ${escapeHtml(rs.rd_local_note)}
                                 </div>
                             </div>
                             <div id="senda-ask-box" style="display:none;background:rgba(128,128,128,0.12);border-left:3px solid #00B0FF;border-radius:8px;padding:12px 14px;margin-bottom:14px;">
                                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                                    <strong style="font-size:12px;color:#00B0FF;">💬 CONSULTA SOBERANA AL ARTÍCULO</strong>
+                                    <strong style="font-size:12px;color:#00B0FF;">🔎 ${escapeHtml(rs.rd_ask_header.uppercase())}</strong>
                                     <button onclick="document.getElementById('senda-ask-box').style.display='none'" style="background:none;border:none;color:inherit;font-size:14px;cursor:pointer;opacity:0.6;">✕</button>
                                 </div>
                                 <div style="display:flex;gap:6px;margin-bottom:8px;">
-                                    <input type="text" id="senda-ask-input" placeholder="Haz una pregunta sobre esta noticia..." style="flex:1;background:rgba(128,128,128,0.15);border:1px solid rgba(128,128,128,0.3);border-radius:6px;padding:8px 10px;color:inherit;font-size:13px;outline:none;" onkeydown=\"if(event.key==='Enter') executeSendaAsk();\" />
-                                    <button onclick="executeSendaAsk()" style="background:#00B0FF;color:#FFFFFF;border:none;border-radius:6px;padding:8px 12px;font-weight:600;font-size:12px;cursor:pointer;">Buscar</button>
+                                    <input type="text" id="senda-ask-input" placeholder="${escapeHtml(rs.rd_ask_placeholder)}" style="flex:1;background:rgba(128,128,128,0.15);border:1px solid rgba(128,128,128,0.3);border-radius:6px;padding:8px 10px;color:inherit;font-size:13px;outline:none;" onkeydown="if(event.key==='Enter') executeSendaAsk();" />
+                                    <button onclick="executeSendaAsk()" style="background:#00B0FF;color:#FFFFFF;border:none;border-radius:6px;padding:8px 12px;font-weight:600;font-size:12px;cursor:pointer;">${escapeHtml(rs.general_search)}</button>
                                 </div>
                                 <div id="senda-ask-result" style="display:none;font-size:0.92em;line-height:1.55;background:rgba(128,128,128,0.08);border-radius:6px;padding:10px;margin-top:6px;"></div>
                                 <div style="margin-top:8px;font-size:10px;opacity:0.6;border-top:1px solid rgba(128,128,128,0.2);padding-top:4px;">
-                                    🔒 100% Offline • Respuestas fundamentadas únicamente en el texto de la página
+                                    🔒 ${escapeHtml(rs.rd_ask_note)}
                                 </div>
                             </div>
                             <h1>$safeTitle</h1>
@@ -1570,14 +1589,15 @@ class BrowserTab(
                     val encoded = URLEncoder.encode(readerHtml, "UTF-8").replace("+", "%20")
                     session.loadUri("data:text/html;charset=utf-8,$encoded")
                 } else {
-                    fallbackInPageReader(articleTitle, themeBg, themeFg, fontFamily, fontScale)
+                    fallbackInPageReader(articleTitle, themeBg, themeFg, fontFamily, fontScale, readerTexts)
                 }
             },
             { err ->
                 android.util.Log.w("Senda", "SessionPageExtractor no disponible, usando fallback: ${err?.message}")
-                fallbackInPageReader(articleTitle, themeBg, themeFg, fontFamily, fontScale)
+                fallbackInPageReader(articleTitle, themeBg, themeFg, fontFamily, fontScale, readerTexts)
             }
         )
+        }, UNFOLD_DELAY_MS)
     }
 
     /**
@@ -1631,6 +1651,51 @@ class BrowserTab(
         return out.toString()
     }
 
+    /**
+     * Textos del lector en el idioma de Senda, como objeto JSON para su JavaScript. Ya van escapados para HTML
+     * porque el lector los inserta con innerHTML; JSONObject escapa también «</» para no cerrar el <script>.
+     */
+    private fun readerTextsJson(rs: org.senda.browser.core.SendaStringPack, lang: String): String {
+        fun plain(t: String) = java.text.Normalizer.normalize(t, java.text.Normalizer.Form.NFD).replace(Regex("\\p{Mn}+"), "")
+        val stop = when (lang) {
+            "en" -> "the a an of to in on for with and or but is are was were be been it its that this what who which how when where why does did do has have had from by at as about"
+            "de" -> "der die das den dem des ein eine einen einem einer und oder aber ist sind war waren wer was wie wann wo warum mit von zu im in auf für nicht es sie er"
+            "fr" -> "le la les un une des du de et ou mais est sont était qui que quoi comment quand où pourquoi avec pour par dans sur ce cette il elle"
+            "pt" -> "o a os as um uma de do da dos das em no na com por para que quem qual como quando onde porque e ou mas é são foi era se"
+            "it" -> "il lo la i gli le un una di del della da in con per su che chi quale come quando dove perché e o ma è sono era fu si"
+            "es" -> "el la los las un una unos unas de del a al en con por para hacia desde sin sobre entre tras hasta durante mediante que quien quienes cual cuales como cuando donde porque y e ni o u pero sino si no es son era eran fue fueron ser sido siendo ha han habia hay hubo tener tiene tienen tuvo se su sus lo le les me nos te"
+            else -> "" // japonés y chino no separan palabras con espacios
+        }
+        val texts = mapOf(
+            "reader" to rs.tb_reader_mode,
+            "readingTime" to rs.rd_reading_time,
+            "keySentences" to rs.rd_key_sentences,
+            "firstSentencesUp" to rs.rd_first_sentences.uppercase(),
+            "ask" to rs.rd_ask,
+            "askHeaderUp" to rs.rd_ask_header.uppercase(),
+            "askPlaceholder" to rs.rd_ask_placeholder,
+            "search" to rs.general_search,
+            "tooShort" to rs.rd_too_short,
+            "points" to rs.rd_points_summary,
+            "copy" to rs.rd_copy,
+            "copied" to rs.rd_copied,
+            "copyResult" to rs.rd_copy_result,
+            "searching" to rs.rd_searching,
+            "noText" to rs.rd_no_text,
+            "notEnough" to rs.rd_not_enough,
+            "notFound" to rs.rd_not_found,
+            "notFoundNote" to rs.rd_not_found_note,
+            "context" to rs.rd_context,
+            "otherMatch" to rs.rd_other_match,
+            "foundIn" to rs.rd_found_in,
+            "paragraph" to rs.rd_paragraph
+        )
+        val json = org.json.JSONObject()
+        texts.forEach { (k, v) -> json.put(k, escapeHtml(v)) }
+        json.put("stop", org.json.JSONArray(plain(stop).split(' ').filter { it.isNotBlank() }))
+        return json.toString()
+    }
+
     private fun escapeHtml(text: String): String = text
         .replace("&", "&amp;")
         .replace("<", "&lt;")
@@ -1643,13 +1708,15 @@ class BrowserTab(
         themeBg: String,
         themeFg: String,
         fontFamily: String,
-        fontScale: Double
+        fontScale: Double,
+        readerTexts: String
     ) {
         // Barra invertida primero: si no, un título con «\\» deshacía el escape de las comillas
         val safeTitle = articleTitle.replace("\\", "\\\\").replace("'", "\\'").replace("\"", "\\\"")
             .replace("\n", " ").replace("\r", " ").replace("<", "\\u003c")
         val js = "(function(){" +
             "try{" +
+            "var SR=$readerTexts;" +
             "var ex=document.getElementById('senda-reader-container');if(ex){ex.remove();document.body.style.overflow='';return;}" +
             "var candidates=document.querySelectorAll('article,[role=\"main\"],main,.article-content,.post-content,.entry-content');" +
             "var m=candidates[0];" +
@@ -1662,21 +1729,21 @@ class BrowserTab(
             "var c=document.createElement('div');c.id='senda-reader-container';" +
             "c.style.cssText='position:fixed;top:0;left:0;width:100vw;height:100vh;overflow-y:auto;background:$themeBg;color:$themeFg;z-index:2147483647;padding:24px 20px 80px 20px;box-sizing:border-box;font-family:$fontFamily;line-height:1.75;font-size:${19 * fontScale}px;';" +
             "var b=document.createElement('div');b.style.cssText='max-width:680px;margin:0 auto 24px auto;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(128,128,128,0.25);padding-bottom:12px;font-size:13px;opacity:0.85;flex-wrap:wrap;gap:8px;';" +
-            "b.innerHTML='<div><span>📖 Modo Lectura · '+time+' min</span></div><div style=\"display:flex;gap:6px;align-items:center;\"><button id=\"senda-fb-sum\" style=\"background:rgba(0,210,160,0.15);border:1px solid #00D2A0;color:inherit;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;\">⚡ Síntesis</button><button id=\"senda-fb-ask\" style=\"background:rgba(0,180,255,0.15);border:1px solid #00B0FF;color:inherit;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;\">💬 Preguntar</button><button id=\"senda-reader-close\" style=\"background:rgba(128,128,128,0.2);border:none;color:inherit;padding:4px 10px;border-radius:14px;font-weight:bold;cursor:pointer;font-size:12px;\">✕</button></div>';" +
+            "b.innerHTML='<div><span>📖 '+SR.reader+' · '+SR.readingTime.replace('{n}',time)+'</span></div><div style=\"display:flex;gap:6px;align-items:center;\"><button id=\"senda-fb-sum\" style=\"background:rgba(0,210,160,0.15);border:1px solid #00D2A0;color:inherit;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;\">⚡ '+SR.keySentences+'</button><button id=\"senda-fb-ask\" style=\"background:rgba(0,180,255,0.15);border:1px solid #00B0FF;color:inherit;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;\">🔎 '+SR.ask+'</button><button id=\"senda-reader-close\" style=\"background:rgba(128,128,128,0.2);border:none;color:inherit;padding:4px 10px;border-radius:14px;font-weight:bold;cursor:pointer;font-size:12px;\">✕</button></div>';" +
             "var w=document.createElement('div');w.style.cssText='max-width:680px;margin:0 auto;word-break:break-word;';" +
             "var sumBox=document.createElement('div');sumBox.id='senda-summary-box';sumBox.style.cssText='display:none;background:rgba(128,128,128,0.12);border-left:3px solid #00D2A0;border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:0.9em;';" +
-            "sumBox.innerHTML='<div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;\"><strong style=\"font-size:12px;color:#00D2A0;\">⚡ PRIMERAS FRASES</strong><button onclick=\"document.getElementById(\\'senda-summary-box\\').style.display=\\'none\\'\" style=\"background:none;border:none;color:inherit;font-size:14px;cursor:pointer;\">✕</button></div><div id=\"senda-summary-content\"></div>';" +
+            "sumBox.innerHTML='<div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;\"><strong style=\"font-size:12px;color:#00D2A0;\">⚡ '+SR.firstSentencesUp+'</strong><button onclick=\"document.getElementById(\\'senda-summary-box\\').style.display=\\'none\\'\" style=\"background:none;border:none;color:inherit;font-size:14px;cursor:pointer;\">✕</button></div><div id=\"senda-summary-content\"></div>';" +
             "var askBox=document.createElement('div');askBox.id='senda-ask-box';askBox.style.cssText='display:none;background:rgba(128,128,128,0.12);border-left:3px solid #00B0FF;border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:0.9em;';" +
-            "askBox.innerHTML='<div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;\"><strong style=\"font-size:12px;color:#00B0FF;\">💬 CONSULTA SOBERANA AL ARTÍCULO</strong><button onclick=\"document.getElementById(\\'senda-ask-box\\').style.display=\\'none\\'\" style=\"background:none;border:none;color:inherit;font-size:14px;cursor:pointer;\">✕</button></div><div style=\"display:flex;gap:6px;margin-bottom:8px;\"><input type=\"text\" id=\"senda-ask-input\" placeholder=\"Haz una pregunta...\" style=\"flex:1;background:rgba(128,128,128,0.15);border:1px solid rgba(128,128,128,0.3);border-radius:6px;padding:8px;color:inherit;font-size:13px;outline:none;\"/><button id=\"senda-fb-ask-exec\" style=\"background:#00B0FF;color:#FFF;border:none;border-radius:6px;padding:8px 12px;font-weight:600;font-size:12px;cursor:pointer;\">Buscar</button></div><div id=\"senda-ask-result\" style=\"display:none;background:rgba(128,128,128,0.08);border-radius:6px;padding:10px;margin-top:6px;\"></div>';" +
+            "askBox.innerHTML='<div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;\"><strong style=\"font-size:12px;color:#00B0FF;\">🔎 '+SR.askHeaderUp+'</strong><button onclick=\"document.getElementById(\\'senda-ask-box\\').style.display=\\'none\\'\" style=\"background:none;border:none;color:inherit;font-size:14px;cursor:pointer;\">✕</button></div><div style=\"display:flex;gap:6px;margin-bottom:8px;\"><input type=\"text\" id=\"senda-ask-input\" placeholder=\"'+SR.askPlaceholder+'\" style=\"flex:1;background:rgba(128,128,128,0.15);border:1px solid rgba(128,128,128,0.3);border-radius:6px;padding:8px;color:inherit;font-size:13px;outline:none;\"/><button id=\"senda-fb-ask-exec\" style=\"background:#00B0FF;color:#FFF;border:none;border-radius:6px;padding:8px 12px;font-weight:600;font-size:12px;cursor:pointer;\">'+SR.search+'</button></div><div id=\"senda-ask-result\" style=\"display:none;background:rgba(128,128,128,0.08);border-radius:6px;padding:10px;margin-top:6px;\"></div>';" +
             "var h=document.createElement('h1');h.innerText='$safeTitle';h.style.cssText='font-size:${28 * fontScale}px;line-height:1.3;margin-bottom:20px;font-weight:bold;';" +
             "w.appendChild(h);w.appendChild(sumBox);w.appendChild(askBox);w.appendChild(clone);c.appendChild(b);c.appendChild(w);document.body.appendChild(c);document.body.style.overflow='hidden';" +
             "document.getElementById('senda-reader-close').onclick=function(){c.remove();document.body.style.overflow='';};" +
             "function stripAcc(s){return (s||'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'');}" +
             "function escH(x){return String(x).replace(/[&<>\"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c];});}" +
-            "function hlM(txt,tms){if(!tms||tms.length===0)return escH(txt);var nt=tms.map(function(t){return stripAcc(t.toLowerCase());});return txt.split(/([\\wÀ-ÿ]+)/).map(function(tok,ix){if(ix%2===1){var ntok=stripAcc(tok.toLowerCase());for(var i=0;i<nt.length;i++){if(ntok===nt[i]||(nt[i].length>=5&&ntok.indexOf(nt[i].substring(0,nt[i].length-1))===0))return '<mark style=\"background:rgba(0,180,255,0.28);color:inherit;padding:1px 3px;border-radius:3px;font-weight:600;\">'+escH(tok)+'</mark>';}}return escH(tok);}).join('');}" +
+            "function hlM(txt,tms){if(!tms||tms.length===0)return escH(txt);var nt=tms.map(function(t){return stripAcc(t.toLowerCase());});return txt.split(/([\\p{L}\\p{N}_]+)/u).map(function(tok,ix){if(ix%2===1){var ntok=stripAcc(tok.toLowerCase());for(var i=0;i<nt.length;i++){if(ntok===nt[i]||(nt[i].length>=5&&ntok.indexOf(nt[i].substring(0,nt[i].length-1))===0))return '<mark style=\"background:rgba(0,180,255,0.28);color:inherit;padding:1px 3px;border-radius:3px;font-weight:600;\">'+escH(tok)+'</mark>';}}return escH(tok);}).join('');}" +
             "document.getElementById('senda-fb-sum').onclick=function(){if(sumBox.style.display==='none'||sumBox.style.display===''){sumBox.style.display='block';var raw=(clone.innerText||'').trim();var sens=raw.replace(/\\s+/g,' ').split(/(?<=[.!?])\\s+/).map(function(s){return s.trim();}).filter(function(s){return s.length>30;});var pts=sens.slice(0,3);var ul=pts.map(function(p){return '<li>'+escH(p)+'</li>';}).join('');document.getElementById('senda-summary-content').innerHTML='<ul>'+ul+'</ul>';}else{sumBox.style.display='none';}};" +
             "document.getElementById('senda-fb-ask').onclick=function(){askBox.style.display=(askBox.style.display==='none'||askBox.style.display==='')?'block':'none';if(askBox.style.display==='block'){document.getElementById('senda-ask-input').focus();}};" +
-            "function doAsk(){var q=document.getElementById('senda-ask-input').value.trim();if(!q)return;var res=document.getElementById('senda-ask-result');res.style.display='block';res.innerHTML='🔍 Analizando...';var stp=new Set(['el','la','los','las','un','una','unos','unas','de','del','a','al','en','con','por','para','que','quien','cual','como','cuando','donde','y','o','pero','si','es','son','fue','era','ha','han','se','su','sus','lo','le','les']);var terms=stripAcc(q.toLowerCase()).replace(/[^a-z0-9\\s]/g,' ').split(/\\s+/).filter(function(w){return w.length>2&&!stp.has(w);});if(terms.length===0)terms=stripAcc(q.toLowerCase()).replace(/[^a-z0-9\\s]/g,' ').split(/\\s+/).filter(function(w){return w.length>1;});var pars=(clone.innerText||'').split(/\\n+/).filter(function(p){return p.length>20;});var sens=[];pars.forEach(function(p,pIdx){p.replace(/\\s+/g,' ').split(/(?<=[.!?])\\s+/).forEach(function(s){if(s.length>20)sens.push({text:s,pNum:pIdx+1,pText:p});});});var m=[];sens.forEach(function(item){var ns=stripAcc(item.text.toLowerCase());var sc=0;var mw=[];terms.forEach(function(t){if(ns.indexOf(t)!==-1){sc+=10;mw.push(t);}});if(sc>0)m.push({item:item,score:sc,mw:mw});});m.sort(function(a,b){return b.score-a.score;});if(m.length===0){res.innerHTML='<strong>ℹ️ Dato no encontrado en el texto.</strong><br><span style=\"font-size:11px;opacity:0.7;\">Senda solo busca frases que contengan tus palabras.</span>';return;}var best=m[0];res.innerHTML='<div>'+hlM(best.item.text,best.mw)+'</div><div style=\"font-size:11px;opacity:0.8;margin-top:6px;border-top:1px solid rgba(128,128,128,0.2);padding-top:4px;\">📌 Párrafo '+best.item.pNum+'</div>';}" +
+            "function doAsk(){var q=document.getElementById('senda-ask-input').value.trim();if(!q)return;var res=document.getElementById('senda-ask-result');res.style.display='block';res.innerHTML='🔍 '+SR.searching;var stp=new Set(SR.stop);var terms=stripAcc(q.toLowerCase()).replace(/[^\\p{L}\\p{N}\\s]/gu,' ').split(/\\s+/).filter(function(w){return w.length>2&&!stp.has(w);});if(terms.length===0)terms=stripAcc(q.toLowerCase()).replace(/[^\\p{L}\\p{N}\\s]/gu,' ').split(/\\s+/).filter(function(w){return w.length>1;});var pars=(clone.innerText||'').split(/\\n+/).filter(function(p){return p.length>20;});var sens=[];pars.forEach(function(p,pIdx){p.replace(/\\s+/g,' ').split(/(?<=[.!?])\\s+/).forEach(function(s){if(s.length>20)sens.push({text:s,pNum:pIdx+1,pText:p});});});var m=[];sens.forEach(function(item){var ns=stripAcc(item.text.toLowerCase());var sc=0;var mw=[];terms.forEach(function(t){if(ns.indexOf(t)!==-1){sc+=10;mw.push(t);}});if(sc>0)m.push({item:item,score:sc,mw:mw});});m.sort(function(a,b){return b.score-a.score;});if(m.length===0){res.innerHTML='<strong>ℹ️ '+SR.notFound+'</strong><br><span style=\"font-size:11px;opacity:0.7;\">'+SR.notFoundNote+'</span>';return;}var best=m[0];res.innerHTML='<div>'+hlM(best.item.text,best.mw)+'</div><div style=\"font-size:11px;opacity:0.8;margin-top:6px;border-top:1px solid rgba(128,128,128,0.2);padding-top:4px;\">📌 '+SR.paragraph.replace('{n}',best.item.pNum)+'</div>';}" +
             "document.getElementById('senda-fb-ask-exec').onclick=doAsk;" +
             "document.getElementById('senda-ask-input').onkeydown=function(e){if(e.key==='Enter')doAsk();};" +
             "}catch(e){console.error(e);}" +

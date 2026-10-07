@@ -63,7 +63,7 @@ fun SettingsAutofillDialog(
                 ) {
                     Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Abrir Ajustes de Autocompletado del Sistema", fontSize = 12.sp)
+                    Text(strings.autofill_open_system, fontSize = 12.sp)
                 }
             }
         },

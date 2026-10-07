@@ -21,9 +21,6 @@ object SendaAssistant {
     /** Capacidades comprobadas con una cuenta real (solo estas se ofrecen). */
     data class Capabilities(val searchWeb: Boolean, val attach: Boolean, val thinkDeep: Boolean)
 
-    /** IA con clave de API en uso, o null si se usa ChatGPT (o nada). */
-    fun apiProvider(prefs: PreferencesManager): ApiProvider? = ApiProvider.byId(prefs.assistantProvider)
-
     /** IA conectadas: ChatGPT con sesión iniciada y las que tienen clave guardada, en ese orden. */
     fun connected(prefs: PreferencesManager): List<String> =
         listOfNotNull(PROVIDER_ID.takeIf { ChatGptPlanAuth.isSignedIn(prefs) }) +

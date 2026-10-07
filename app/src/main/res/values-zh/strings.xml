@@ -1,18 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Senda</string>
-    <string name="search_hint">搜索或输入网址…</string>
-    <string name="dissolve_tab">关闭标签页</string>
-    <string name="panic_burn_all">关闭所有标签页</string>
-    <string name="new_tab">新建标签页</string>
-    <string name="tabs_open">已打开标签页</string>
-    <string name="settings">设置</string>
-    <string name="trackers_blocked">已拦截跟踪器</string>
-    <string name="devtools_title">开发人员控制台</string>
-    <string name="install_extension">安装扩展组件 (.xpi)</string>
     <string name="biometric_prompt_title">解锁 Senda</string>
     <string name="biometric_prompt_desc">请进行身份验证以访问安全会话</string>
-    <string name="biometric_cancel">取消</string>
     <string name="biometric_unlock_button">解锁</string>
     <string name="biometric_no_device_lock">此手机未设置 PIN、图案或指纹：在设置之前，Senda 锁无法保护它。</string>
 </resources>

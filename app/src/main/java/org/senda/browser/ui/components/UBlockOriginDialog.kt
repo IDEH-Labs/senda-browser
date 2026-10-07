@@ -79,7 +79,7 @@ fun UBlockOriginDialog(
                             if (target != null) {
                                 onNavigate(target)
                             } else {
-                                Toast.makeText(context, "Conectando con uBlock Origin...", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, strings.ublock_connecting, Toast.LENGTH_SHORT).show()
                                 SendaGeckoEngine.refreshExtensions {
                                     refreshKey++
                                     val fresh = SendaGeckoEngine.getUBlockFiltersUrl()
@@ -116,7 +116,7 @@ fun UBlockOriginDialog(
                             if (target != null) {
                                 onNavigate(target)
                             } else {
-                                Toast.makeText(context, "Conectando con uBlock Origin...", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, strings.ublock_connecting, Toast.LENGTH_SHORT).show()
                                 SendaGeckoEngine.refreshExtensions {
                                     refreshKey++
                                     val fresh = SendaGeckoEngine.getUBlockPopupUrl() ?: SendaGeckoEngine.getUBlockDashboardUrl()
@@ -153,7 +153,7 @@ fun UBlockOriginDialog(
                             if (target != null) {
                                 onNavigate(target)
                             } else {
-                                Toast.makeText(context, "Conectando con uBlock Origin...", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, strings.ublock_connecting, Toast.LENGTH_SHORT).show()
                                 SendaGeckoEngine.refreshExtensions {
                                     refreshKey++
                                     val fresh = SendaGeckoEngine.getUBlockDashboardUrl()

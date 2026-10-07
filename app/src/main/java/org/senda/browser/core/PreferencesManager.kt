@@ -45,12 +45,23 @@ class PreferencesManager(context: Context) {
         // Borrar sube la generación: las visitas que ya estaban en cola no deben volver a escribir el historial
         val historyLock = Any()
         val historyGeneration = java.util.concurrent.atomic.AtomicLong()
+
+        // Limpieza de datos antiguos: una vez por proceso. SendaNet crea un PreferencesManager en cada conexión
+        // y antes recorría todas las preferencias cada vez
+        @Volatile var legacyCleanupDone = false
     }
 
     private val prefs: SharedPreferences =
         context.getSharedPreferences("senda_preferences", Context.MODE_PRIVATE)
 
     init {
+        if (!legacyCleanupDone) {
+            legacyCleanupDone = true
+            cleanUpLegacyData()
+        }
+    }
+
+    private fun cleanUpLegacyData() {
         // Ajustes de la IA retirada: no deben quedar datos de una función que ya no existe
         if (prefs.all.keys.any { it.startsWith("ai_") || it == "selected_local_ai_model" }) {
             prefs.edit().apply {
@@ -249,10 +260,6 @@ class PreferencesManager(context: Context) {
         get() = prefs.getBoolean("show_devtools_button", false)
         set(value) = prefs.edit().putBoolean("show_devtools_button", value).apply()
 
-    var showFireButton: Boolean
-        get() = prefs.getBoolean("show_fire_button", false)
-        set(value) = prefs.edit().putBoolean("show_fire_button", value).apply()
-
     var showCastButton: Boolean
         get() = prefs.getBoolean("show_cast_button", true)
         set(value) = prefs.edit().putBoolean("show_cast_button", value).apply()
@@ -318,8 +325,10 @@ class PreferencesManager(context: Context) {
         get() = prefs.getBoolean("show_reader_button", true)
         set(value) = prefs.edit().putBoolean("show_reader_button", value).apply()
 
+    // Apagado por defecto: Recargar/Detener están en el menú y en la barra el hueco es para el dominio (en un
+    // móvil de 360 dp solo cabía «es.wiki…»)
     var showReloadButton: Boolean
-        get() = prefs.getBoolean("show_reload_button", true)
+        get() = prefs.getBoolean("show_reload_button", false)
         set(value) = prefs.edit().putBoolean("show_reload_button", value).apply()
 
     var showSecurityIndicator: Boolean
@@ -472,14 +481,6 @@ class PreferencesManager(context: Context) {
         get() = prefs.getBoolean("enable_anti_snooping", false)
         set(value) = prefs.edit().putBoolean("enable_anti_snooping", value).apply()
 
-    var savePasswords: Boolean
-        get() = prefs.getBoolean("save_passwords", true)
-        set(value) = prefs.edit().putBoolean("save_passwords", value).apply()
-
-    var requireBiometricsForAutofill: Boolean
-        get() = prefs.getBoolean("require_biometrics_autofill", true)
-        set(value) = prefs.edit().putBoolean("require_biometrics_autofill", value).apply()
-
     // --- PERMISOS DEL SITIO & NOTIFICACIONES ---
     var sitePermissionCamera: String
         get() = prefs.getString("site_perm_camera", "ASK") ?: "ASK"
@@ -500,10 +501,6 @@ class PreferencesManager(context: Context) {
     var blockWebPopups: Boolean
         get() = prefs.getBoolean("block_web_popups", true)
         set(value) = prefs.edit().putBoolean("block_web_popups", value).apply()
-
-    var javascriptEnabled: Boolean
-        get() = prefs.getBoolean("javascript_enabled", true)
-        set(value) = prefs.edit().putBoolean("javascript_enabled", value).apply()
 
     // --- DESCARGAS Y APLICACIONES EXTERNAS ---
     var openLinksInApps: String
@@ -526,10 +523,6 @@ class PreferencesManager(context: Context) {
     var fontHinting: String
         get() = prefs.getString("font_hinting", "SLIGHT") ?: "SLIGHT" // NONE, SLIGHT, MEDIUM, FULL
         set(value) = prefs.edit().putString("font_hinting", value).apply()
-
-    var fontAntialiasing: String
-        get() = prefs.getString("font_antialiasing", "SUBPIXEL") ?: "SUBPIXEL" // SUBPIXEL, GRAYSCALE, NONE
-        set(value) = prefs.edit().putString("font_antialiasing", value).apply()
 
     var syncWebFontScale: Boolean
         get() = prefs.getBoolean("sync_web_font_scale", true)

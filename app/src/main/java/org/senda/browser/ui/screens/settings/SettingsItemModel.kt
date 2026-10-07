@@ -29,14 +29,6 @@ fun buildSettingsList(
     onOpenDialog: (String) -> Unit,
     onSettingsChanged: () -> Unit
 ): List<SettingItemData> {
-    val searchSummary = prefs.searchEngineName
-    val tabsSummary = when (prefs.closeTabsPolicy) {
-        "MANUAL" -> strings.summary_tabs_manual
-        "ON_EXIT" -> strings.summary_tabs_on_exit
-        "AFTER_ONE_DAY" -> strings.summary_tabs_one_day
-        "AFTER_ONE_WEEK" -> strings.summary_tabs_one_week
-        else -> strings.summary_tabs_manual
-    }
     val homeSummary = when (prefs.zenHomeLayout) {
         ZenHomeLayout.FOCUSED -> strings.preset_focused
         ZenHomeLayout.INSPIRATIONAL -> strings.preset_inspirational
@@ -104,7 +96,7 @@ fun buildSettingsList(
         SettingItemData(
             id = "home",
             title = strings.st_home_title,
-            subtitle = strings.st_home_sub,
+            subtitle = homeSummary,
             category = strings.cat_nav,
             icon = Icons.Default.Home,
             onClick = { onOpenDialog("home") }
@@ -229,7 +221,7 @@ fun buildSettingsList(
         SettingItemData(
             id = "https_only",
             title = strings.st_https_title,
-            subtitle = strings.st_https_sub,
+            subtitle = httpsSummary,
             category = strings.cat_privacy,
             icon = Icons.Default.Lock,
             onClick = { onOpenDialog("https_only") }
@@ -237,7 +229,7 @@ fun buildSettingsList(
         SettingItemData(
             id = "dns_over_https",
             title = strings.st_doh_title,
-            subtitle = strings.st_doh_sub,
+            subtitle = dohSummary,
             category = strings.cat_privacy,
             icon = Icons.Default.Dns,
             onClick = { onOpenDialog("dns_over_https") }
@@ -253,7 +245,7 @@ fun buildSettingsList(
         SettingItemData(
             id = "tracking_protection",
             title = strings.st_tracking_title,
-            subtitle = strings.st_tracking_sub,
+            subtitle = trackingSummary,
             category = strings.cat_privacy,
             icon = Icons.Default.Shield,
             onClick = { onOpenDialog("tracking_protection") }
@@ -328,7 +320,7 @@ fun buildSettingsList(
         SettingItemData(
             id = "open_in_apps",
             title = strings.st_open_in_apps_title,
-            subtitle = strings.st_open_in_apps_sub,
+            subtitle = openLinksSummary,
             category = strings.cat_advanced,
             icon = Icons.AutoMirrored.Filled.OpenInNew,
             onClick = { onOpenDialog("open_in_apps") }

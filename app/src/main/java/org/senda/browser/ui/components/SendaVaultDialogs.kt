@@ -52,18 +52,20 @@ fun SendaVaultDialog(
     onRequireBiometricAuth: ((Boolean) -> Unit) -> Unit
 ) {
     val context = LocalContext.current
+    // Clave anulada por Android (se quitó o restableció el bloqueo de pantalla): antes solo salía un aviso y la
+    // Bóveda quedaba inservible para siempre
+    var showVaultReset by remember { mutableStateOf(false) }
 
     // Ejecuta una operación con la clave de la Bóveda. Si pasaron más de 30 s desde la última identificación,
     // el chip la rechaza: se pide huella o PIN y se reintenta una vez
     fun secure(action: () -> Unit) {
         fun explain(e: org.senda.browser.core.security.VaultUnavailableException) {
-            val msg = when (e.reason) {
+            when (e.reason) {
                 org.senda.browser.core.security.VaultUnavailableException.Reason.NO_SCREEN_LOCK ->
-                    strings.vault_err_no_lock
+                    Toast.makeText(context, strings.vault_err_no_lock, Toast.LENGTH_LONG).show()
                 org.senda.browser.core.security.VaultUnavailableException.Reason.KEY_INVALIDATED ->
-                    strings.vault_err_key_invalidated
+                    showVaultReset = true
             }
-            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
         }
         try {
             action()
@@ -101,6 +103,35 @@ fun SendaVaultDialog(
     }
     var credentials by remember { mutableStateOf(SendaVaultManager.getCredentials(context)) }
     var searchQuery by remember { mutableStateOf("") }
+
+    // Se comprueba al abrir: sin contraseñas guardadas no se pierde nada y se crea una clave nueva sin preguntar
+    LaunchedEffect(Unit) {
+        if (SendaVaultManager.isVaultKeyInvalidated()) {
+            if (credentials.isEmpty()) SendaVaultManager.resetInvalidatedVaultKey(context) else showVaultReset = true
+        }
+    }
+
+    if (showVaultReset) {
+        AlertDialog(
+            onDismissRequest = { showVaultReset = false },
+            icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text(strings.vault_reset_title) },
+            text = { Text(strings.vault_reset_body) },
+            confirmButton = {
+                TextButton(onClick = {
+                    SendaVaultManager.resetInvalidatedVaultKey(context)
+                    credentials = SendaVaultManager.getCredentials(context)
+                    showVaultReset = false
+                    Toast.makeText(context, strings.vault_reset_done, Toast.LENGTH_SHORT).show()
+                }) {
+                    Text(strings.vault_reset_confirm, color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showVaultReset = false }) { Text(strings.general_cancel) }
+            }
+        )
+    }
 
     // Generador de claves
     var genLength by rememberSaveable { mutableFloatStateOf(18f) }
