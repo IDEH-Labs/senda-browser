@@ -1,18 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Senda</string>
-    <string name="search_hint">Entrez une adresse web ou recherchez…</string>
-    <string name="dissolve_tab">Fermer et nettoyer l\'onglet</string>
-    <string name="panic_burn_all">Incinérer toutes les sessions</string>
-    <string name="new_tab">Nouvel onglet</string>
-    <string name="tabs_open">Onglets ouverts</string>
-    <string name="settings">Paramètres</string>
-    <string name="trackers_blocked">Pisteurs bloqués</string>
-    <string name="devtools_title">Console du développeur</string>
-    <string name="install_extension">Installer une extension (.xpi)</string>
     <string name="biometric_prompt_title">Déverrouiller Senda</string>
     <string name="biometric_prompt_desc">Authentifiez-vous pour accéder à vos sessions sécurisées</string>
-    <string name="biometric_cancel">Annuler</string>
     <string name="biometric_unlock_button">Déverrouiller</string>
     <string name="biometric_no_device_lock">Ce téléphone n’a ni code, ni schéma, ni empreinte : le verrou de Senda ne peut pas le protéger tant que vous n’en configurez pas.</string>
 </resources>

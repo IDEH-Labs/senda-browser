@@ -216,6 +216,10 @@ private fun LoginSelectDialog(request: SendaPrompt.LoginSelect, onDismiss: () ->
                     fail()
                 }
             }
+        } catch (e: org.senda.browser.core.security.VaultUnavailableException) {
+            android.util.Log.w(tag, "selector: Bóveda no disponible: ${e.reason}")
+            android.widget.Toast.makeText(context, vaultUnavailableMessage(e, strings), android.widget.Toast.LENGTH_LONG).show()
+            fail()
         } catch (e: Exception) {
             android.util.Log.w(tag, "selector: error al descifrar: ${e.javaClass.simpleName}")
             fail()
@@ -328,6 +332,9 @@ private fun LoginSaveBar(request: SendaPrompt.LoginSave, onDismiss: () -> Unit) 
                     android.widget.Toast.makeText(context, strings.vault_err_generic.format(e.message ?: ""), android.widget.Toast.LENGTH_LONG).show()
                 }
             }
+        } catch (e: org.senda.browser.core.security.VaultUnavailableException) {
+            android.util.Log.w(tag, "guardar: Bóveda no disponible: ${e.reason}")
+            android.widget.Toast.makeText(context, vaultUnavailableMessage(e, strings), android.widget.Toast.LENGTH_LONG).show()
         } catch (e: Exception) {
             android.util.Log.w(tag, "guardar: error: ${e.javaClass.simpleName}")
             android.widget.Toast.makeText(context, strings.vault_err_generic.format(e.message ?: ""), android.widget.Toast.LENGTH_LONG).show()
@@ -1151,4 +1158,13 @@ private fun DateTimePromptDialog(request: SendaPrompt.DateTime, onDismiss: () ->
             dismissButton = { TextButton(onClick = { finish(null) }) { Text(strings.general_cancel) } }
         )
     }
+}
+
+/** Por qué la Bóveda no se puede usar, explicado al usuario (antes salía «Error: KEY_INVALIDATED»). */
+private fun vaultUnavailableMessage(
+    e: org.senda.browser.core.security.VaultUnavailableException,
+    strings: org.senda.browser.core.SendaStringPack
+): String = when (e.reason) {
+    org.senda.browser.core.security.VaultUnavailableException.Reason.NO_SCREEN_LOCK -> strings.vault_err_no_lock
+    org.senda.browser.core.security.VaultUnavailableException.Reason.KEY_INVALIDATED -> strings.vault_err_key_invalidated
 }

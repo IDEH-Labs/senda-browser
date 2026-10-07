@@ -188,5 +188,4 @@ fun getSendaTypography(
     )
 }
 
-val SendaTypography = getSendaTypography(SerifFontFamily)
 

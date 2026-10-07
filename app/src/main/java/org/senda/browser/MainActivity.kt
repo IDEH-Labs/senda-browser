@@ -207,7 +207,6 @@ class MainActivity : FragmentActivity() {
             }
 
             val activeTab = tabs.find { it.id == activeTabId } ?: tabs.firstOrNull()
-            val isBrowsingExternalSite = activeTab != null && activeTab.url != "about:blank" && activeTab.url.isNotBlank()
             // Pantalla completa inmersiva solo cuando el usuario lo solicita explícitamente en la pestaña
             val isFullScreen = activeTab?.isFullScreen == true
             val keepPortrait = activeTab?.isFullScreenVideoPortrait == true

@@ -2,6 +2,9 @@ package org.senda.browser.core.news
 
 import android.util.Xml
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import org.xmlpull.v1.XmlPullParser
 import java.io.InputStream
@@ -22,77 +25,37 @@ object EthicalNewsRepository {
     private var lastFetchTime = 0L
     private const val CACHE_DURATION_MS = 15 * 60 * 1000L // 15 minutos
 
-    private val fallbackNews = listOf(
-        EthicalNewsItem(
-            title = "Privacidad digital: cómo proteger tu huella y datos en Android",
-            url = "https://www.eff.org",
-            source = "EFF",
-            publishedDate = "Hoy",
-            snippet = "Herramientas de código abierto que devuelven el control y la privacidad a los usuarios."
-        ),
-        EthicalNewsItem(
-            title = "El Manifiesto de Software Libre y las 4 Libertades Esenciales",
-            url = "https://www.fsf.org/philosophy/free-sw.es.html",
-            source = "FSF",
-            publishedDate = "Filosofía Libre",
-            snippet = "La libertad 0, 1, 2 y 3: ejecutar el programa, estudiar el código, distribuir copias y mejorar la herramienta para la comunidad."
-        ),
-        EthicalNewsItem(
-            title = "Novedades en el ecosistema GNU/Linux y privacidad web",
-            url = "https://www.muylinux.com",
-            source = "MuyLinux",
-            publishedDate = "Software Libre",
-            snippet = "Grandes avances en motores de navegación independientes y el avance de estándares abiertos libres de telemetría."
-        ),
-        EthicalNewsItem(
-            title = "Por qué los estándares abiertos garantizan la neutralidad de Internet",
-            url = "https://blog.mozilla.org",
-            source = "Mozilla",
-            publishedDate = "Web Abierta",
-            snippet = "Una web sin monopolios cerrados permite que cualquier persona cree su propio navegador y determine sus propias reglas."
-        )
-    )
-
     suspend fun fetchEthicalNews(forceRefresh: Boolean = false): List<EthicalNewsItem> {
         val now = System.currentTimeMillis()
         if (!forceRefresh && cachedItems.isNotEmpty() && (now - lastFetchTime < CACHE_DURATION_MS)) {
             return cachedItems
         }
 
-        return withContext(Dispatchers.IO) {
-            val results = mutableListOf<EthicalNewsItem>()
+        // Las tres fuentes a la vez: en serie, con 8 s de espera por fuente, la portada podía tardar 24 s.
+        // Si ninguna responde se devuelve una lista vacía y la portada lo dice (nunca titulares de relleno)
+        val results = coroutineScope {
+            listOf(
+                async { fetchRssSafely("https://www.muylinux.com/feed/", "MuyLinux", 4) },
+                async { fetchRssSafely("https://www.eff.org/rss/updates.xml", "EFF", 4) },
+                async { fetchRssSafely("https://www.fsf.org/static/fsforg/rss/news.xml", "FSF", 3) }
+            ).awaitAll().flatten()
+        }
+        if (results.isNotEmpty()) {
+            cachedItems.clear()
+            cachedItems.addAll(results)
+            lastFetchTime = now
+        }
+        return results
+    }
 
-            // 1. MuyLinux (Español)
+    private suspend fun fetchRssSafely(feedUrl: String, sourceName: String, maxItems: Int): List<EthicalNewsItem> =
+        withContext(Dispatchers.IO) {
             try {
-                results.addAll(fetchRss("https://www.muylinux.com/feed/", "MuyLinux", 4))
-            } catch (t: Throwable) {
-                // Silencioso, continuamos con otras fuentes
-            }
-
-            // 2. Electronic Frontier Foundation (EFF)
-            try {
-                results.addAll(fetchRss("https://www.eff.org/rss/updates.xml", "EFF", 4))
-            } catch (t: Throwable) {
-                // Silencioso
-            }
-
-            // 3. Free Software Foundation (FSF)
-            try {
-                results.addAll(fetchRss("https://www.fsf.org/static/fsforg/rss/news.xml", "FSF", 3))
-            } catch (t: Throwable) {
-                // Silencioso
-            }
-
-            if (results.isEmpty()) {
-                fallbackNews
-            } else {
-                cachedItems.clear()
-                cachedItems.addAll(results)
-                lastFetchTime = now
-                results
+                fetchRss(feedUrl, sourceName, maxItems)
+            } catch (_: Throwable) {
+                emptyList()
             }
         }
-    }
 
     private fun fetchRss(feedUrl: String, sourceName: String, maxItems: Int): List<EthicalNewsItem> {
         val items = mutableListOf<EthicalNewsItem>()
@@ -148,13 +111,16 @@ object EthicalNewsRepository {
                         XmlPullParser.END_TAG -> {
                             if ((name.equals("item", ignoreCase = true) || name.equals("entry", ignoreCase = true)) && insideItem) {
                                 insideItem = false
-                                if (currentTitle.isNotBlank() && currentLink.isNotBlank()) {
+                                // Solo enlaces web: un feed alterado no debe poder abrir javascript: ni file:
+                                val isWebLink = currentLink.startsWith("https://", ignoreCase = true) ||
+                                    currentLink.startsWith("http://", ignoreCase = true)
+                                if (currentTitle.isNotBlank() && isWebLink) {
                                     items.add(
                                         EthicalNewsItem(
                                             title = currentTitle,
                                             url = currentLink,
                                             source = sourceName,
-                                            publishedDate = currentPubDate.ifBlank { "Reciente" },
+                                            publishedDate = currentPubDate,
                                             snippet = currentSnippet
                                         )
                                     )

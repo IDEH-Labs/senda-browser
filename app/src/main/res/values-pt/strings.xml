@@ -1,18 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Senda</string>
-    <string name="search_hint">Digite um endereço web ou pesquise…</string>
-    <string name="dissolve_tab">Fechar e limpar aba</string>
-    <string name="panic_burn_all">Incinerar todas as sessões</string>
-    <string name="new_tab">Nova aba</string>
-    <string name="tabs_open">Abas abertas</string>
-    <string name="settings">Configurações</string>
-    <string name="trackers_blocked">Rastreadores bloqueados</string>
-    <string name="devtools_title">Console do desenvolvedor</string>
-    <string name="install_extension">Instalar extensão (.xpi)</string>
     <string name="biometric_prompt_title">Desbloquear Senda</string>
     <string name="biometric_prompt_desc">Autentique-se para acessar suas sessões seguras</string>
-    <string name="biometric_cancel">Cancelar</string>
     <string name="biometric_unlock_button">Desbloquear</string>
     <string name="biometric_no_device_lock">Este telefone não tem PIN, padrão nem digital: o bloqueio do Senda não pode protegê-lo até que você configure um.</string>
 </resources>

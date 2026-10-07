@@ -270,14 +270,6 @@ fun DownloadsManagerDialog(
 // 2. SOPORTE VISUAL DE COMPLEMENTOS (ADD-ONS / EXTENSIONES)
 // =========================================================================
 
-data class CuratedExtension(
-    val id: String,
-    val name: String,
-    val description: String,
-    val downloadUrl: String,
-    val author: String
-)
-
 @Composable
 fun ExtensionsManagerDialog(
     onDismiss: () -> Unit
@@ -326,7 +318,7 @@ fun ExtensionsManagerDialog(
                 Spacer(modifier = Modifier.width(8.dp))
                 Column {
                     Text(strings.st_extensions_title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text("Gestión soberana • Solo archivos .xpi locales", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
+                    Text(strings.st_extensions_sub, fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
                 }
             }
         },

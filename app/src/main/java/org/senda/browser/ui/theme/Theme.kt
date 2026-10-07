@@ -19,7 +19,6 @@ object SendaColors {
     val DarkGraphite = Color(0xFF0D1117)
     val PureOledBlack = Color(0xFF000000)
     val SurfaceDark = Color(0xFF161B22)
-    val SurfaceHighlight = Color(0xFF21262D)
     val TextPrimary = Color(0xFFF0F6FC)
     val TextSecondary = Color(0xFF8B949E)
     val BorderSubtle = Color(0xFF30363D)

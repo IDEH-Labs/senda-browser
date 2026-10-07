@@ -437,7 +437,7 @@ private fun TabCardItem(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = if (tab.url == "about:blank" || tab.url.isBlank()) "senda://zen" else tab.url.removePrefix("https://").removePrefix("http://"),
+                    text = if (tab.url == "about:blank" || tab.url.isBlank()) "senda://zen" else displayUrl(tab.url.removePrefix("https://").removePrefix("http://")),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     fontSize = 10.5.sp,

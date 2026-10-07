@@ -49,75 +49,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.ImageBitmap
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import org.senda.browser.core.AppThemeMode
-
-object FaviconManager {
-    private val memoryCache = android.util.LruCache<String, ImageBitmap>(60)
-
-    fun getDomain(rawUrl: String): String {
-        return try {
-            val uri = android.net.Uri.parse(if (!rawUrl.startsWith("http")) "https://$rawUrl" else rawUrl)
-            uri.host?.removePrefix("www.")?.lowercase() ?: rawUrl.lowercase()
-        } catch (_: Exception) {
-            rawUrl.lowercase()
-        }
-    }
-
-    fun getCachedFavicon(context: android.content.Context, domain: String): ImageBitmap? {
-        memoryCache.get(domain)?.let { return it }
-        val file = java.io.File(context.cacheDir, "favicons/$domain.png")
-        if (file.exists() && file.length() > 0) {
-            try {
-                val bmp = android.graphics.BitmapFactory.decodeFile(file.absolutePath)
-                if (bmp != null) {
-                    val imgBmp = bmp.asImageBitmap()
-                    memoryCache.put(domain, imgBmp)
-                    return imgBmp
-                }
-            } catch (_: Exception) {}
-        }
-        return null
-    }
-
-    suspend fun loadFavicon(context: android.content.Context, domain: String): ImageBitmap? = withContext(Dispatchers.IO) {
-        getCachedFavicon(context, domain)?.let { return@withContext it }
-        if (domain.isBlank()) return@withContext null
-
-        val urls = listOf(
-            "https://icons.duckduckgo.com/ip3/$domain.ico",
-            "https://$domain/favicon.ico"
-        )
-        for (urlStr in urls) {
-            try {
-                val conn = org.senda.browser.core.SendaNet.open(urlStr)
-                conn.connectTimeout = 3000
-                conn.readTimeout = 3000
-                conn.instanceFollowRedirects = true
-                if (conn.responseCode == 200) {
-                    conn.inputStream.use { input ->
-                        val bmp = android.graphics.BitmapFactory.decodeStream(input)
-                        if (bmp != null && bmp.width > 0 && bmp.height > 0) {
-                            val dir = java.io.File(context.cacheDir, "favicons")
-                            dir.mkdirs()
-                            val targetFile = java.io.File(dir, "$domain.png")
-                            java.io.FileOutputStream(targetFile).use { out ->
-                                bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
-                            }
-                            val imgBmp = bmp.asImageBitmap()
-                            memoryCache.put(domain, imgBmp)
-                            return@withContext imgBmp
-                        }
-                    }
-                }
-            } catch (_: Exception) {}
-        }
-        null
-    }
-}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -196,9 +133,12 @@ fun NewTabZenView(
 
     // Solo se contacta a los medios si este diseño muestra noticias («Enfocado» no debe tocar la red)
     val wantsNews = displayNewsFeed || currentLayout == ZenHomeLayout.INSPIRATIONAL // artículo destacado
-    val newsList by produceState(initialValue = emptyList<EthicalNewsItem>(), wantsNews) {
-        if (wantsNews) value = EthicalNewsRepository.fetchEthicalNews()
+    // null mientras se descarga; vacía si ninguna fuente respondió (antes se mostraban titulares fijos como si fueran noticias)
+    val newsResult by produceState<List<EthicalNewsItem>?>(initialValue = null, wantsNews) {
+        value = if (wantsNews) EthicalNewsRepository.fetchEthicalNews() else emptyList()
     }
+    val newsList = newsResult.orEmpty()
+    val newsUnavailable = displayNewsFeed && newsResult?.isEmpty() == true
 
     // Rotación de fondos: el turno se guarda en preferencias para que siga igual entre pestañas y reinicios
     var rotatingWallpaper by remember { mutableStateOf<FreeWallpaper?>(null) }
@@ -261,7 +201,8 @@ fun NewTabZenView(
                 queryText = queryText,
                 onQueryChange = { queryText = it },
                 onSearch = onSearch,
-                newsList = newsList
+                newsList = newsList,
+                newsUnavailable = newsUnavailable
             )
         } else {
             // MODO ENFOCADO / INSPIRADOR / PERSONALIZADO
@@ -277,6 +218,7 @@ fun NewTabZenView(
                 featuredArticle = if (currentLayout == ZenHomeLayout.INSPIRATIONAL) newsList.firstOrNull() else null,
                 displayNewsFeed = displayNewsFeed,
                 newsList = newsList,
+                newsUnavailable = newsUnavailable,
                 shortcuts = shortcutsList,
                 onAddShortcut = { showAddShortcutDialog = true },
                 onEditShortcut = { editingShortcut = it }
@@ -744,6 +686,7 @@ fun FocusedOrInspirationalLayout(
     featuredArticle: EthicalNewsItem?,
     displayNewsFeed: Boolean = false,
     newsList: List<EthicalNewsItem> = emptyList(),
+    newsUnavailable: Boolean = false,
     shortcuts: List<ZenShortcut> = emptyList(),
     onAddShortcut: () -> Unit = {},
     onEditShortcut: (ZenShortcut) -> Unit = {}
@@ -862,7 +805,7 @@ fun FocusedOrInspirationalLayout(
                 focusedBorderColor = MaterialTheme.colorScheme.primary,
                 unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
             ),
-            modifier = Modifier.fillMaxWidth(0.98f)
+            modifier = Modifier.fillMaxWidth(0.98f).searchOnEnterRelease { if (queryText.isNotBlank()) onSearch(queryText) }
         )
 
         // Accesos directos éticos en cuadrícula responsiva (4 por fila) aprovechando todo el ancho
@@ -908,6 +851,11 @@ fun FocusedOrInspirationalLayout(
                     }
                 }
             }
+        }
+
+        if (newsUnavailable) {
+            Spacer(modifier = Modifier.height(16.dp))
+            NewsUnavailableNote()
         }
 
         // Feed completo de noticias éticas si está activo
@@ -1028,7 +976,8 @@ fun InformationalLayout(
     queryText: String,
     onQueryChange: (String) -> Unit,
     onSearch: (String) -> Unit,
-    newsList: List<EthicalNewsItem>
+    newsList: List<EthicalNewsItem>,
+    newsUnavailable: Boolean = false
 ) {
     val strings = LocalSendaStrings.current
     var selectedSource by remember { mutableStateOf("Todas") }
@@ -1141,7 +1090,7 @@ fun InformationalLayout(
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
                         unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                     ),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth().searchOnEnterRelease { if (queryText.isNotBlank()) onSearch(queryText) }
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -1213,7 +1162,24 @@ fun InformationalLayout(
                 onClick = { onSearch(article.url) }
             )
         }
+
+        if (newsUnavailable) {
+            item { NewsUnavailableNote() }
+        }
     }
+}
+
+@Composable
+private fun NewsUnavailableNote() {
+    Text(
+        text = LocalSendaStrings.current.news_offline_none,
+        fontSize = 13.sp,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 16.dp)
+    )
 }
 
 @Composable
@@ -1576,3 +1542,18 @@ fun CustomToggleRow(title: String, checked: Boolean, onCheckedChange: (Boolean) 
 private val wallpaperLabelStyle = androidx.compose.ui.text.TextStyle(
     shadow = androidx.compose.ui.graphics.Shadow(color = Color.Black.copy(alpha = 0.8f), blurRadius = 6f)
 )
+
+/**
+ * Intro de un teclado físico: se busca al SOLTAR la tecla y el campo se queda con las dos pulsaciones. Si se buscaba
+ * al pulsarla, la portada desaparecía, el foco pasaba a la barra y al soltar Intro se activaba el botón Inicio, que
+ * volvía a la página en blanco (medido: fallaba 5 de 11 arranques). El botón «Buscar» del teclado en pantalla no
+ * envía teclas y sigue usando keyboardActions.
+ */
+private fun Modifier.searchOnEnterRelease(onEnter: () -> Unit): Modifier = onPreviewKeyEvent { event ->
+    if (event.key == Key.Enter || event.key == Key.NumPadEnter) {
+        if (event.type == KeyEventType.KeyUp) onEnter()
+        true
+    } else {
+        false
+    }
+}

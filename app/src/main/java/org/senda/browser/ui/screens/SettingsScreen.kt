@@ -66,26 +66,6 @@ fun SettingsScreen(
 
     // Diálogos activos (guardado persistente para no cerrarse en cambios de tema o configuración)
     var activeDialog by rememberSaveable { mutableStateOf<String?>(null) }
-    var extensionInstallStatus by remember { mutableStateOf<String?>(null) }
-
-    // Selector de archivos para extensiones .xpi locales
-    val filePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            SendaGeckoEngine.installExtension(
-                uri = uri,
-                onSuccess = { ext ->
-                    extensionInstallStatus = strings.addon_installed_success
-                    onSettingsChanged()
-                },
-                onError = { err ->
-                    extensionInstallStatus = "${strings.addon_install_error}: ${err.message}"
-                }
-            )
-        }
-    }
-
     // Comprobador y lanzador de navegador predeterminado
     var isDefaultBrowserApp by remember {
         mutableStateOf(checkIsDefaultBrowser(context))

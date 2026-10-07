@@ -1,18 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Senda</string>
-    <string name="search_hint">Webadresse eingeben oder suchen…</string>
-    <string name="dissolve_tab">Tab schließen und bereinigen</string>
-    <string name="panic_burn_all">Alle Sitzungen vernichten</string>
-    <string name="new_tab">Neuer Tab</string>
-    <string name="tabs_open">Geöffnete Tabs</string>
-    <string name="settings">Einstellungen</string>
-    <string name="trackers_blocked">Tracker blockiert</string>
-    <string name="devtools_title">Entwicklerkonsole</string>
-    <string name="install_extension">Erweiterung installieren (.xpi)</string>
     <string name="biometric_prompt_title">Senda entsperren</string>
     <string name="biometric_prompt_desc">Authentifizieren Sie sich, um auf Ihre sicheren Sitzungen zuzugreifen</string>
-    <string name="biometric_cancel">Abbrechen</string>
     <string name="biometric_unlock_button">Entsperren</string>
     <string name="biometric_no_device_lock">Dieses Telefon hat keine PIN, kein Muster und keinen Fingerabdruck: Die Senda-Sperre kann es erst schützen, wenn du eines einrichtest.</string>
 </resources>

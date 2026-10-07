@@ -233,7 +233,7 @@ object SendaDownloadManager {
     }
 
     fun openDownloadedFile(context: Context, item: DownloadItem) {
-        val strings = SendaStrings.get("SYSTEM", context)
+        val strings = SendaStrings.forApp(context)
         try {
             val uri = if (item.filePath.startsWith("content://")) {
                 Uri.parse(item.filePath)
@@ -300,7 +300,7 @@ object SendaDownloadManager {
 
     private fun toast(context: Context, message: (SendaStringPack) -> String) {
         mainHandler.post {
-            val strings = SendaStrings.get("SYSTEM", context)
+            val strings = SendaStrings.forApp(context)
             Toast.makeText(context, message(strings), Toast.LENGTH_SHORT).show()
         }
     }

@@ -30,7 +30,7 @@ import org.senda.browser.ui.model.BrowserTab
 
 object CastHelper {
     fun openSystemCast(context: Context): Boolean {
-        val strings = org.senda.browser.core.SendaStrings.get("SYSTEM", context)
+        val strings = org.senda.browser.core.SendaStrings.forApp(context)
         val intents = listOf(
             Intent(Settings.ACTION_CAST_SETTINGS),
             Intent("android.settings.WIFI_DISPLAY_SETTINGS"),
