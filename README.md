@@ -4,9 +4,9 @@
 
 The interface is available in 8 languages: Spanish, English, German, French, Portuguese, Italian, Japanese and Chinese.
 
-> **Status: advanced alpha (0.1.3-alpha).** Its author uses it every day, but it is **not yet recommended for sensitive data**:
+> **Status: advanced alpha (0.1.4-alpha).** Its author uses it every day, but it is **not yet recommended for sensitive data**:
 > - Tested on a single phone model (Motorola moto g34 5G, Android 15).
-> - Signed release builds have been tested on that phone: startup, browsing, reader mode, Tor, uBlock Origin and Settings (0.1.1); the password vault filling in and saving accounts, the ChatGPT assistant and TV mode (a pre-release build of 0.1.2); browsing and the password vault (0.1.3).
+> - Signed release builds have been tested on that phone: startup, browsing, reader mode, Tor, uBlock Origin and Settings (0.1.1); the password vault filling in and saving accounts, the ChatGPT assistant and TV mode (a pre-release build of 0.1.2); browsing and the password vault (0.1.3, 0.1.4).
 > - It has not had an external security audit.
 >
 > Bug reports are welcome.
@@ -62,7 +62,13 @@ cd senda-browser
 
 ## Tests
 
-The tests are instrumented (`app/src/androidTest`) and need a connected phone.
+Unit tests for the Public Suffix List (`PublicSuffixListTest`) run on the host JVM:
+
+```bash
+./gradlew testDebugUnitTest
+```
+
+Instrumented tests (`app/src/androidTest`) need a connected phone.
 
 ```bash
 ./gradlew assembleDebug assembleDebugAndroidTest
