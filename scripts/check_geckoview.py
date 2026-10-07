@@ -52,17 +52,25 @@ def main() -> int:
 
     print(f"GeckoView in Senda: {current}")
     print(f"Latest published: {latest}")
+    if not newer:
+        # Already on the latest GeckoView: dot-release advisories of this major version are taken as fixed
+        # (the build number does not say which Firefox dot release it is). Advisories for a newer major
+        # version mean Firefox has fixes that GeckoView has not published yet
+        ahead = [x for x in pending if tuple(int(v) for v in x[2].split("."))[:1] > cur_major[:1]]
+        if ahead:
+            print("Firefox has security fixes not yet published as GeckoView:")
+            for mfsa, level, fixed in ahead:
+                print(f"  {mfsa} ({level} impact): fixed in Firefox {fixed} — {ADVISORIES}{mfsa.lower()}/")
+            return 1
+        print("Up to date.")
+        return 0
     if pending:
         print("Firefox security advisories newer than Senda's version:")
         for mfsa, level, fixed in pending:
             print(f"  {mfsa} ({level} impact): fixed in Firefox {fixed} — {ADVISORIES}{mfsa.lower()}/")
-    if newer and pending:
         print(f"UPDATE NEEDED: there are {len(newer)} newer version(s) and advisories not yet fixed in Senda.")
         return 1
-    if newer:
-        print(f"There are {len(newer)} newer version(s) with no associated security advisories yet: review them.")
-        return 0
-    print("Up to date.")
+    print(f"There are {len(newer)} newer version(s) with no associated security advisories yet: review them.")
     return 0
 
 
