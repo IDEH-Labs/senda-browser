@@ -33,18 +33,18 @@ import org.senda.browser.R
 import org.senda.browser.core.PreferencesManager
 
 /**
- * Modo TV: mientras el teléfono se duplica en una TV (Miracast, «Enviar pantalla» o HDMI), adapta todo
- * el teléfono, no solo Senda, para que en la TV se vea a pantalla completa y con el menor retraso:
+ * TV mode: while the phone is mirrored to a TV (Miracast, "Cast screen" or HDMI), it adapts the whole
+ * phone, not just Senda, so the TV shows it full screen and with the least delay:
  *
- *  - 60 Hz en todo el sistema: la TV no muestra más, y componer y codificar 120 imágenes por segundo
- *    es lo que retrasa y entrecorta el duplicado.
- *  - Horizontal: Telegram, la galería o cualquier app se ven ocupando la TV y no como una tira vertical.
- *  - Proporción y resolución de la TV (16:9, normalmente 1920×1080) en vez de las del móvil (20:9, p. ej.
- *    720×1600): la TV no pone franjas negras y recibe una imagen nítida, no 720p estirado.
+ *  - 60 Hz across the system: the TV shows no more, and composing and encoding 120 frames per second
+ *    is what delays and stutters the mirroring.
+ *  - Landscape: Telegram, the gallery or any app fill the TV instead of showing as a vertical strip.
+ *  - The TV's aspect ratio and resolution (16:9, usually 1920×1080) instead of the phone's (20:9, e.g.
+ *    720×1600): the TV shows no black bars and gets a sharp picture, not stretched 720p.
  *
- * Los dos primeros usan una ventana invisible de 1 px sobre las demás apps (permiso «Mostrar sobre
- * otras apps»). La proporción necesita WRITE_SECURE_SETTINGS, que solo se concede por ADB; sin él se
- * omite. Al cortar la transmisión todo vuelve exactamente a como estaba.
+ * The first two use an invisible 1 px window over other apps ("Display over other apps"
+ * permission). The aspect ratio needs WRITE_SECURE_SETTINGS, which is only granted through ADB; without it, it is
+ * skipped. When casting stops everything goes back exactly to how it was.
  */
 object SendaTvMode {
 
@@ -54,39 +54,39 @@ object SendaTvMode {
     private const val KEY_ORIGINAL_W = "original_w"
     private const val KEY_ORIGINAL_H = "original_h"
     private const val KEY_ORIGINAL_DENSITY = "original_density"
-    // Usuario de Android en el que corre Senda (con USER_CURRENT, -2, Android exige INTERACT_ACROSS_USERS)
+    // Android user Senda runs as (with USER_CURRENT, -2, Android requires INTERACT_ACROSS_USERS)
     private val userId: Int
         get() = android.os.Process.myUid() / 100_000
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private lateinit var appContext: Context
     private var overlay: View? = null
-    /** true mientras el teléfono está adaptado a la TV (horizontal, 16:9). */
+    /** true while the phone is adapted to the TV (landscape, 16:9). */
     var active by mutableStateOf(false)
         private set
 
 
-    /** true mientras la pantalla del teléfono se duplica en una TV (Miracast, «Enviar pantalla» o HDMI). */
+    /** true while the phone's screen is mirrored to a TV (Miracast, "Cast screen" or HDMI). */
     var tvConnected by mutableStateOf(false)
         private set
 
     private val displayListener = object : DisplayManager.DisplayListener {
         override fun onDisplayAdded(displayId: Int) = evaluate()
         override fun onDisplayRemoved(displayId: Int) = evaluate()
-        // El teléfono giró (o cambió de tamaño): 16:9 solo en horizontal
+        // The phone rotated (or changed size): 16:9 only in landscape
         override fun onDisplayChanged(displayId: Int) {
             if (displayId == Display.DEFAULT_DISPLAY && active) applyForRotation()
         }
     }
 
-    /** Se llama una vez al arrancar el proceso principal. */
+    /** Called once when the main process starts. */
     fun init(context: Context) {
         if (::appContext.isInitialized) {
             evaluate()
             return
         }
         appContext = context.applicationContext
-        // Si el proceso murió con la proporción de TV puesta, devolver la pantalla a la normalidad
+        // If the process died with the TV aspect ratio in place, return the screen to normal
         if (mirroringDisplay() == null) restoreDisplaySize()
         appContext.getSystemService(DisplayManager::class.java)?.registerDisplayListener(displayListener, mainHandler)
         evaluate()
@@ -97,7 +97,7 @@ object SendaTvMode {
     fun canAdaptAspect(context: Context): Boolean =
         context.checkSelfPermission(Manifest.permission.WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED
 
-    /** Revisa si hay una TV conectada y activa o retira el modo TV según corresponda. */
+    /** Checks whether a TV is connected and turns TV mode on or off accordingly. */
     fun evaluate() {
         if (!::appContext.isInitialized) return
         val tv = mirroringDisplay()
@@ -113,9 +113,9 @@ object SendaTvMode {
     }
 
     /**
-     * El usuario va a elegir la TV en el menú de Android: mientras tanto Senda queda en segundo plano y Android
-     * congela su proceso, así que el modo TV no se aplicaba hasta volver a Senda. El servicio se arranca ya
-     * (Senda aún está delante) y mantiene el proceso despierto; si en 2 minutos no se conecta ninguna TV, se detiene.
+     * The user is about to pick the TV in Android's menu: meanwhile Senda is in the background and Android
+     * freezes its process, so TV mode was not applied until returning to Senda. The service is started now
+     * (Senda is still in front) and keeps the process awake; if no TV connects within 2 minutes, it stops.
      */
     fun awaitTv() {
         if (!::appContext.isInitialized) return
@@ -129,17 +129,17 @@ object SendaTvMode {
         mainHandler.postDelayed(stopWaiting, 120_000L)
     }
 
-    /** Nombre de la TV conectada, sin el sufijo de Miracast («[R1]»). */
+    /** Name of the connected TV, without the Miracast suffix ("[R1]"). */
     var tvName by mutableStateOf<String?>(null)
         private set
 
-    /** Pantalla de la TV en la que Senda puede mostrar contenido propio (null si no hay TV conectada). */
+    /** TV display where Senda can show its own content (null if no TV is connected). */
     fun tvDisplay(): Display? = if (::appContext.isInitialized) mirroringDisplay() else null
 
     /**
-     * Desconecta la TV sin pasar por los ajustes de Android. Conectar Miracast es solo de las apps del sistema
-     * (CONFIGURE_WIFI_DISPLAY); desconectar lo puede pedir cualquier app, con una función oculta (probado en un
-     * moto g34; MediaRouter no lo hacía). Si no funcionara, se abre el panel «Enviar pantalla» para tocar «Desconectar».
+     * Disconnects the TV without going through Android's settings. Connecting Miracast is only for system apps
+     * (CONFIGURE_WIFI_DISPLAY); disconnecting can be requested by any app, through a hidden function (tested on a
+     * moto g34; MediaRouter did not do it). If it did not work, the "Cast screen" panel is opened to tap "Disconnect".
      */
     fun disconnect(context: Context) {
         SendaTvPlayer.requestReturn?.invoke()
@@ -162,29 +162,29 @@ object SendaTvMode {
 
     private fun activate(tv: Display) {
         if (active) {
-            // Ya activo: reaplicar por si el usuario cambió los ajustes
+            // Already active: reapply in case the user changed the settings
             applyForRotation()
             return
         }
         active = true
         Log.i(TAG, "TV conectada (${tv.name} ${tv.mode.physicalWidth}x${tv.mode.physicalHeight}): activando modo TV")
-        // Nunca se gira el teléfono: la ventana invisible solo fija 60 Hz (la TV no muestra más y se duplica con
-        // menos retraso)
+        // The phone is never rotated: the invisible window only sets 60 Hz (the TV shows no more and mirrors with
+        // less delay)
         updateOverlay(landscape = false)
         applyForRotation()
         try {
             appContext.startForegroundService(Intent(appContext, SendaTvModeService::class.java))
         } catch (e: Exception) {
-            // Android puede negar el servicio si Senda está en segundo plano: el modo TV sigue aplicado
-            // mientras el proceso viva, y se restaura igual al cortar la transmisión
+            // Android may refuse the service if Senda is in the background: TV mode stays applied
+            // while the process lives, and it is restored all the same when casting stops
             Log.w(TAG, "No se pudo iniciar el servicio del modo TV: ${e.message}")
         }
     }
 
     /**
-     * En vertical el teléfono queda exactamente como está (la TV lo muestra tal cual: una imagen vertical no puede
-     * llenar una TV sin cambiar la del teléfono). Cuando el usuario gira el teléfono —un video a pantalla completa en
-     * cualquier app— la imagen pasa a 16:9 y la TV se llena; en el teléfono quedan dos franjas finas en los extremos.
+     * In portrait the phone stays exactly as it is (the TV shows it as is: a portrait picture cannot
+     * fill a TV without changing the phone's). When the user rotates the phone (a full-screen video in
+     * any app) the picture switches to 16:9 and fills the TV; the phone shows two thin strips at the ends.
      */
     private fun applyForRotation() {
         val tv = mirroringDisplay() ?: return
@@ -203,7 +203,7 @@ object SendaTvMode {
         appContext.stopService(Intent(appContext, SendaTvModeService::class.java))
     }
 
-    // --- 60 Hz y horizontal en todo el sistema ---
+    // --- 60 Hz and landscape across the system ---
 
     private fun updateOverlay(landscape: Boolean) {
         if (!canDrawOverlay(appContext)) {
@@ -249,7 +249,7 @@ object SendaTvMode {
         }
     }
 
-    /** Modo de la pantalla del móvil con la menor frecuencia ≥ 59 Hz y la misma resolución (0 si no hay). */
+    /** Phone display mode with the lowest refresh rate ≥ 59 Hz and the same resolution (0 if there is none). */
     private fun lowestRefreshModeId(): Int {
         val display = appContext.getSystemService(DisplayManager::class.java)?.getDisplay(Display.DEFAULT_DISPLAY) ?: return 0
         val current = display.mode
@@ -258,7 +258,7 @@ object SendaTvMode {
             .minByOrNull { it.refreshRate }?.modeId ?: 0
     }
 
-    // --- Proporción de la TV ---
+    // --- TV aspect ratio ---
 
     private fun forceTvAspect(tv: Display) {
         if (!canAdaptAspect(appContext)) {
@@ -274,17 +274,17 @@ object SendaTvMode {
             val tvLong = maxOf(tv.mode.physicalWidth, tv.mode.physicalHeight)
             val tvShort = minOf(tv.mode.physicalWidth, tv.mode.physicalHeight)
             if (tvShort <= 0) return
-            // Proporción de la TV con el lado corto del móvil (720×1600 → 720×1280): medido el 2026-10-06 en un
-            // moto g34 duplicando en un LG, 0 imágenes perdidas de 943. Solo cambia el tamaño, nunca la densidad:
-            // a la resolución de la TV (1080×1920, densidad 459) el teléfono perdía el 6 % de las imágenes y, al
-            // cambiar la densidad, Android reiniciaba Telegram y Senda por dentro al girar (video que no deja
-            // adelantar, pestaña que «se cierra»). En par para el codificador
+            // TV aspect ratio using the phone's short side (720×1600 → 720×1280): measured on 2026-10-06 on a
+            // moto g34 mirroring to an LG, 0 of 943 frames dropped. Only the size changes, never the density:
+            // at the TV's resolution (1080×1920, density 459) the phone dropped 6 % of the frames and, when the
+            // density changed, Android restarted Telegram and Senda internally on rotation (a video that would not
+            // seek, a tab that "closes"). Even numbers for the encoder
             val phoneShort = minOf(initial.x, initial.y)
             val phoneLong = maxOf(initial.x, initial.y)
             val shortSide = phoneShort and 1.inv()
             val longSide = (phoneShort.toLong() * tvLong / tvShort).toInt().coerceAtMost(phoneLong) and 1.inv()
             if (longSide >= phoneLong - 8) {
-                // El móvil ya tiene la proporción de la TV: si quedó un tamaño forzado de antes, se quita
+                // The phone already has the TV's aspect ratio: if a forced size was left from before, it is removed
                 restoreDisplaySize()
                 return
             }
@@ -292,7 +292,7 @@ object SendaTvMode {
             if (base.x == w && base.y == h) return
             val state = appContext.getSharedPreferences(STATE_PREFS, Context.MODE_PRIVATE)
             if (!state.getBoolean(KEY_FORCED, false)) {
-                // Guardar el tamaño que tenía el usuario (normalmente el de fábrica) para devolverlo tal cual
+                // Save the size the user had (usually the factory one) to give it back exactly
                 state.edit()
                     .putBoolean(KEY_FORCED, true)
                     .putInt(KEY_ORIGINAL_W, if (base == initial) 0 else base.x)
@@ -321,7 +321,7 @@ object SendaTvMode {
             } else {
                 iface.getMethod("clearForcedDisplaySize", Int::class.java).invoke(wms, Display.DEFAULT_DISPLAY)
             }
-            // Solo una versión del 2026-10-06 cambiaba la escala (y la guardaba): las demás no la tocan
+            // Only a 2026-10-06 version changed the scale (and saved it): the others do not touch it
             if (state.contains(KEY_ORIGINAL_DENSITY)) {
                 val density = state.getInt(KEY_ORIGINAL_DENSITY, 0)
                 if (density > 0) {
@@ -344,8 +344,8 @@ object SendaTvMode {
 }
 
 /**
- * Mantiene vivo el proceso de Senda mientras dura la transmisión, para poder devolver la pantalla
- * a la normalidad en cuanto se corta, aunque se esté usando otra app.
+ * Keeps Senda's process alive while casting lasts, so the screen can be returned
+ * to normal as soon as it stops, even if another app is in use.
  */
 class SendaTvModeService : Service() {
 
@@ -397,8 +397,8 @@ class SendaTvModeService : Service() {
 }
 
 /**
- * La proporción forzada de la TV sobrevive a un reinicio o a una actualización de Senda. Recibir este
- * aviso arranca el proceso, y [SendaTvMode.init] (desde SendaApplication) devuelve la pantalla a como estaba.
+ * The forced TV aspect ratio survives a restart or an update of Senda. Receiving this
+ * broadcast starts the process, and [SendaTvMode.init] (from SendaApplication) returns the screen to how it was.
  */
 class SendaTvModeRestoreReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {

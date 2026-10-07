@@ -42,11 +42,11 @@ import org.senda.browser.core.cast.SendaCastRelay
 import org.senda.browser.core.cast.SendaTvMode
 import org.senda.browser.core.cast.SendaTvPlayer
 
-/** Si el video no empieza a sonar en la TV en este tiempo, vuelve a la pestaña. */
+/** If the video does not start playing on the TV within this time, it goes back to the tab. */
 private const val START_TIMEOUT_MS = 15_000L
 
 /**
- * Muestra [playback] en la TV como pantalla secundaria mientras esté en la composición. El teléfono no cambia.
+ * Shows [playback] on the TV as a secondary display while it is in the composition. The phone does not change.
  */
 @Composable
 fun TvPresentationHost(playback: SendaTvPlayer.Playback) {
@@ -58,15 +58,15 @@ fun TvPresentationHost(playback: SendaTvPlayer.Playback) {
             try {
                 TvVideoPresentation(context, it, playback).also { p -> p.show() }
             } catch (e: Exception) {
-                // La TV se desconectó justo ahora o Android no deja mostrar en ella
+                // The TV just disconnected or Android does not allow showing on it
                 Log.w("SendaTvPlayer", "No se pudo mostrar en la TV: ${e.message}")
                 null
             }
         }
         if (presentation == null) SendaTvPlayer.finish(null, null, userExit = false)
-        // Al salir de Senda la TV vuelve a mostrar el teléfono. Desde el ciclo de vida: en segundo plano Senda no se
-        // redibuja y la composición no se enteraría
-        // Con la pantalla del teléfono apagada (dejarlo a un lado o bloquearlo) el video sigue en la TV
+        // When leaving Senda the TV shows the phone again. From the lifecycle: in the background Senda does not
+        // redraw and the composition would not notice
+        // With the phone screen off (put aside or locked) the video stays on the TV
         val power = context.getSystemService(android.os.PowerManager::class.java)
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_STOP && power?.isInteractive != false) SendaTvPlayer.requestLeave?.invoke()
@@ -80,9 +80,9 @@ fun TvPresentationHost(playback: SendaTvPlayer.Playback) {
 }
 
 /**
- * Modo TV dentro del diálogo de transmisión: a qué TV está conectado, el video que se ve en ella (pausa y «Ver en
- * el teléfono») y «Desconectar TV». Fuera de aquí no hay nada fijo en pantalla: el botón de transmitir en color
- * indica que la TV está conectada.
+ * TV mode inside the cast dialog: which TV it is connected to, the video shown on it (pause and "Watch on
+ * the phone") and "Disconnect TV". Outside of this there is nothing fixed on screen: the colored cast button
+ * shows that the TV is connected.
  */
 @Composable
 fun TvControlsCard(onDone: () -> Unit) {
@@ -161,7 +161,7 @@ fun TvControlsCard(onDone: () -> Unit) {
     }
 }
 
-/** Posición del video de la TV según el reproductor (sin scripts en la página). */
+/** Position of the TV video according to the player (no scripts in the page). */
 private class TvMediaClock {
     var everPlayed = false
     var playing = false
@@ -186,8 +186,8 @@ private class TvMediaClock {
 }
 
 /**
- * Lo que se ve en la TV: el video a pantalla completa sobre negro, a la resolución de la TV. Android la retira
- * sola si la TV se desconecta (onStop), y entonces el video vuelve a la pestaña donde iba.
+ * What is shown on the TV: the video full screen over black, at the TV's resolution. Android removes it
+ * on its own if the TV disconnects (onStop), and then the video goes back to the tab where it was.
  */
 private class TvVideoPresentation(
     context: Context,
@@ -231,7 +231,7 @@ private class TvVideoPresentation(
                     session: GeckoSession,
                     perm: GeckoSession.PermissionDelegate.ContentPermission
                 ): GeckoResult<Int> {
-                    // Solo la reproducción automática: el video debe empezar solo en la TV. Nada más se concede
+                    // Autoplay only: the video must start on its own on the TV. Nothing else is granted
                     val allowed = perm.permission == GeckoSession.PermissionDelegate.PERMISSION_AUTOPLAY_AUDIBLE ||
                         perm.permission == GeckoSession.PermissionDelegate.PERMISSION_AUTOPLAY_INAUDIBLE
                     return GeckoResult.fromValue(
@@ -273,8 +273,8 @@ private class TvVideoPresentation(
     }
 
     private fun showFile(root: FrameLayout, file: SendaTvPlayer.Playback.File) {
-        // El reproductor de Android no usa el proxy de Senda ni sabe el Referer: pide el video a un relé local
-        // (solo 127.0.0.1) que lo trae como la página, por el mismo proxy o Tor
+        // Android's player does not use Senda's proxy and does not know the Referer: it asks a local relay for the video
+        // (127.0.0.1 only), which fetches it the way the page did, through the same proxy or Tor
         val prefs = org.senda.browser.core.PreferencesManager(context)
         val r = try {
             SendaCastRelay.open(java.net.InetAddress.getByName("127.0.0.1"), file.media.referer, SendaCastRelay.proxyFrom(prefs))
@@ -286,7 +286,7 @@ private class TvVideoPresentation(
         relay = r
         val view = VideoView(context)
         videoView = view
-        // Centrado y con su proporción: VideoView ajusta el tamaño al video dentro del espacio disponible
+        // Centered and with its aspect ratio: VideoView fits the size to the video within the available space
         root.addView(view, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER))
         view.setOnPreparedListener { mp ->
             if (file.startSeconds > 0) mp.seekTo(file.startSeconds * 1000L, android.media.MediaPlayer.SEEK_CLOSEST)
@@ -324,11 +324,11 @@ private class TvVideoPresentation(
         SendaTvPlayer.requestReturn = null
         SendaTvPlayer.requestLeave = null
         SendaTvPlayer.finish(positionSeconds(), clock.duration.takeIf { it > 0.0 }, userExit, resumeOnPhone)
-        // Se cierra sola: con Senda en segundo plano su interfaz no se redibuja y la TV seguía mostrando el video
+        // It closes on its own: with Senda in the background its UI is not redrawn and the TV kept showing the video
         handler.post { close() }
     }
 
-    /** La TV se desconectó o Android retiró la pantalla secundaria. */
+    /** The TV disconnected or Android removed the secondary display. */
     override fun onStop() {
         finish(userExit = false)
         super.onStop()

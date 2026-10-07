@@ -110,8 +110,8 @@ fun getSendaTypography(
     fontFamily: FontFamily = SerifFontFamily,
     hinting: String = "SLIGHT"
 ): Typography {
-    // Los estilos que no se definen aquí (títulos de diálogo, descripciones, etiquetas pequeñas) tomaban la
-    // fuente por defecto de Android y la interfaz mezclaba dos o tres tipos de letra. Todos usan la elegida
+    // Styles not defined here (dialog titles, descriptions, small labels) used to take Android's
+    // default font and the UI mixed two or three typefaces. They all use the chosen one
     val defaults = Typography()
     val custom = Typography(
         displayLarge = TextStyle(

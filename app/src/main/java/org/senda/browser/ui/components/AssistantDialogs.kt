@@ -45,14 +45,14 @@ import org.senda.browser.core.assistant.RemoteAiException
 import org.senda.browser.core.assistant.SendaAssistant
 import org.senda.browser.ui.model.BrowserTab
 
-/** Texto para el usuario a partir de un fallo del proveedor (sin detalles técnicos que no ayudan). */
+/** User-facing text for a provider failure (without technical details that do not help). */
 fun assistantErrorText(e: Throwable, strings: SendaStringPack, destination: String): String = when (e) {
     is RemoteAiException -> when (e.kind) {
         RemoteAiException.Kind.NOT_CONFIGURED -> strings.as_err_incomplete
         RemoteAiException.Kind.AUTH -> strings.as_err_auth
         RemoteAiException.Kind.RATE_LIMIT -> strings.as_err_rate
         RemoteAiException.Kind.NETWORK -> strings.as_err_network.format(destination)
-        // Código HTTP y el comienzo del mensaje de OpenAI
+        // HTTP code and the beginning of OpenAI's message
         RemoteAiException.Kind.BAD_RESPONSE -> strings.as_err_bad.format(e.message?.take(80)?.ifBlank { null } ?: "?")
         RemoteAiException.Kind.USAGE_LIMIT -> strings.as_chatgpt_limit
         RemoteAiException.Kind.NOT_ELIGIBLE -> strings.as_chatgpt_not_eligible
@@ -60,7 +60,7 @@ fun assistantErrorText(e: Throwable, strings: SendaStringPack, destination: Stri
     else -> strings.as_err_network.format(destination)
 }
 
-/** Abre una dirección en el navegador predeterminado (normalmente el propio Senda). */
+/** Opens an address in the default browser (usually Senda itself). */
 fun openInBrowser(context: Context, url: String) {
     try {
         context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
@@ -69,10 +69,10 @@ fun openInBrowser(context: Context, url: String) {
 }
 
 /**
- * Inicio de sesión de OpenAI en otro navegador del teléfono (RFC 8252: navegador externo). En Senda, el bloqueo
- * estricto de rastreadores y uBlock cortan peticiones que necesita la página de OpenAI y el botón no responde
- * (probado el 2026-10-05); no se rebajan las protecciones de Senda para todos los sitios por esto. La vuelta llega
- * igual a Senda por 127.0.0.1. Sin otro navegador instalado, se abre en Senda.
+ * OpenAI sign-in in another browser on the phone (RFC 8252: external browser). In Senda, strict
+ * tracker blocking and uBlock cut requests OpenAI's page needs and the button does not respond
+ * (tested on 2026-10-05); Senda's protections are not lowered for every site because of this. The redirect still
+ * reaches Senda through 127.0.0.1. With no other browser installed, it opens in Senda.
  */
 fun openSignInBrowser(context: Context, url: String) {
     val uri = android.net.Uri.parse(url)
@@ -89,7 +89,7 @@ fun openSignInBrowser(context: Context, url: String) {
     try { context.startActivity(chooser) } catch (_: android.content.ActivityNotFoundException) { openInBrowser(context, url) }
 }
 
-/** Aviso obligatorio de OpenAI al usar el plan de ChatGPT por primera vez, con su logo. */
+/** OpenAI's mandatory notice when using the ChatGPT plan for the first time, with its logo. */
 @Composable
 fun ChatGptWelcomeDialog(onDismiss: () -> Unit) {
     val strings = LocalSendaStrings.current
@@ -102,10 +102,10 @@ fun ChatGptWelcomeDialog(onDismiss: () -> Unit) {
     )
 }
 
-/** Aviso de límite de uso del plan, con la acción «Manage usage» que exige la guía de OpenAI. */
+/** Plan usage limit notice, with the "Manage usage" action required by OpenAI's guide. */
 /**
- * Límite de uso de la IA en uso alcanzado (plan de ChatGPT o cuota de la clave, p. ej. el nivel gratuito de Gemini).
- * Dice qué pasó y ofrece lo útil: seguir con otra IA conectada o ver el uso en la página oficial de esa empresa.
+ * Usage limit of the AI in use reached (ChatGPT plan or the key's quota, e.g. Gemini's free tier).
+ * Says what happened and offers what is useful: continue with another connected AI or see usage on that company's official page.
  */
 @Composable
 fun UsageLimitDialog(prefs: PreferencesManager, onSwitched: () -> Unit, onDismiss: () -> Unit) {
@@ -113,7 +113,7 @@ fun UsageLimitDialog(prefs: PreferencesManager, onSwitched: () -> Unit, onDismis
     val context = LocalContext.current
     val current = prefs.assistantProvider ?: SendaAssistant.PROVIDER_ID
     val name = SendaAssistant.displayName(current)
-    // Otra IA ya conectada y aceptada a la que pasar con un toque (ChatGPT primero)
+    // Another AI already connected and accepted to switch to with one tap (ChatGPT first)
     val alternative = SendaAssistant.connected(prefs).firstOrNull { it != current && prefs.assistantConsentFor(it) }
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -150,7 +150,7 @@ internal fun ChatGptLogo(sizeDp: Int) {
     )
 }
 
-/** Configuración del asistente: proveedor, clave cifrada, prueba de conexión, modelo y aviso de privacidad. */
+/** Assistant settings: provider, encrypted key, connection test, model and privacy notice. */
 private data class AssistantMessage(
     val role: ChatTurn.Role,
     val shown: String,
@@ -159,13 +159,13 @@ private data class AssistantMessage(
     val sources: List<Source> = emptyList()
 )
 
-/** Fotos y PDF: lo que ChatGPT acepta con el plan (medido el 2026-10-06). */
+/** Photos and PDF: what ChatGPT accepts with the plan (measured on 2026-10-06). */
 private const val ATTACH_MAX_MB = 20
 private const val IMAGE_MAX_SIDE = 1600
 
 /**
- * Prepara un archivo elegido por el usuario: las fotos se reducen a 1600 px en JPEG (ChatGPT no necesita más y la
- * petición pesa mucho menos); los PDF van tal cual hasta 20 MB. Otros tipos no se aceptan.
+ * Prepares a file chosen by the user: photos are reduced to 1600 px JPEG (ChatGPT needs no more and the
+ * request is much lighter); PDFs go as they are up to 20 MB. Other types are not accepted.
  */
 private fun readAttachment(context: Context, uri: android.net.Uri): Result<Attachment> = runCatching {
     val resolver = context.contentResolver
@@ -206,7 +206,7 @@ private fun readAttachment(context: Context, uri: android.net.Uri): Result<Attac
     }
 }
 
-/** Chat con ChatGPT. La página solo se envía si el usuario la incluye en ese mensaje. */
+/** Chat with ChatGPT. The page is only sent if the user includes it in that message. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SendaAssistantSheet(prefs: PreferencesManager, activeTab: BrowserTab?, onDismiss: () -> Unit) {
@@ -224,17 +224,17 @@ fun SendaAssistantSheet(prefs: PreferencesManager, activeTab: BrowserTab?, onDis
     val pending = remember { mutableStateListOf<Attachment>() }
     val listState = rememberLazyListState()
     val hasPage = activeTab != null && activeTab.url.isNotBlank() && activeTab.url != "about:blank"
-    // Cambia al pasar a otra IA desde el aviso de límite
+    // Changes when switching to another AI from the limit notice
     var switched by remember { mutableIntStateOf(0) }
     val destination = remember(switched) { SendaAssistant.destination(prefs) }
-    // Lo que la IA elegida tiene comprobado: el chat no ofrece lo demás
+    // What the chosen AI has verified: the chat does not offer anything else
     val backend = remember(configured, switched) { runCatching { SendaAssistant.client(prefs) }.getOrNull() }
     val usingChatGpt = backend is ChatGptPlanClient
     val language = remember { org.senda.browser.core.SendaLocaleManager.getEffectiveLanguage(prefs.appLanguage, context) }
     var showLimit by remember { mutableStateOf(false) }
     if (showLimit) UsageLimitDialog(prefs, onSwitched = { switched++ }, onDismiss = { showLimit = false })
 
-    // Fotos y PDF: el selector del sistema; Senda no ve más archivos que los elegidos
+    // Photos and PDF: the system picker; Senda sees no files other than the chosen ones
     val picker = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.OpenMultipleDocuments()
     ) { uris ->
@@ -279,21 +279,21 @@ fun SendaAssistantSheet(prefs: PreferencesManager, activeTab: BrowserTab?, onDis
             includePage = false
             try {
                 val turns = messages.map { ChatTurn(it.role, it.sent, it.attachments) }
-                // Si la IA en uso aún no tiene modelo (recién conectada o retirado), se elige ahora
+                // If the AI in use has no model yet (just connected or retired), it is chosen now
                 val model = SendaAssistant.ensureModel(prefs)
                 val reply = SendaAssistant.client(prefs).chat(model, SendaAssistant.systemPrompt(language), turns, deep && backend?.canThinkDeep == true) { partial = it }
                 messages += AssistantMessage(ChatTurn.Role.ASSISTANT, reply.text, reply.text, sources = reply.sources)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
-                // El error no entra en el historial que se envía: solo se muestra
+                // The error does not go into the history that is sent: it is only shown
                 messages.removeAt(messages.lastIndex)
-                // La empresa retiró el modelo o no sirve para conversar (pasa: Google retira modelos con frecuencia):
-                // se olvida y, al volver a usar esa IA en «Mis IA», Senda elige otro que funcione
+                // The company retired the model or it is not for chatting (it happens: Google retires models often):
+                // it is forgotten and, when that AI is used again in "My AIs", Senda picks another one that works
                 val modelGone = e is RemoteAiException && e.kind == RemoteAiException.Kind.BAD_RESPONSE &&
                     Regex("HTTP 40[04]").containsMatchIn(e.message.orEmpty()) && e.message.orEmpty().contains("model", ignoreCase = true)
                 if (modelGone) {
-                    // Se olvida: el próximo mensaje elegirá otro modelo que funcione (ensureModel)
+                    // Forgotten: the next message will pick another model that works (ensureModel)
                     prefs.assistantProvider?.let { prefs.setAssistantModelFor(it, "") }
                     Toast.makeText(context, strings.as_model_gone, Toast.LENGTH_LONG).show()
                 } else if (e is RemoteAiException && e.kind == RemoteAiException.Kind.USAGE_LIMIT) showLimit = true
@@ -318,7 +318,7 @@ fun SendaAssistantSheet(prefs: PreferencesManager, activeTab: BrowserTab?, onDis
                 showSettings = false
                 configured = SendaAssistant.isConfigured(prefs)
             },
-            // La página de OpenAI queda a la vista: se cierran el cuadro y la hoja del asistente
+            // OpenAI's page is left in view: the dialog and the assistant sheet are closed
             onLeaveForSignIn = { showSettings = false; busy?.cancel(); onDismiss() }
         )
     }
@@ -329,7 +329,7 @@ fun SendaAssistantSheet(prefs: PreferencesManager, activeTab: BrowserTab?, onDis
                 Column(modifier = Modifier.weight(1f)) {
                     Text(strings.as_menu_title, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     if (configured) {
-                        // Nombre de la IA (no la dirección técnica) y su modelo
+                        // Name of the AI (not the technical address) and its model
                         val aiName = remember(switched) { SendaAssistant.displayName(prefs.assistantProvider ?: SendaAssistant.PROVIDER_ID) }
                         Text(strings.as_sending_to.format(aiName, SendaAssistant.model(prefs).ifBlank { strings.as_model_pending }),
                             fontSize = 11.sp, color = MaterialTheme.colorScheme.primary, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
@@ -368,7 +368,7 @@ fun SendaAssistantSheet(prefs: PreferencesManager, activeTab: BrowserTab?, onDis
                     }
                 }
             }
-            // Opciones del mensaje: página, pensar a fondo y crear imágenes (en chatgpt.com: aquí OpenAI no lo permite)
+            // Message options: page, think deeply and create images (on chatgpt.com: OpenAI does not allow it here)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (hasPage) {
                     FilterChip(selected = includePage, onClick = { includePage = !includePage }, label = { Text(strings.as_include_page, fontSize = 12.sp) })
@@ -398,7 +398,7 @@ fun SendaAssistantSheet(prefs: PreferencesManager, activeTab: BrowserTab?, onDis
                     }
                 }
             }
-            // Etiqueta obligatoria de OpenAI junto al cuadro de escritura cuando se usa el plan
+            // OpenAI's mandatory label next to the input box when the plan is used
             if (usingChatGpt) Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
                 ChatGptLogo(14)
                 Spacer(Modifier.width(6.dp))
@@ -445,7 +445,7 @@ private fun AssistantBubble(m: AssistantMessage, strings: SendaStringPack, conte
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         m.sources.forEach { src ->
                             if (src.url.isBlank()) {
-                                // Servicio de datos de OpenAI sin página (p. ej. el tiempo): se nombra, no se abre
+                                // OpenAI data service without a page (e.g. the weather): it is named, not opened
                                 AssistChip(onClick = {}, enabled = false, label = { Text("OpenAI · ${src.title}", fontSize = 11.sp, maxLines = 1) })
                             } else {
                                 val host = runCatching { java.net.URL(src.url).host.removePrefix("www.") }.getOrDefault(src.url)

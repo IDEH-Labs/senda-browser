@@ -16,9 +16,9 @@ import java.net.URL
 import java.net.URLDecoder
 
 /**
- * «Sign in with ChatGPT» sin cuenta real: la URL que acepta OpenAI, la escucha local en 127.0.0.1:1455, la
- * comprobación de state y el canje en el endpoint de tokens (un código falso debe ser rechazado).
- * No guarda sesión: solo el identificador de instalación (ext_agent_host_id), que es necesario de todos modos.
+ * "Sign in with ChatGPT" without a real account: the URL OpenAI accepts, the local listener on 127.0.0.1:1455, the
+ * state check and the exchange at the token endpoint (a fake code must be rejected).
+ * Stores no session: only the installation identifier (ext_agent_host_id), which is needed anyway.
  */
 @RunWith(AndroidJUnit4::class)
 class SendaChatGptPlanTest {
@@ -29,13 +29,13 @@ class SendaChatGptPlanTest {
     fun loopbackFlowReachesTokenEndpoint() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val prefs = PreferencesManager(context)
-        // Con una sesión real del usuario no se prueba: el inicio de sesión de prueba usaría su cliente y su id_token
+        // Not tested with the user's real session: the test sign-in would use their client and their id_token
         org.junit.Assume.assumeTrue("Hay una sesión real de ChatGPT en este teléfono", !ChatGptPlanAuth.isSignedIn(prefs) && prefs.assistantChatGptClientId.isBlank())
         var authorizeUrl = ""
         try {
             ChatGptPlanAuth.signIn(context, prefs) { url ->
                 authorizeUrl = url
-                // En vez de abrir el navegador, el «navegador» vuelve al instante con un código falso
+                // Instead of opening the browser, the "browser" returns at once with a fake code
                 val q = url.substringAfter('?').split('&').associate {
                     it.substringBefore('=') to URLDecoder.decode(it.substringAfter('='), "UTF-8")
                 }
@@ -58,7 +58,7 @@ class SendaChatGptPlanTest {
         assertTrue(prefs.assistantChatGptHostId.startsWith("urn:uuid:"))
         assertEquals(false, ChatGptPlanAuth.isSignedIn(prefs))
 
-        // La URL generada en el teléfono la acepta OpenAI (302 a su inicio de sesión, no 400)
+        // OpenAI accepts the URL generated on the phone (302 to its sign-in page, not 400)
         val probe = (URL(authorizeUrl).openConnection() as HttpURLConnection).apply {
             instanceFollowRedirects = false; connectTimeout = 15000; readTimeout = 15000
             setRequestProperty("User-Agent", org.senda.browser.core.SendaNet.USER_AGENT)

@@ -17,10 +17,10 @@ import java.net.ServerSocket
 import kotlin.concurrent.thread
 
 /**
- * Clientes por clave de API sin claves reales: un servidor en 127.0.0.1 responde con los formatos documentados
- * (OpenAI-compatible: /models y /chat/completions en SSE; Anthropic: /v1/models y /v1/messages en SSE). Comprueba
- * que Senda lista modelos, junta el texto que llega por partes, envía la clave en la cabecera correcta y traduce
- * los errores. No comprueba el comportamiento real de cada empresa.
+ * API-key clients without real keys: a server on 127.0.0.1 answers with the documented formats
+ * (OpenAI-compatible: /models and /chat/completions over SSE; Anthropic: /v1/models and /v1/messages over SSE). Checks
+ * that Senda lists models, joins text that arrives in parts, sends the key in the right header and translates
+ * errors. It does not check each company's real behavior.
  */
 @RunWith(AndroidJUnit4::class)
 class SendaApiClientsTest {
@@ -88,7 +88,7 @@ class SendaApiClientsTest {
 
     @Test
     fun openAiCompatibleListsAndStreams() = runBlocking {
-        // Grok y Mistral muestran todos los modelos; Gemini solo los de conversación de Gemini
+        // Grok and Mistral show every model; Gemini only Gemini's chat models
         assertEquals(listOf("gemini-3-pro", "grok-5"), ApiProvider.XAI.clientAt("$base/openai", "clave-de-prueba").listModels())
         val client = ApiProvider.GEMINI.clientAt("$base/openai", "clave-de-prueba")
         assertEquals(listOf("gemini-3-pro"), client.listModels())
@@ -126,16 +126,16 @@ class SendaApiClientsTest {
         Unit
     }
 
-    /** Modelo automático: se salta el retirado (404) y se queda con el primero que responde. */
+    /** Automatic model: skips the retired one (404) and keeps the first one that answers. */
     @Test
     fun autoModelSkipsRetired() = runBlocking {
         val client = ApiProvider.GEMINI.clientAt("$base/auto", "clave-de-prueba")
-        // Primero el flash de versión más alta (gemini-9-flash, retirado en el simulador)
+        // First the flash model with the highest version (gemini-9-flash, retired in the simulator)
         assertEquals(listOf("gemini-9-flash", "gemini-8-flash"), client.listModels())
         assertEquals("gemini-8-flash", org.senda.browser.core.assistant.SendaAssistant.autoSelectModel(client))
     }
 
-    /** Cuota agotada (429 «quota»): aviso de límite, no «ocupado». */
+    /** Quota exhausted (429 "quota"): limit notice, not "busy". */
     @Test
     fun quotaIsUsageLimit() = runBlocking {
         nextStatus = 429
@@ -148,7 +148,7 @@ class SendaApiClientsTest {
         Unit
     }
 
-    /** «Demasiada demanda» (503) una vez: se reintenta solo y responde. */
+    /** "Too much demand" (503) once: retried automatically and answers. */
     @Test
     fun busyIsRetriedOnce() = runBlocking {
         fail503Once = true

@@ -4,9 +4,9 @@ import org.mozilla.geckoview.GeckoResult
 import org.mozilla.geckoview.GeckoSession
 
 /**
- * Representa los diferentes tipos de solicitudes y diálogos interactivos que una página web
- * o el motor Gecko pueden disparar (menús desplegables <select>, alertas, confirmaciones,
- * subida de archivos, etc.).
+ * The different kinds of requests and interactive dialogs a web page
+ * or the Gecko engine can trigger (<select> dropdowns, alerts, confirmations,
+ * file uploads, etc.).
  */
 sealed interface SendaPrompt {
     data class Choice(
@@ -44,50 +44,50 @@ sealed interface SendaPrompt {
         val result: GeckoResult<GeckoSession.PromptDelegate.PromptResponse>
     ) : SendaPrompt
 
-    /** <input type="date|time|datetime-local|month">: sin esto el campo no abre ningún selector. */
+    /** <input type="date|time|datetime-local|month">: without this the field opens no picker. */
     data class DateTime(
         val prompt: GeckoSession.PromptDelegate.DateTimePrompt,
         val result: GeckoResult<GeckoSession.PromptDelegate.PromptResponse>
     ) : SendaPrompt
 
-    /** Un sitio pide ubicación, cámara, micrófono o notificaciones y el ajuste es «Preguntar». */
+    /** A site asks for location, camera, microphone or notifications and the setting is "Ask". */
     data class Permission(
         val host: String,
         val kinds: List<PermissionKind>,
         val onDecision: (Boolean) -> Unit
     ) : SendaPrompt
 
-    /** «Abrir enlaces en apps» en «Preguntar»: [appName] es null si Android mostraría su selector. */
+    /** "Open links in apps" set to "Ask": [appName] is null if Android would show its chooser. */
     data class OpenInApp(
         val appName: String?,
         val onDecision: (Boolean) -> Unit
     ) : SendaPrompt
 
-    /** Autenticación HTTP (Basic/Digest) o de proxy: sin esto la página quedaba en 401 sin poder entrar. */
+    /** HTTP (Basic/Digest) or proxy authentication: without this the page stayed at 401 with no way in. */
     data class Auth(
         val prompt: GeckoSession.PromptDelegate.AuthPrompt,
         val result: GeckoResult<GeckoSession.PromptDelegate.PromptResponse>
     ) : SendaPrompt
 
-    /** Formulario de inicio de sesión con cuentas guardadas en la Bóveda (sin contraseña hasta identificarse). */
+    /** Sign-in form with accounts saved in the vault (no password until authenticating). */
     data class LoginSelect(
         val request: GeckoSession.PromptDelegate.AutocompleteRequest<org.mozilla.geckoview.Autocomplete.LoginSelectOption>,
         val result: GeckoResult<GeckoSession.PromptDelegate.PromptResponse>
     ) : SendaPrompt
 
-    /** Se envió un inicio de sesión con una cuenta que no está en la Bóveda: ofrecer guardarla. */
+    /** A sign-in was submitted with an account that is not in the vault: offer to save it. */
     data class LoginSave(
         val request: GeckoSession.PromptDelegate.AutocompleteRequest<org.mozilla.geckoview.Autocomplete.LoginSaveOption>,
         val result: GeckoResult<GeckoSession.PromptDelegate.PromptResponse>
     ) : SendaPrompt
 
-    /** Un script tarda demasiado: el usuario decide si se detiene ([onDecision] true) o se espera. */
+    /** A script is taking too long: the user decides whether to stop it ([onDecision] true) or wait. */
     data class SlowScript(
         val host: String,
         val onDecision: (stop: Boolean) -> Unit
     ) : SendaPrompt
 
-    /** La página inició una descarga y «Preguntar dónde guardar» está apagado: confirmar antes de guardar. */
+    /** The page started a download and "Ask where to save" is off: confirm before saving. */
     data class Download(
         val fileName: String,
         val host: String,
@@ -95,7 +95,7 @@ sealed interface SendaPrompt {
         val onDecision: (Boolean) -> Unit
     ) : SendaPrompt
 
-    /** Pulsación larga sobre un enlace, una imagen o un video. */
+    /** Long press on a link, an image or a video. */
     data class ContextMenu(
         val element: GeckoSession.ContentDelegate.ContextElement
     ) : SendaPrompt

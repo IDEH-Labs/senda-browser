@@ -76,7 +76,7 @@ fun BrowserScreen(
     var isAddressBarEditing by remember { mutableStateOf(false) }
     var showFindBar by remember { mutableStateOf(false) }
 
-    // Miniaturas de la vista de pestañas: se capturan de la vista web visible, se reducen y quedan solo en memoria
+    // Tab view thumbnails: captured from the visible web view, reduced and kept in memory only
     var geckoView by remember { mutableStateOf<GeckoView?>(null) }
     fun captureThumbnail() {
         val view = geckoView ?: return
@@ -88,7 +88,7 @@ fun BrowserScreen(
         try {
             view.capturePixels().accept({ bitmap ->
                 if (bitmap == null || bitmap.width == 0 || bitmap.height == 0) return@accept
-                // La vista ya puede mostrar otra pestaña cuando llega la captura
+                // The view may already be showing another tab when the capture arrives
                 if (view.session !== tab.session) {
                     bitmap.recycle()
                     return@accept
@@ -107,36 +107,36 @@ fun BrowserScreen(
         captureThumbnail()
         showTabsSheet = true
     }
-    // Fallo de la traducción (sin red para bajar el modelo, idioma no admitido…)
+    // Translation failure (no network to download the model, unsupported language…)
     LaunchedEffect(activeTab?.translationError) {
         if (activeTab?.translationError != null) {
             android.widget.Toast.makeText(context, strings.translate_failed, android.widget.Toast.LENGTH_LONG).show()
         }
     }
-    // Al terminar de cargar una página, actualizar su miniatura
+    // When a page finishes loading, update its thumbnail
     LaunchedEffect(activeTab?.id, activeTab?.isLoading, activeTab?.url) {
         if (activeTab != null && !activeTab.isLoading) {
             kotlinx.coroutines.delay(800)
             captureThumbnail()
         }
     }
-    // Al cambiar de pestaña la búsqueda anterior ya no aplica
+    // When switching tabs the previous search no longer applies
     LaunchedEffect(activeTab?.id) { showFindBar = false }
 
-    // Prioridad 1: Si hay un video o elemento web en pantalla completa, salir de pantalla completa
+    // Priority 1: if a video or web element is in full screen, exit full screen
     BackHandler(enabled = activeTab?.isFullScreen == true) {
         activeTab?.exitFullScreen()
     }
 
-    // Prioridad 2: Interceptar gesto/botón Atrás cuando la barra de direcciones está en edición para cerrarla
+    // Priority 2: intercept the Back gesture/button while the address bar is being edited, to close it
     BackHandler(enabled = activeTab?.isFullScreen != true && isAddressBarEditing) {
         isAddressBarEditing = false
     }
 
-    // Prioridad 3: Interceptar botón atrás si la pestaña actual puede retroceder en su historial web
-    // Salida de emergencia: una página que se vuelve a poner delante al retroceder (redirección o pushState)
-    // dejaba a Senda sin poder cerrarse con Atrás. Si 3 pulsaciones seguidas no retroceden en el historial
-    // de la pestaña, Atrás saca a Senda a segundo plano. Retroceder rápido por páginas reales sí baja la posición
+    // Priority 3: intercept the back button if the current tab can go back in its web history
+    // Emergency exit: a page that puts itself in front again when going back (redirect or pushState)
+    // left Senda unable to close with Back. If 3 presses in a row do not go back in the tab's
+    // history, Back sends Senda to the background. Going back quickly through real pages does lower the position
     var backTrapTabId by remember { mutableStateOf<String?>(null) }
     var backTrapIndex by remember { mutableIntStateOf(-1) }
     var backTrapCount by remember { mutableIntStateOf(0) }
@@ -164,7 +164,7 @@ fun BrowserScreen(
         tab.goBack()
     }
 
-    // Prioridad 4: pestaña abierta desde un enlace y sin historial propio: cerrarla y volver a la de origen
+    // Priority 4: tab opened from a link and with no history of its own: close it and return to the original one
     val parentTab = activeTab?.parentTabId?.let { id -> tabs.firstOrNull { it.id == id } }
     BackHandler(enabled = activeTab?.isFullScreen != true && !isAddressBarEditing && activeTab?.canGoBack != true && parentTab != null) {
         val child = activeTab ?: return@BackHandler
@@ -173,19 +173,19 @@ fun BrowserScreen(
         onCloseTab(child)
     }
 
-    // Una sola función: sin TV, el botón abre el panel de Android para elegirla (solo el sistema puede conectar);
-    // con TV, sus controles. Los videos pasan solos a la TV
+    // A single feature: without a TV, the button opens Android's panel to pick it (only the system can connect);
+    // with a TV, its controls. Videos move to the TV on their own
     val openCast: () -> Unit = {
         if (org.senda.browser.core.cast.SendaTvMode.tvConnected) {
             showCastDialog = true
         } else if (prefs.tvModeEnabled) {
             fun startMirroring() {
                 org.senda.browser.core.cast.SendaTvMode.evaluate()
-                // Que Android no congele Senda mientras se elige la TV: el modo TV se aplica al conectar
+                // Keep Android from freezing Senda while the TV is being picked: TV mode is applied on connecting
                 org.senda.browser.core.cast.SendaTvMode.awaitTv()
                 org.senda.browser.ui.components.CastHelper.openSystemCast(context)
             }
-            // Sin permiso de notificaciones Android oculta la del modo TV y su botón «Pantalla normal»
+            // Without notification permission Android hides the TV mode notification and its "Normal screen" button
             val requester = org.senda.browser.ui.model.BrowserTab.androidPermissionRequester
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU && requester != null) {
                 requester(listOf(android.Manifest.permission.POST_NOTIFICATIONS)) { startMirroring() }
@@ -202,7 +202,7 @@ fun BrowserScreen(
     val showCast = prefs.showCastButton
     val isFullWidth = prefs.toolbarFullWidth
     val showBookmarksBar = prefs.showBookmarksBar
-    // Pantalla completa inmersiva solo cuando el usuario la activa en la pestaña
+    // Immersive full screen only when the user turns it on in the tab
     val isFullScreen = activeTab?.isFullScreen == true
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -299,7 +299,7 @@ fun BrowserScreen(
                         onCloseAllTabs = onCloseAllTabs
                     )
                 }
-                // Barra de favoritos: bajo la barra superior, o arriba del todo si la barra va abajo
+                // Bookmarks bar: below the top bar, or at the very top if the bar is at the bottom
                 if (showBookmarksBar && !isFullScreen && !showTabsSheet && !isAddressBarEditing) {
                     BookmarksBar(
                         prefs = prefs,
@@ -325,10 +325,10 @@ fun BrowserScreen(
                             onRestore = { activeTab.restoreSession() }
                         )
                     } else {
-                        // Contenedor GeckoView para renderizado web con Gecko.
-                        // En pantalla completa horizontal con "Llenar pantalla", la vista se hace 16:9 a lo ancho
-                        // (más alta que la pantalla 20:9 y recortada arriba/abajo), así el video ocupa toda la pantalla
-                        // sin franjas laterales y sin tocar el contenido de la página.
+                        // GeckoView container for web rendering with Gecko.
+                        // In landscape full screen with "Fill screen", the view becomes 16:9 across the width
+                        // (taller than the 20:9 screen and cropped top/bottom), so the video fills the whole screen
+                        // without side bars and without touching the page content.
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -362,7 +362,7 @@ fun BrowserScreen(
                     )
                 }
 
-                // Lienzo Zen visible solo cuando la pestaña esté vacía
+                // Zen canvas visible only when the tab is empty
                 if (activeTab == null || activeTab.url == "about:blank" || activeTab.url.isBlank()) {
                     Box(
                         modifier = Modifier
@@ -386,7 +386,7 @@ fun BrowserScreen(
             }
         }
 
-        // Hoja / Vista completa de gestión de pestañas
+        // Tab management sheet / full view
         if (showTabsSheet) {
             TabsOverview(
                 tabs = tabs,
@@ -413,7 +413,7 @@ fun BrowserScreen(
             )
         }
 
-        // Hoja de DevTools nativo
+        // Native DevTools sheet
         if (showDevToolsSheet) {
             DevToolsSheet(
                 activeTab = activeTab,
@@ -421,13 +421,13 @@ fun BrowserScreen(
             )
         }
 
-        // Asistente con la IA externa que configure el usuario
+        // Assistant with the external AI the user sets up
         if (showAssistant) {
             org.senda.browser.ui.components.SendaAssistantSheet(prefs = prefs, activeTab = activeTab, onDismiss = { showAssistant = false })
         }
 
-        // Duplicando en una TV: el video que suena pasa a la TV como pantalla secundaria (el teléfono no cambia)
-        // Cada vuelta de Senda a primer plano: el video que se retiró al salir vuelve a la TV desde donde iba
+        // Mirroring to a TV: the playing video moves to the TV as a secondary display (the phone does not change)
+        // Every time Senda comes back to the foreground: the video removed on leaving returns to the TV from where it was
         val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
         var foregroundCount by remember { mutableIntStateOf(0) }
         DisposableEffect(lifecycleOwner) {
@@ -443,8 +443,8 @@ fun BrowserScreen(
             org.senda.browser.core.cast.SendaMediaCatalog.version,
             foregroundCount
         ) {
-            // Con el modo TV la TV muestra el teléfono en formato TV: el video se ve en los dos a la vez y en tiempo real
-            // (pantalla completa o teléfono girado). El reproductor aparte de la TV solo sin el modo TV
+            // With TV mode the TV shows the phone in TV format: the video is seen on both at once and in real time
+            // (full screen or phone rotated). The separate TV player only without TV mode
             org.senda.browser.core.cast.SendaTvPlayer.autoStart(activeTab, enabled = !prefs.tvModeEnabled)
         }
         val tvPlayback = org.senda.browser.core.cast.SendaTvPlayer.playback
@@ -452,12 +452,12 @@ fun BrowserScreen(
             org.senda.browser.ui.components.TvPresentationHost(tvPlayback)
         }
 
-        // Transmitir con la TV ya conectada: el video de la TV y «Desconectar TV»
+        // Casting with the TV already connected: the TV's video and "Disconnect TV"
         if (showCastDialog) {
             CastDialog(onDismiss = { showCastDialog = false })
         }
 
-        // Diálogo gestor de favoritos / marcadores
+        // Bookmarks manager dialog
         if (showBookmarksDialog) {
             BookmarksManagerDialog(
                 prefs = prefs,
@@ -468,7 +468,7 @@ fun BrowserScreen(
             )
         }
 
-        // Diálogo gestor de historial de navegación
+        // Browsing history manager dialog
         if (showHistoryDialog) {
             HistoryManagerDialog(
                 prefs = prefs,
@@ -478,7 +478,7 @@ fun BrowserScreen(
             )
         }
 
-        // Diálogo de borrado de datos de navegación
+        // Clear browsing data dialog
         if (showClearDataDialog) {
             ClearBrowsingDataDialog(
                 prefs = prefs,
@@ -489,7 +489,7 @@ fun BrowserScreen(
             )
         }
 
-        // Diálogo gestor de descargas avanzadas
+        // Advanced downloads manager dialog
         if (showDownloadsDialog) {
             DownloadsManagerDialog(
                 prefs = prefs,
@@ -497,11 +497,11 @@ fun BrowserScreen(
             )
         }
 
-        // Subir archivos a una página (<input type="file">). Antes no había selector: el aviso se quedaba sin
-        // resolver y ninguna página podía recibir un archivo
+        // Uploading files to a page (<input type="file">). There used to be no picker: the prompt was left
+        // unresolved and no page could receive a file
         SendaFilePromptHandler(activeTab)
 
-        // Anfitrión de diálogos interactivos web (Desplegables / Select, Alertas, Confirmaciones)
+        // Host for interactive web dialogs (dropdowns / select, alerts, confirmations)
         if (activeTab?.activePrompt != null && activeTab.activePrompt !is SendaPrompt.File) {
             SendaPromptHost(
                 prompt = activeTab.activePrompt,
@@ -600,13 +600,13 @@ private fun TabCrashedView(
 }
 
 
-/** Abre el selector de documentos de Android para el aviso de archivo de la pestaña y le entrega lo elegido. */
+/** Opens Android's document picker for the tab's file prompt and hands it what was chosen. */
 @Composable
 private fun SendaFilePromptHandler(tab: BrowserTab?) {
     val context = LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val filePrompt = tab?.activePrompt as? SendaPrompt.File
-    // Evita abrir el selector dos veces para el mismo aviso (p. ej. al girar la pantalla)
+    // Avoids opening the picker twice for the same prompt (e.g. when rotating the screen)
     var launchedFor by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(0) }
 
     fun deliver(uris: List<android.net.Uri>) {
@@ -641,14 +641,14 @@ private fun SendaFilePromptHandler(tab: BrowserTab?) {
         val id = System.identityHashCode(p)
         if (launchedFor == id) return@LaunchedEffect
         launchedFor = id
-        // Gecko da tipos MIME («image/*») y a veces extensiones («.pdf»): el selector solo entiende MIME
+        // Gecko gives MIME types ("image/*") and sometimes extensions (".pdf"): the picker only understands MIME
         val mimes = p.prompt.mimeTypes?.filter { it.contains('/') }?.distinct()?.takeIf { it.isNotEmpty() }
             ?.toTypedArray() ?: arrayOf("*/*")
         try {
             when (p.prompt.type) {
                 org.mozilla.geckoview.GeckoSession.PromptDelegate.FilePrompt.Type.MULTIPLE -> pickMany.launch(mimes)
                 org.mozilla.geckoview.GeckoSession.PromptDelegate.FilePrompt.Type.SINGLE -> pickOne.launch(mimes)
-                // Carpetas: GeckoView no tiene cómo recibirlas desde el selector de documentos
+                // Folders: GeckoView has no way to receive them from the document picker
                 else -> t.dismissActivePrompt()
             }
         } catch (e: android.content.ActivityNotFoundException) {

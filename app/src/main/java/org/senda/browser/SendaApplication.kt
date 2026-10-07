@@ -10,7 +10,7 @@ class SendaApplication : Application() {
 
     override fun attachBaseContext(base: Context?) {
         super.attachBaseContext(base)
-        // Desbloquear APIs ocultas de ART para compatibilidad con puentes JNI de GeckoView en Android 9-15
+        // Unlock ART hidden APIs for compatibility with GeckoView JNI bridges on Android 9-15
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             try {
                 HiddenApiBypass.addHiddenApiExemptions("L")
@@ -22,15 +22,15 @@ class SendaApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        // Asegurar que GeckoRuntime solo se inicialice en el proceso principal de la UI,
-        // no en los procesos secundarios de Gecko (:tab, :gpu, :crashhelper, etc.)
+        // Make sure GeckoRuntime is only initialized in the main UI process,
+        // not in Gecko's child processes (:tab, :gpu, :crashhelper, etc.)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             val processName = Application.getProcessName()
             if (processName != packageName) {
                 return
             }
         }
-        // Capturar y registrar excepciones no controladas para evitar cierres silenciosos
+        // Catch and log uncaught exceptions to avoid silent crashes
         val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             android.util.Log.e("SendaCrash", "FATAL EXCEPTION in thread ${thread.name}", throwable)
@@ -44,22 +44,22 @@ class SendaApplication : Application() {
             defaultHandler?.uncaughtException(thread, throwable)
         }
 
-        // Inicializar el motor GeckoView con directivas de privacidad y preferencias
+        // Initialize the GeckoView engine with privacy directives and preferences
         val prefs = org.senda.browser.core.PreferencesManager(this)
         org.senda.browser.core.SendaLocaleManager.applyLocale(this, prefs.appLanguage)
         SendaGeckoEngine.initialize(this, prefs)
 
         instance = this
-        // Modo TV: adaptar el teléfono mientras se duplica en una TV, y restaurarlo si quedó adaptado
+        // TV mode: adapt the phone while mirroring to a TV, and restore it if it was left adapted
         org.senda.browser.core.cast.SendaTvMode.init(this)
         Thread {
-            // Senda ya no incluye IA (2026-10-05): ningún modelo pequeño respondía con fiabilidad en sus 8 idiomas
-            // en un teléfono. Se borran los modelos descargados (hasta 3,3 GB) que ya no se pueden usar
+            // Senda no longer includes on-device AI (2026-10-05): no small model answered reliably in its 8 languages
+            // on a phone. Downloaded models (up to 3.3 GB) that can no longer be used are deleted
             java.io.File(filesDir, "models_ai").deleteRecursively()
-            // Copias de archivos subidos a páginas en la sesión anterior
+            // Copies of files uploaded to pages in the previous session
             org.senda.browser.core.SendaWebUploads.cleanup(this)
         }.start()
-        // Inicializar gestor de Tor integrado
+        // Initialize the built-in Tor manager
         org.senda.browser.core.SendaTorManager.init(this)
         if (prefs.proxyMode == "TOR_ORBOT") {
             org.senda.browser.core.SendaTorManager.start(this) {

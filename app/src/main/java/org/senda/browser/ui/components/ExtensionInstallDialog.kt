@@ -21,8 +21,8 @@ import org.senda.browser.core.LocalSendaStrings
 import org.senda.browser.core.SendaGeckoEngine
 
 /**
- * Confirmación antes de instalar una extensión que no viene con Senda: muestra qué podrá hacer y
- * no instala nada hasta que el usuario lo acepte.
+ * Confirmation before installing an extension that does not ship with Senda: shows what it will be able to do and
+ * installs nothing until the user accepts.
  */
 @Composable
 fun ExtensionInstallDialog(request: SendaGeckoEngine.ExtensionInstallRequest) {

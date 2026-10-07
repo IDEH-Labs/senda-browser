@@ -15,7 +15,7 @@ import javax.crypto.spec.GCMParameterSpec
 import kotlin.system.measureNanoTime
 
 /**
- * Reporte detallado de los resultados de la auditoría y prueba de estrés.
+ * Detailed report of the audit and stress test results.
  */
 data class AuditTestItem(
     val name: String,
@@ -39,8 +39,8 @@ data class VaultAuditReport(
 )
 
 /**
- * Motor de Auditoría Rigurosa y Pruebas de Estrés para la Bóveda de Senda.
- * Ejecuta pruebas forenses y criptográficas con máxima precisión matemática.
+ * Audit and stress test engine for Senda's password vault.
+ * Runs forensic and cryptographic tests.
  */
 object SendaVaultAuditRunner {
 
@@ -53,9 +53,9 @@ object SendaVaultAuditRunner {
         var failedCount = 0
 
         // -------------------------------------------------------------
-        // 1. AUDITORÍA DE ANCLAJE EN HARDWARE (ARM TrustZone / TEE)
+        // 1. HARDWARE ANCHORING AUDIT (ARM TrustZone / TEE)
         // -------------------------------------------------------------
-        // Antes esta prueba se daba siempre por aprobada; ahora informa lo que dice el propio Keystore
+        // This test used to always pass; now it reports what the keystore itself says
         val securityLevel = SendaVaultManager.keySecurityLevel()
         val isHwBacked = securityLevel == "STRONGBOX" || securityLevel == "TEE"
         results.add(
@@ -73,7 +73,7 @@ object SendaVaultAuditRunner {
         )
         if (isHwBacked) passedCount++ else failedCount++
 
-        // La clave de las contraseñas solo funciona tras huella o PIN recientes (lo comprueba el Keystore)
+        // The passwords key only works after a recent fingerprint or PIN (checked by the keystore)
         val authBound = SendaVaultManager.vaultKeyRequiresAuth()
         results.add(
             AuditTestItem(
@@ -86,7 +86,7 @@ object SendaVaultAuditRunner {
         if (authBound) passedCount++ else failedCount++
 
         // -------------------------------------------------------------
-        // 2. PRUEBA DE ESTRÉS Y RENDIMIENTO (1.000 Ciclos Cifrado/Descifrado)
+        // 2. STRESS AND PERFORMANCE TEST (1,000 encryption/decryption cycles)
         // -------------------------------------------------------------
         val latencies = mutableListOf<Double>()
         var stressFailed = false
@@ -106,7 +106,7 @@ object SendaVaultAuditRunner {
                         }
                         SendaVaultManager.wipe(decChars)
                     }
-                    latencies.add(opTime / 1_000_000.0) // Convertir a ms
+                    latencies.add(opTime / 1_000_000.0) // Convert to ms
                 } catch (e: Exception) {
                     stressFailed = true
                     stressErrorMessage = strings.audit_stress_exception.format(i, e.message ?: e.javaClass.simpleName)
@@ -148,7 +148,7 @@ object SendaVaultAuditRunner {
         }
 
         // -------------------------------------------------------------
-        // 3. PRUEBA DE COLISIÓN DE NONCE / VECTOR DE INICIALIZACIÓN (IV)
+        // 3. NONCE / INITIALIZATION VECTOR (IV) COLLISION TEST
         // -------------------------------------------------------------
         val ivSet = HashSet<String>()
         var ivCollisionDetected = false
@@ -187,7 +187,7 @@ object SendaVaultAuditRunner {
         }
 
         // -------------------------------------------------------------
-        // 4. RESISTENCIA A MANIPULACIÓN DE BITS (AEAD Tag Tamper-Resistance)
+        // 4. BIT TAMPERING RESISTANCE (AEAD tag tamper resistance)
         // -------------------------------------------------------------
         var tamperDetected = false
         var tamperEx: Exception? = null
@@ -196,11 +196,11 @@ object SendaVaultAuditRunner {
             val (encBase64, ivBase64) = SendaVaultManager.encryptPassword(samplePassword, SendaVaultManager.APP_KEY_ALIAS)
             val encBytes = Base64.decode(encBase64, Base64.NO_WRAP)
 
-            // Simular ataque de inyección: alterar deliberadamente el último byte del tag de autenticación
+            // Simulate an injection attack: deliberately alter the last byte of the authentication tag
             encBytes[encBytes.size - 1] = (encBytes[encBytes.size - 1].toInt() xor 0x01).toByte()
             val tamperedBase64 = Base64.encodeToString(encBytes, Base64.NO_WRAP)
 
-            // Debe fallar obligatoriamente
+            // It must fail
             SendaVaultManager.decryptPassword(tamperedBase64, ivBase64, SendaVaultManager.APP_KEY_ALIAS)
         } catch (e: Exception) {
             tamperDetected = true
@@ -230,7 +230,7 @@ object SendaVaultAuditRunner {
         }
 
         // -------------------------------------------------------------
-        // 5. HIGIENE DE MEMORIA Y ZEROIZATION (Destrucción en RAM)
+        // 5. MEMORY HYGIENE AND ZEROIZATION (wiping RAM)
         // -------------------------------------------------------------
         val volatileBuffer = charArrayOf('S', 'e', 'c', 'r', 'e', 't', '1', '2', '3')
         SendaVaultManager.wipe(volatileBuffer)
@@ -259,13 +259,13 @@ object SendaVaultAuditRunner {
         }
 
         // -------------------------------------------------------------
-        // 6. MATRIZ DE VERIFICACIÓN ANTI-PHISHING (eTLD+1)
+        // 6. ANTI-PHISHING CHECK MATRIX (eTLD+1)
         // -------------------------------------------------------------
         val phishingVectors = listOf(
             Pair("https://login.banco.com.es/cuenta", "banco.com.es") to true,
-            Pair("https://banco.com.es.sitio-malicioso.com/login", "banco.com.es") to false, // Ataque subdominio
+            Pair("https://banco.com.es.sitio-malicioso.com/login", "banco.com.es") to false, // Subdomain attack
             Pair("http://usuario:pass@sub.dominio.co.uk:8080/path?id=1", "dominio.co.uk") to true,
-            Pair("https://paypal.com.evil.org", "paypal.com") to false,                     // Dominio legítimo usado como subdominio de otro
+            Pair("https://paypal.com.evil.org", "paypal.com") to false,                     // Legitimate domain used as a subdomain of another one
             Pair("https://seguridad.senda.org/admin", "senda.org") to true
         )
 
@@ -305,7 +305,7 @@ object SendaVaultAuditRunner {
         }
 
         // -------------------------------------------------------------
-        // 7. ENTROPÍA DEL GENERADOR CRIPTOGRÁFICO
+        // 7. ENTROPY OF THE CRYPTOGRAPHIC GENERATOR
         // -------------------------------------------------------------
         val (genPass, entropy) = SendaVaultManager.generateStrongPassword(length = 20)
         val hasUpper = genPass.any { it.isUpperCase() }

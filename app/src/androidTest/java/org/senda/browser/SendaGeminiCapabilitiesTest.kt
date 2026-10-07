@@ -13,8 +13,8 @@ import org.senda.browser.core.PreferencesManager
 import org.senda.browser.core.SendaNet
 
 /**
- * Qué acepta Gemini por clave de API, con la clave real que el usuario guardó en Senda (nunca se registra). Por su
- * capa compatible con OpenAI y por su API propia. Medición: no falla; ver logcat SendaGeminiCaps.
+ * What Gemini accepts with an API key, using the real key the user saved in Senda (never logged). Through its
+ * OpenAI-compatible layer and through its own API. Measurement: it does not fail; see logcat SendaGeminiCaps.
  */
 @RunWith(AndroidJUnit4::class)
 class SendaGeminiCapabilitiesTest {
@@ -57,7 +57,7 @@ class SendaGeminiCapabilitiesTest {
         } finally { conn.disconnect() }
     }
 
-    // --- Capa compatible con OpenAI ---
+    // --- OpenAI-compatible layer ---
     private fun compat(name: String, key: String, model: String, content: Any, extra: (JSONObject) -> Unit = {}) {
         val body = JSONObject().put("model", model)
             .put("messages", JSONArray().put(JSONObject().put("role", "user").put("content", content)))
@@ -67,7 +67,7 @@ class SendaGeminiCapabilitiesTest {
         log("compat $name → ${msg?.optString("content").orEmpty().take(200).replace('\n', ' ')} | claves=${r.keys().asSequence().toList()}")
     }
 
-    // --- API propia de Google ---
+    // --- Google's own API ---
     private fun native(name: String, key: String, model: String, parts: JSONArray, extra: (JSONObject) -> Unit = {}) {
         val body = JSONObject().put("contents", JSONArray().put(JSONObject().put("role", "user").put("parts", parts)))
         extra(body)
@@ -84,7 +84,7 @@ class SendaGeminiCapabilitiesTest {
         val prefs = PreferencesManager(InstrumentationRegistry.getInstrumentation().targetContext)
         val key = prefs.getAssistantKey("gemini")
         assumeTrue("Sin clave de Gemini", key.isNotBlank())
-        // Modelos disponibles con esta clave
+        // Models available with this key
         val conn = SendaNet.open("$base/openai/models").apply { setRequestProperty("Authorization", "Bearer $key") }
         val ids = try {
             val data = JSONObject(conn.inputStream.bufferedReader().use { it.readText() }).optJSONArray("data") ?: JSONArray()
@@ -127,7 +127,7 @@ class SendaGeminiCapabilitiesTest {
         }
     }
 
-    /** El cliente de Senda con Gemini: lista filtrada (primero el flash más reciente), foto, PDF y razonamiento. */
+    /** Senda's client with Gemini: filtered list (newest flash first), photo, PDF and reasoning. */
     @Test
     fun sendaGeminiClient() = kotlinx.coroutines.runBlocking {
         val prefs = PreferencesManager(InstrumentationRegistry.getInstrumentation().targetContext)

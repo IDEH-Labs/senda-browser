@@ -6,22 +6,22 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Asistente con IA. Lo normal: ChatGPT con el plan del usuario («Sign in with ChatGPT», lo único que una empresa
- * permite hoy con la suscripción). Para usuarios avanzados, en Ajustes: Claude, Gemini, Grok o Mistral con clave de
- * API (se paga aparte; ver [ApiProvider]).
+ * AI assistant. The usual option: ChatGPT with the user's plan ("Sign in with ChatGPT", the only thing a company
+ * allows today with the subscription). For advanced users, in Settings: Claude, Gemini, Grok or Mistral with an API
+ * key (paid separately; see [ApiProvider]).
  *
- * Límites (auditoría del 2026-10-05): la IA solo prepara borradores, nunca envía ni actúa por su cuenta; no ve
- * la Bóveda; no inventa experiencia en hojas de vida; el texto de una página son datos, no órdenes.
+ * Limits (audit of 2026-10-05): the AI only prepares drafts, never sends or acts on its own; it cannot see
+ * the vault; it does not invent experience in résumés; a page's text is data, not instructions.
  */
 object SendaAssistant {
 
-    /** Identificador guardado en assistant_provider para ChatGPT con el plan. */
+    /** Identifier stored in assistant_provider for ChatGPT with the plan. */
     const val PROVIDER_ID = "chatgpt_plan"
 
-    /** Capacidades comprobadas con una cuenta real (solo estas se ofrecen). */
+    /** Capabilities verified with a real account (only these are offered). */
     data class Capabilities(val searchWeb: Boolean, val attach: Boolean, val thinkDeep: Boolean)
 
-    /** IA conectadas: ChatGPT con sesión iniciada y las que tienen clave guardada, en ese orden. */
+    /** Connected AIs: ChatGPT with a signed-in session and those with a saved key, in that order. */
     fun connected(prefs: PreferencesManager): List<String> =
         listOfNotNull(PROVIDER_ID.takeIf { ChatGptPlanAuth.isSignedIn(prefs) }) +
             ApiProvider.entries.filter { prefs.getAssistantKey(it.id).isNotBlank() }.map { it.id }
@@ -30,29 +30,29 @@ object SendaAssistant {
 
     fun destinationOf(id: String): String = ApiProvider.byId(id)?.host ?: CHATGPT_DESTINATION
 
-    /** Página oficial donde el usuario ve su uso y sus límites con esa IA. */
+    /** Official page where the user sees their usage and limits with that AI. */
     fun usagePageOf(id: String): String = ApiProvider.byId(id)?.usagePage ?: ChatGptPlanClient.MANAGE_USAGE_URL
 
-    /** Sin red: lo medido con cada empresa (ChatGptPlanClient, ApiProvider.clientAt). */
+    /** No network: what was measured with each company (ChatGptPlanClient, ApiProvider.clientAt). */
     fun capabilities(id: String): Capabilities = when (id) {
         PROVIDER_ID -> Capabilities(searchWeb = true, attach = true, thinkDeep = true)
         ApiProvider.GEMINI.id -> Capabilities(searchWeb = false, attach = true, thinkDeep = true)
         else -> Capabilities(searchWeb = false, attach = false, thinkDeep = false)
     }
 
-    /** Modelo de la IA en uso. */
+    /** Model of the AI in use. */
     fun model(prefs: PreferencesManager): String = prefs.assistantProvider?.let { prefs.assistantModelFor(it) }.orEmpty()
 
     /**
-     * IA en uso conectada y con consentimiento. El modelo no hace falta: si falta (recién conectada, o la empresa
-     * retiró el que había), [ensureModel] lo elige al enviar el primer mensaje.
+     * AI in use, connected and with consent. The model is not required: if it is missing (just connected, or the company
+     * retired the one there was), [ensureModel] picks it when the first message is sent.
      */
     fun isConfigured(prefs: PreferencesManager): Boolean {
         val id = prefs.assistantProvider ?: return false
         return id in connected(prefs) && prefs.assistantConsentFor(id)
     }
 
-    /** Modelo de la IA en uso; si no hay, lo elige ([autoSelectModel]) y lo guarda. */
+    /** Model of the AI in use; if there is none, picks one ([autoSelectModel]) and saves it. */
     suspend fun ensureModel(prefs: PreferencesManager): String {
         val id = prefs.assistantProvider ?: throw RemoteAiException(RemoteAiException.Kind.NOT_CONFIGURED)
         prefs.assistantModelFor(id).takeIf { it.isNotBlank() }?.let { return it }
@@ -63,13 +63,13 @@ object SendaAssistant {
     }
 
     /**
-     * Para buscar el modelo al tocar «Usar» sin que cerrar «Mis IA» lo cancele: no depende de la pantalla.
-     * [connecting] dice qué IA se está preparando, para mostrarlo al volver a abrir.
+     * To look for the model when tapping "Use" without closing "My AIs" cancelling it: it does not depend on the screen.
+     * [connecting] says which AI is being prepared, to show it when the screen is reopened.
      */
     val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main)
     val connecting = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
 
-    /** Adónde viajan los datos de la IA en uso. */
+    /** Where the data of the AI in use travels to. */
     fun destination(prefs: PreferencesManager): String = destinationOf(prefs.assistantProvider ?: PROVIDER_ID)
 
     const val CHATGPT_DESTINATION = "api.openai.com"
@@ -83,9 +83,9 @@ object SendaAssistant {
     }
 
     /**
-     * Modelo automático: los de la lista de la empresa en su orden recomendado, probados con un mensaje corto hasta
-     * que uno responde (la lista incluye modelos que esa cuenta no puede usar). Como mucho [MAX_TRIES] pruebas, para
-     * no gastar la cuota. Clave inválida, sesión caducada o cuota agotada cortan la búsqueda y se informan.
+     * Automatic model: the ones in the company's list in its recommended order, tried with a short message until
+     * one answers (the list includes models that account cannot use). At most [MAX_TRIES] attempts, so as not to
+     * spend the quota. An invalid key, expired session or exhausted quota stop the search and are reported.
      */
     suspend fun autoSelectModel(backend: AssistantBackend): String {
         val candidates = backend.listModels()
@@ -95,7 +95,7 @@ object SendaAssistant {
                 backend.chat(model, "Reply with: OK", listOf(ChatTurn(ChatTurn.Role.USER, "OK")), deep = false) {}
                 return model
             } catch (e: RemoteAiException) {
-                // Solo el tipo y el código: nunca la clave ni lo escrito
+                // Only the type and the code: never the key or what was written
                 android.util.Log.w("SendaAssistant", "Modelo $model no responde: ${e.kind} ${e.message?.take(40)}")
                 if (e.kind != RemoteAiException.Kind.BAD_RESPONSE) throw e
                 last = e
@@ -106,12 +106,12 @@ object SendaAssistant {
 
     private const val MAX_TRIES = 3
 
-    /** Pone en uso una IA conectada (ya con modelo y consentimiento). */
+    /** Puts a connected AI in use (already with model and consent). */
     fun use(prefs: PreferencesManager, id: String) {
         prefs.assistantProvider = id
     }
 
-    /** Desconecta una IA: cierra la sesión o borra la clave, su modelo y su consentimiento. */
+    /** Disconnects an AI: signs out or deletes the key, its model and its consent. */
     fun disconnect(prefs: PreferencesManager, id: String) {
         if (id == PROVIDER_ID) ChatGptPlanAuth.signOut(prefs) else prefs.setAssistantKey(id, "")
         prefs.setAssistantModelFor(id, "")
@@ -119,7 +119,7 @@ object SendaAssistant {
         if (prefs.assistantProvider == id) prefs.assistantProvider = connected(prefs).firstOrNull { prefs.assistantConsentFor(it) }
     }
 
-    /** Instrucciones en el idioma de la interfaz; el modelo responde en el idioma del usuario. */
+    /** Instructions in the interface language; the model answers in the user's language. */
     fun systemPrompt(languageCode: String): String {
         val lang = languageCode.take(2).lowercase()
         val date = DateFormat.getDateInstance(DateFormat.FULL, Locale.forLanguageTag(lang)).format(Date())
@@ -127,8 +127,8 @@ object SendaAssistant {
     }
 
     /**
-     * Texto de una página web (de terceros) entre etiquetas para que el modelo lo trate como datos. Se quitan del
-     * título y del texto las propias etiquetas: si no, una página podría cerrar el bloque y escribir órdenes fuera.
+     * Text of a (third-party) web page wrapped in tags so the model treats it as data. The tags themselves are removed
+     * from the title and text: otherwise a page could close the block and write instructions outside it.
      */
     fun pageBlock(title: String, url: String, text: String): String {
         val clean = { s: String -> BLOCK_TAG.replace(s, " ") }
@@ -137,7 +137,7 @@ object SendaAssistant {
 
     private val BLOCK_TAG = Regex("</?\\s*pagina\\s*>", RegexOption.IGNORE_CASE)
 
-    /** ~10-15 mil palabras: suficiente para un artículo largo sin enviar páginas enormes sin necesidad. */
+    /** ~10-15 thousand words: enough for a long article without sending huge pages needlessly. */
     const val PAGE_MAX_CHARS = 60_000
 
     private val SYSTEM = mapOf(

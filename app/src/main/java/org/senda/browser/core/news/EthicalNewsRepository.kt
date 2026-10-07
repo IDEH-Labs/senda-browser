@@ -23,7 +23,7 @@ object EthicalNewsRepository {
 
     private val cachedItems = mutableListOf<EthicalNewsItem>()
     private var lastFetchTime = 0L
-    private const val CACHE_DURATION_MS = 15 * 60 * 1000L // 15 minutos
+    private const val CACHE_DURATION_MS = 15 * 60 * 1000L // 15 minutes
 
     suspend fun fetchEthicalNews(forceRefresh: Boolean = false): List<EthicalNewsItem> {
         val now = System.currentTimeMillis()
@@ -31,8 +31,8 @@ object EthicalNewsRepository {
             return cachedItems
         }
 
-        // Las tres fuentes a la vez: en serie, con 8 s de espera por fuente, la portada podía tardar 24 s.
-        // Si ninguna responde se devuelve una lista vacía y la portada lo dice (nunca titulares de relleno)
+        // All three sources at once: one after another, with an 8 s wait per source, the front page could take 24 s.
+        // If none answers an empty list is returned and the front page says so (never filler headlines)
         val results = coroutineScope {
             listOf(
                 async { fetchRssSafely("https://www.muylinux.com/feed/", "MuyLinux", 4) },
@@ -111,7 +111,7 @@ object EthicalNewsRepository {
                         XmlPullParser.END_TAG -> {
                             if ((name.equals("item", ignoreCase = true) || name.equals("entry", ignoreCase = true)) && insideItem) {
                                 insideItem = false
-                                // Solo enlaces web: un feed alterado no debe poder abrir javascript: ni file:
+                                // Web links only: a tampered feed must not be able to open javascript: or file:
                                 val isWebLink = currentLink.startsWith("https://", ignoreCase = true) ||
                                     currentLink.startsWith("http://", ignoreCase = true)
                                 if (currentTitle.isNotBlank() && isWebLink) {

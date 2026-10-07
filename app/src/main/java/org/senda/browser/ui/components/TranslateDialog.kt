@@ -18,15 +18,15 @@ import org.senda.browser.ui.model.BrowserTab
 import kotlin.coroutines.resume
 
 /**
- * Traducción de la página con el motor de Firefox, que corre en el teléfono. La primera vez para cada par
- * de idiomas se descargan los modelos (desde los servidores de Mozilla, por la misma conexión que el resto
- * de Senda); el texto de la página nunca se envía a ningún servicio.
+ * Page translation with Firefox's engine, which runs on the phone. The first time for each language
+ * pair the models are downloaded (from Mozilla's servers, over the same connection as the rest
+ * of Senda); the page's text is never sent to any service.
  */
 @Composable
 fun TranslateDialog(tab: BrowserTab, onDismiss: () -> Unit) {
     val strings = LocalSendaStrings.current
 
-    // null = consultando; lista vacía = el motor no está disponible en este dispositivo
+    // null = querying; empty list = the engine is not available on this device
     var fromLanguages by remember { mutableStateOf<List<Language>?>(null) }
     var toLanguages by remember { mutableStateOf<List<Language>>(emptyList()) }
     LaunchedEffect(Unit) {
@@ -44,7 +44,7 @@ fun TranslateDialog(tab: BrowserTab, onDismiss: () -> Unit) {
         to = matchLanguage(tab.userLanguage ?: java.util.Locale.getDefault().language, toLanguages)
     }
 
-    // Tamaño de los modelos que faltan; 0 = ya descargados, null = desconocido
+    // Size of the missing models; 0 = already downloaded, null = unknown
     var downloadBytes by remember { mutableStateOf<Long?>(null) }
     LaunchedEffect(from, to) {
         downloadBytes = null
@@ -141,7 +141,7 @@ private fun LanguagePicker(label: String, selected: String?, options: List<Langu
     }
 }
 
-/** Busca [tag] («es-MX», «en») entre los idiomas del motor: primero exacto y luego por idioma base. */
+/** Looks for [tag] ("es-MX", "en") among the engine's languages: first exact and then by base language. */
 private fun matchLanguage(tag: String?, options: List<Language>): String? {
     if (tag.isNullOrBlank()) return null
     options.firstOrNull { it.code.equals(tag, ignoreCase = true) }?.let { return it.code }
@@ -158,7 +158,7 @@ private suspend fun <T> awaitGecko(call: () -> org.mozilla.geckoview.GeckoResult
         }
     }
 
-/** Nombre del idioma en el idioma de Senda (Gecko lo da en inglés); si Java no lo conoce, el de Gecko */
+/** Name of the language in Senda's language (Gecko gives it in English); if Java does not know it, Gecko's */
 private fun languageName(language: Language, uiLanguageTag: String): String {
     val uiLocale = java.util.Locale.forLanguageTag(uiLanguageTag)
     val name = java.util.Locale.forLanguageTag(language.code).getDisplayName(uiLocale)

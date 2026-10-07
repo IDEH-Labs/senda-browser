@@ -141,7 +141,7 @@ fun SettingsGnomeTypographyDialog(
                     .verticalScroll(rememberScrollState())
                     .fillMaxWidth()
             ) {
-                // 1. Tarjeta de Muestra en Vivo
+                // 1. Live sample card
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -192,7 +192,7 @@ fun SettingsGnomeTypographyDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // 2. Tipo de Letra de la Interfaz
+                // 2. Interface typeface
                 Text(
                     text = strings.dlg_font_family_title,
                     style = MaterialTheme.typography.titleSmall,
@@ -242,7 +242,7 @@ fun SettingsGnomeTypographyDialog(
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
 
-                // 3. Factor de Escala de Texto
+                // 3. Text scale factor
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -275,13 +275,13 @@ fun SettingsGnomeTypographyDialog(
                     valueRange = 85f..150f,
                     steps = 12
                 )
-                // Cinco botones iguales: con SpaceBetween el quinto no cabía y se dibujaba deformado
+                // Five equal buttons: with SpaceBetween the fifth did not fit and was drawn distorted
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     listOf(90, 100, 115, 130, 150).forEach { preset ->
-                        // Botón propio sin el relleno interno de los chips: en cinco chips no cabía el «%»
+                        // Own button without the chips' inner padding: with five chips the "%" did not fit
                         val selected = fontScale == preset
                         Surface(
                             onClick = {

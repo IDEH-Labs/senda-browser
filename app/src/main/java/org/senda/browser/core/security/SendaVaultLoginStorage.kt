@@ -5,18 +5,18 @@ import org.mozilla.geckoview.Autocomplete
 import org.mozilla.geckoview.GeckoResult
 
 /**
- * Ofrece a GeckoView las cuentas de la Bóveda para los formularios de inicio de sesión.
+ * Offers GeckoView the vault accounts for sign-in forms.
  *
- * Solo entrega usuario y origen, nunca la contraseña: la clave de la Bóveda exige huella o PIN, así que
- * descifrar al cargar cada página no es posible ni deseable. La contraseña se descifra cuando el usuario
- * elige la cuenta en el selector (SendaPrompt.LoginSelect), tras identificarse.
+ * It only hands over username and origin, never the password: the vault key requires fingerprint or PIN, so
+ * decrypting on every page load is neither possible nor desirable. The password is decrypted when the user
+ * picks the account in the selector (SendaPrompt.LoginSelect), after authenticating.
  */
 class SendaVaultLoginStorage(context: Context) : Autocomplete.StorageDelegate {
     companion object {
         const val TAG = "SendaLogin"
 
-        // Cuenta elegida cuyo relleno quedó pendiente: el aviso de huella le quita el foco a la página y
-        // GeckoView cancela la petición; al volver a tocar el campo (clave aún disponible) se rellena sola
+        // Chosen account whose fill is still pending: the fingerprint prompt takes focus away from the page and
+        // GeckoView cancels the request; tapping the field again (key still available) fills it automatically
         private const val PENDING_MS = 25_000L
         @Volatile private var pendingGuid: String? = null
         @Volatile private var pendingAt = 0L
@@ -26,7 +26,7 @@ class SendaVaultLoginStorage(context: Context) : Autocomplete.StorageDelegate {
             pendingAt = System.currentTimeMillis()
         }
 
-        /** Devuelve y consume la cuenta pendiente si sigue vigente y está entre las [guids] ofrecidas. */
+        /** Returns and consumes the pending account if it is still valid and among the offered [guids]. */
         fun takePending(guids: Collection<String?>): String? {
             val guid = pendingGuid ?: return null
             if (System.currentTimeMillis() - pendingAt > PENDING_MS) {
@@ -39,8 +39,8 @@ class SendaVaultLoginStorage(context: Context) : Autocomplete.StorageDelegate {
         }
 
         /**
-         * La misma cuenta con la contraseña descifrada, lista para confirmar el selector de GeckoView.
-         * Lanza [VaultLockedException] si hace falta identificarse; null si la cuenta ya no existe.
+         * The same account with the password decrypted, ready to confirm GeckoView's selector.
+         * Throws [VaultLockedException] if authentication is needed; null if the account no longer exists.
          */
         fun filledOption(context: Context, option: Autocomplete.LoginSelectOption): Autocomplete.LoginSelectOption? {
             val entry = option.value
@@ -60,8 +60,8 @@ class SendaVaultLoginStorage(context: Context) : Autocomplete.StorageDelegate {
 
     private val appContext = context.applicationContext
 
-    // GeckoView pide por dominio base (eTLD+1 resuelto con la Public Suffix List),
-    // y luego filtra estrictamente por origen (signon.includeOtherSubdomainsInLookup deshabilitado)
+    // GeckoView asks by base domain (eTLD+1 resolved with the Public Suffix List),
+    // and then filters strictly by origin (signon.includeOtherSubdomainsInLookup disabled)
     override fun onLoginFetch(domain: String): GeckoResult<Array<Autocomplete.LoginEntry>> {
         val baseDomain = SendaVaultManager.extractCanonicalDomain(domain, appContext)
         val entries = try {

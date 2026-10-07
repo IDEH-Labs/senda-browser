@@ -76,7 +76,7 @@ fun buildSettingsList(
     val downloadsSummary = if (prefs.askDownloadLocation) strings.dlg_download_ask else strings.st_downloads_title
 
     return listOf(
-        // GENERAL / SURFEN & SUCHE
+        // GENERAL / BROWSING & SEARCH
         SettingItemData(
             id = "search",
             title = strings.st_search_title,
@@ -193,7 +193,7 @@ fun buildSettingsList(
             }
         ),
 
-        // SICHERHEIT & PRIVATSPHÄRE / PRIVACIDAD Y SEGURIDAD
+        // PRIVACY & SECURITY
         SettingItemData(
             id = "passwords",
             title = strings.st_passwords_title,
@@ -300,7 +300,7 @@ fun buildSettingsList(
             onClick = { onOpenDialog("data_collection") }
         ),
 
-        // ERWEITERT / AVANZADO
+        // ADVANCED
         SettingItemData(
             id = "extensions",
             title = strings.st_extensions_title,
@@ -359,7 +359,7 @@ fun buildSettingsList(
             onClick = { onOpenDialog("chromecast_settings") }
         ),
 
-        // ÜBER SENDA / ACERCA DE
+        // ABOUT SENDA
         SettingItemData(
             id = "about_senda",
             title = strings.st_about_title,

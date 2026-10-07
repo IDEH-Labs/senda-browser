@@ -10,9 +10,9 @@ enum class ToolbarPosition {
 }
 
 enum class ToolbarWidgetSize {
-    COMPACT,    // Compacto: 32dp botones, 18dp íconos, barra 48dp (caben más widgets)
-    BALANCED,   // Equilibrado: 38dp botones, 20dp íconos, barra 54dp
-    COMFORTABLE // Cómodo: 44dp botones, 22dp íconos, barra 60dp
+    COMPACT,    // Compact: 32dp buttons, 18dp icons, 48dp bar (more widgets fit)
+    BALANCED,   // Balanced: 38dp buttons, 20dp icons, 54dp bar
+    COMFORTABLE // Comfortable: 44dp buttons, 22dp icons, 60dp bar
 }
 
 enum class AppThemeMode {
@@ -22,10 +22,10 @@ enum class AppThemeMode {
 }
 
 enum class ZenHomeLayout {
-    FOCUSED,        // Enfocado: minimalista, sin fondo ni noticias, solo buscador y accesos
-    INSPIRATIONAL,  // Inspirador: fondo libre/GPL rotativo + buscador + accesos + titulares breves
-    INFORMATIONAL,  // Informativo: feed de noticias de noticias libres centrado y desplazable
-    CUSTOM          // Personalizado: el usuario activa/desactiva fondo, accesos y noticias a gusto
+    FOCUSED,        // Focused: minimal, no background or news, only search and shortcuts
+    INSPIRATIONAL,  // Inspiring: rotating free/GPL wallpaper + search + shortcuts + short headlines
+    INFORMATIONAL,  // Informative: centered, scrollable feed from free news sources
+    CUSTOM          // Custom: the user turns background, shortcuts and news on or off as they like
 }
 
 data class ZenShortcut(
@@ -42,12 +42,12 @@ class PreferencesManager(context: Context) {
         val historyExecutor: java.util.concurrent.ExecutorService =
             java.util.concurrent.Executors.newSingleThreadExecutor { r -> Thread(r, "senda-history") }
 
-        // Borrar sube la generación: las visitas que ya estaban en cola no deben volver a escribir el historial
+        // Clearing bumps the generation: visits already queued must not write the history again
         val historyLock = Any()
         val historyGeneration = java.util.concurrent.atomic.AtomicLong()
 
-        // Limpieza de datos antiguos: una vez por proceso. SendaNet crea un PreferencesManager en cada conexión
-        // y antes recorría todas las preferencias cada vez
+        // Old data cleanup: once per process. SendaNet creates a PreferencesManager on every connection
+        // and it used to walk through all preferences every time
         @Volatile var legacyCleanupDone = false
     }
 
@@ -62,14 +62,14 @@ class PreferencesManager(context: Context) {
     }
 
     private fun cleanUpLegacyData() {
-        // Ajustes de la IA retirada: no deben quedar datos de una función que ya no existe
+        // Settings of the retired AI: no data should remain from a feature that no longer exists
         if (prefs.all.keys.any { it.startsWith("ai_") || it == "selected_local_ai_model" }) {
             prefs.edit().apply {
                 prefs.all.keys.filter { it.startsWith("ai_") || it == "selected_local_ai_model" }.forEach { remove(it) }
             }.apply()
         }
-        // El asistente usa ChatGPT o, para avanzados, Claude, Gemini, Grok o Mistral con clave (2026-10-06): se borran
-        // la clave de OpenAI por API y el servidor propio, que ya no existen
+        // The assistant uses ChatGPT or, for advanced users, Claude, Gemini, Grok or Mistral with a key (2026-10-06): the
+        // OpenAI API key and the self-hosted server, which no longer exist, are deleted
         val oldKeys = listOf("openai", "own").flatMap { listOf("assistant_key_enc_$it", "assistant_key_iv_$it") } + "assistant_server_url"
         val stillValid = setOf("chatgpt_plan", "anthropic", "gemini", "xai", "mistral")
         val provider = prefs.getString("assistant_provider", null)
@@ -81,7 +81,7 @@ class PreferencesManager(context: Context) {
                 }
             }.apply()
         }
-        // Modelo y consentimiento de la IA en uso, ahora guardados por IA
+        // Model and consent of the AI in use, now stored per AI
         val activeAi = prefs.getString("assistant_provider", null)
         if (activeAi != null && prefs.contains("assistant_model") && !prefs.contains("assistant_model_$activeAi")) {
             prefs.edit()
@@ -89,7 +89,7 @@ class PreferencesManager(context: Context) {
                 .putBoolean("assistant_consent_$activeAi", prefs.getBoolean("assistant_privacy_accepted", false))
                 .apply()
         }
-        // Versiones anteriores simulaban Firefox Sync: borrar la «cuenta conectada» que nunca existió.
+        // Earlier versions faked Firefox Sync: delete the "connected account" that never existed.
         if (prefs.contains("fxa_is_connected") || prefs.contains("sync_type")) {
             prefs.edit()
                 .remove("sync_type").remove("fxa_email").remove("fxa_is_connected").remove("fxa_custom_server")
@@ -98,7 +98,7 @@ class PreferencesManager(context: Context) {
         }
     }
 
-    // --- PÁGINA DE INICIO Y ESTILO ZEN ---
+    // --- HOME PAGE AND ZEN STYLE ---
     var zenHomeLayout: ZenHomeLayout
         get() {
             val name = prefs.getString("zen_home_layout", ZenHomeLayout.INSPIRATIONAL.name)
@@ -126,12 +126,12 @@ class PreferencesManager(context: Context) {
         get() = prefs.getString("selected_wallpaper_id", "debian_ceratopsian") ?: "debian_ceratopsian"
         set(value) = prefs.edit().putString("selected_wallpaper_id", value).apply()
 
-    /** Cambio de fondo: 0 = fijo, -1 = uno distinto en cada pestaña nueva, >0 = cada tantos minutos. */
+    /** Wallpaper change: 0 = fixed, -1 = a different one in each new tab, >0 = every that many minutes. */
     var wallpaperRotationMinutes: Int
         get() = prefs.getInt("wallpaper_rotation_minutes", 0)
         set(value) = prefs.edit().putInt("wallpaper_rotation_minutes", value).apply()
 
-    /** Fondo que se está mostrando en la rotación y cuándo empezó (para seguir el turno entre pestañas). */
+    /** Wallpaper currently shown in the rotation and when it started (to keep the turn across tabs). */
     var wallpaperRotationCurrentId: String?
         get() = prefs.getString("wallpaper_rotation_current_id", null)
         set(value) = prefs.edit().putString("wallpaper_rotation_current_id", value).apply()
@@ -221,7 +221,7 @@ class PreferencesManager(context: Context) {
         prefs.edit().remove("zen_custom_shortcuts").apply()
     }
 
-    // --- APARIENCIA & INTERFAZ ---
+    // --- APPEARANCE & INTERFACE ---
     var toolbarPosition: ToolbarPosition
         get() {
             val name = prefs.getString("toolbar_position", ToolbarPosition.TOP.name)
@@ -265,10 +265,10 @@ class PreferencesManager(context: Context) {
         set(value) = prefs.edit().putBoolean("show_cast_button", value).apply()
 
     /**
-     * Modo TV: mientras se duplica la pantalla en una TV, en vertical el teléfono no cambia; al girarlo (video a
-     * pantalla completa en cualquier app) la imagen pasa a 16:9 y la TV se llena. Al desconectar todo vuelve a como
-     * estaba. Activado por defecto (2026-10-06, a pedido del usuario); clave nueva porque la anterior quedó en false.
-     * Desactivado: la TV muestra el teléfono tal cual y solo los videos de Senda pasan a la TV en formato TV.
+     * TV mode: while mirroring to a TV, in portrait the phone does not change; when rotated (full-screen video
+     * in any app) the picture switches to 16:9 and fills the TV. On disconnect everything goes back to how it
+     * was. On by default (2026-10-06, at the user's request); new key because the old one was left at false.
+     * Off: the TV shows the phone as it is and only Senda's videos go to the TV in TV format.
      */
     var tvModeEnabled: Boolean
         get() = prefs.getBoolean("tv_mode_enabled_v3", true)
@@ -325,8 +325,8 @@ class PreferencesManager(context: Context) {
         get() = prefs.getBoolean("show_reader_button", true)
         set(value) = prefs.edit().putBoolean("show_reader_button", value).apply()
 
-    // Apagado por defecto: Recargar/Detener están en el menú y en la barra el hueco es para el dominio (en un
-    // móvil de 360 dp solo cabía «es.wiki…»)
+    // Off by default: Reload/Stop are in the menu and the bar's space is for the domain (on a
+    // 360 dp phone only "es.wiki…" fit)
     var showReloadButton: Boolean
         get() = prefs.getBoolean("show_reload_button", false)
         set(value) = prefs.edit().putBoolean("show_reload_button", value).apply()
@@ -335,7 +335,7 @@ class PreferencesManager(context: Context) {
         get() = prefs.getBoolean("show_security_indicator", true)
         set(value) = prefs.edit().putBoolean("show_security_indicator", value).apply()
 
-    // --- BÚSQUEDA ---
+    // --- SEARCH ---
     var searchEngineName: String
         get() = prefs.getString("search_engine_name", "DuckDuckGo") ?: "DuckDuckGo"
         set(value) = prefs.edit().putString("search_engine_name", value).apply()
@@ -345,21 +345,21 @@ class PreferencesManager(context: Context) {
         set(value) = prefs.edit().putString("search_engine_url", value).apply()
 
     var searchSuggestionsEnabled: Boolean
-        // Sugerencias locales (favoritos e historial): no salen del teléfono, por eso vienen activadas
+        // Local suggestions (bookmarks and history): they never leave the phone, so they are on
         get() = prefs.getBoolean("search_suggestions_enabled", true)
         set(value) = prefs.edit().putBoolean("search_suggestions_enabled", value).apply()
 
-    // --- PESTAÑAS ---
+    // --- TABS ---
     var closeTabsPolicy: String
         get() = prefs.getString("close_tabs_policy", "MANUAL") ?: "MANUAL"
         set(value) = prefs.edit().putString("close_tabs_policy", value).apply()
 
-    /** Pestaña guardada para reabrirla al volver a Senda (nunca se guardan las privadas). */
+    /** Tab saved to reopen it when coming back to Senda (private ones are never saved). */
     data class SavedTab(val url: String, val title: String, val lastUsed: Long)
 
     /**
-     * Al abrir Senda: HOME = página de inicio limpia al frente (las pestañas anteriores siguen en la lista),
-     * RESUME = continuar en la última pestaña, CLEAN = empezar sin las pestañas anteriores.
+     * When opening Senda: HOME = clean home page in front (previous tabs stay in the list),
+     * RESUME = continue in the last tab, CLEAN = start without the previous tabs.
      */
     var startupMode: String
         get() = prefs.getString("startup_mode", "HOME") ?: "HOME"
@@ -376,7 +376,7 @@ class PreferencesManager(context: Context) {
             .apply()
     }
 
-    /** Pestañas a restaurar según «Cerrar pestañas»: ninguna con «Al salir», solo las recientes con un plazo. */
+    /** Tabs to restore according to "Close tabs": none with "On exit", only recent ones with a time limit. */
     fun loadOpenTabs(): Pair<List<SavedTab>, Int> {
         val maxAge = when (closeTabsPolicy) {
             "ON_EXIT" -> return emptyList<SavedTab>() to 0
@@ -406,7 +406,7 @@ class PreferencesManager(context: Context) {
         get() = prefs.getBoolean("open_links_in_background", false)
         set(value) = prefs.edit().putBoolean("open_links_in_background", value).apply()
 
-    // --- PRIVACIDAD Y SEGURIDAD ---
+    // --- PRIVACY AND SECURITY ---
     var alwaysPrivateMode: Boolean
         get() = prefs.getBoolean("always_private_mode", false)
         set(value) = prefs.edit().putBoolean("always_private_mode", value).apply()
@@ -427,7 +427,7 @@ class PreferencesManager(context: Context) {
         get() = prefs.getString("custom_doh_url", "") ?: ""
         set(value) = prefs.edit().putString("custom_doh_url", value).apply()
 
-    // --- ENRUTAMIENTO TOR & proxy seguro ---
+    // --- TOR ROUTING & SECURE PROXY ---
     var proxyMode: String
         get() = prefs.getString("proxy_mode", "OFF") ?: "OFF" // OFF, TOR_ORBOT, CUSTOM_SOCKS5, CUSTOM_HTTP
         set(value) = prefs.edit().putString("proxy_mode", value).apply()
@@ -444,7 +444,7 @@ class PreferencesManager(context: Context) {
         get() = prefs.getBoolean("proxy_dns_remote", true)
         set(value) = prefs.edit().putBoolean("proxy_dns_remote", value).apply()
 
-    // --- modo lectura (CONFIGURACIÓN) ---
+    // --- READER MODE (SETTINGS) ---
     var readerTheme: String
         get() = prefs.getString("reader_theme", "SEPIA") ?: "SEPIA" // LIGHT, SEPIA, OLED_BLACK
         set(value) = prefs.edit().putString("reader_theme", value).apply()
@@ -481,7 +481,7 @@ class PreferencesManager(context: Context) {
         get() = prefs.getBoolean("enable_anti_snooping", false)
         set(value) = prefs.edit().putBoolean("enable_anti_snooping", value).apply()
 
-    // --- PERMISOS DEL SITIO & NOTIFICACIONES ---
+    // --- SITE PERMISSIONS & NOTIFICATIONS ---
     var sitePermissionCamera: String
         get() = prefs.getString("site_perm_camera", "ASK") ?: "ASK"
         set(value) = prefs.edit().putString("site_perm_camera", value).apply()
@@ -502,7 +502,7 @@ class PreferencesManager(context: Context) {
         get() = prefs.getBoolean("block_web_popups", true)
         set(value) = prefs.edit().putBoolean("block_web_popups", value).apply()
 
-    // --- DESCARGAS Y APLICACIONES EXTERNAS ---
+    // --- DOWNLOADS AND EXTERNAL APPS ---
     var openLinksInApps: String
         get() = prefs.getString("open_links_in_apps", "ASK") ?: "ASK"
         set(value) = prefs.edit().putString("open_links_in_apps", value).apply()
@@ -511,7 +511,7 @@ class PreferencesManager(context: Context) {
         get() = prefs.getBoolean("ask_download_location", true)
         set(value) = prefs.edit().putBoolean("ask_download_location", value).apply()
 
-    // --- ACCESIBILIDAD, TIPOGRAFÍA E IDIOMA ---
+    // --- ACCESSIBILITY, TYPOGRAPHY AND LANGUAGE ---
     var uiFontFamily: String
         get() = prefs.getString("ui_font_family", "SERIF") ?: "SERIF"
         set(value) = prefs.edit().putString("ui_font_family", value).apply()
@@ -544,8 +544,8 @@ class PreferencesManager(context: Context) {
         get() = prefs.getBoolean("offer_translations", false)
         set(value) = prefs.edit().putBoolean("offer_translations", value).apply()
 
-    // --- SENDA LABS & DESARROLLADOR ---
-    /** Safe Browsing descarga listas de Google al arrancar: activado por defecto, pero el usuario puede quitarlo. */
+    // --- SENDA LABS & DEVELOPER ---
+    /** Safe Browsing downloads Google lists at startup: on by default, but the user can turn it off. */
     var safeBrowsingEnabled: Boolean
         get() = prefs.getBoolean("safe_browsing_enabled", true)
         set(value) = prefs.edit().putBoolean("safe_browsing_enabled", value).apply()
@@ -562,14 +562,14 @@ class PreferencesManager(context: Context) {
         get() = prefs.getString("user_custom_script", "") ?: ""
         set(value) = prefs.edit().putString("user_custom_script", value).apply()
 
-    // --- ASISTENTE CON IA REMOTA ---
-    // Prefijo «assistant_»: los «ai_*» de la IA local retirada se borran al arrancar
-    /** «chatgpt_plan» (SendaAssistant.PROVIDER_ID), el id de una IA con clave (ApiProvider) o null. */
+    // --- REMOTE AI ASSISTANT ---
+    // "assistant_" prefix: the "ai_*" keys of the retired on-device AI are deleted at startup
+    /** "chatgpt_plan" (SendaAssistant.PROVIDER_ID), the id of an AI with a key (ApiProvider) or null. */
     var assistantProvider: String?
         get() = prefs.getString("assistant_provider", null)
         set(value) = prefs.edit().putString("assistant_provider", value).apply()
 
-    /** «Sign in with ChatGPT»: identificador estable de esta instalación (ext_agent_host_id) y cliente emitido. */
+    /** "Sign in with ChatGPT": stable identifier of this installation (ext_agent_host_id) and issued client. */
     var assistantChatGptHostId: String
         get() = prefs.getString("assistant_chatgpt_host_id", "") ?: ""
         set(value) = prefs.edit().putString("assistant_chatgpt_host_id", value).apply()
@@ -578,20 +578,20 @@ class PreferencesManager(context: Context) {
         get() = prefs.getString("assistant_chatgpt_client_id", "") ?: ""
         set(value) = prefs.edit().putString("assistant_chatgpt_client_id", value).apply()
 
-    /** Ya vio el aviso de bienvenida obligatorio de OpenAI («Eligible usage in this app uses your ChatGPT plan»). */
+    /** Has already seen OpenAI's mandatory welcome notice ("Eligible usage in this app uses your ChatGPT plan"). */
     var assistantChatGptWelcomeSeen: Boolean
         get() = prefs.getBoolean("assistant_chatgpt_welcome_seen", false)
         set(value) = prefs.edit().putBoolean("assistant_chatgpt_welcome_seen", value).apply()
 
-    // «Mis IA»: cada IA conectada guarda su modelo y su consentimiento, para cambiar de una a otra sin desconfigurar
-    // nada. assistant_provider es la que está en uso; assistant_model y assistant_privacy_accepted, de versiones
-    // anteriores, se pasaron a la IA que estaba en uso (ver init)
+    // "My AIs": each connected AI keeps its own model and consent, to switch between them without losing any
+    // settings. assistant_provider is the one in use; assistant_model and assistant_privacy_accepted, from earlier
+    // versions, were moved to the AI that was in use (see init)
     fun assistantModelFor(id: String): String = prefs.getString("assistant_model_$id", "") ?: ""
     fun setAssistantModelFor(id: String, model: String) = prefs.edit().putString("assistant_model_$id", model).apply()
     fun assistantConsentFor(id: String): Boolean = prefs.getBoolean("assistant_consent_$id", false)
     fun setAssistantConsentFor(id: String, accepted: Boolean) = prefs.edit().putBoolean("assistant_consent_$id", accepted).apply()
 
-    /** Credenciales del asistente (sesión de ChatGPT o clave de API), cifradas con el almacén de claves del teléfono. */
+    /** Assistant credentials (ChatGPT session or API key), encrypted with the phone's keystore. */
     fun getAssistantKey(providerId: String): String {
         val enc = prefs.getString("assistant_key_enc_$providerId", null) ?: return ""
         val iv = prefs.getString("assistant_key_iv_$providerId", null) ?: return ""
@@ -603,7 +603,7 @@ class PreferencesManager(context: Context) {
         }
     }
 
-    /** Guarda la clave cifrada; si el chip no puede cifrar, no se guarda (devuelve false). */
+    /** Saves the encrypted key; if the chip cannot encrypt, it is not saved (returns false). */
     fun setAssistantKey(providerId: String, key: String): Boolean {
         if (key.isBlank()) {
             prefs.edit().remove("assistant_key_enc_$providerId").remove("assistant_key_iv_$providerId").apply()
@@ -621,7 +621,7 @@ class PreferencesManager(context: Context) {
         }
     }
 
-    // --- FAVORITOS / MARCADORES ---
+    // --- BOOKMARKS ---
     var showBookmarksBar: Boolean
         get() = prefs.getBoolean("show_bookmarks_bar", false)
         set(value) = prefs.edit().putBoolean("show_bookmarks_bar", value).apply()
@@ -708,7 +708,7 @@ class PreferencesManager(context: Context) {
         saveBookmarks(current)
     }
 
-    // --- HISTORIAL DE NAVEGACIÓN LOCAL ---
+    // --- LOCAL BROWSING HISTORY ---
     fun getHistory(): List<HistoryItem> {
         val raw = prefs.getString("user_browsing_history", null) ?: return emptyList()
         return try {
@@ -733,7 +733,7 @@ class PreferencesManager(context: Context) {
 
     fun saveHistory(history: List<HistoryItem>) {
         val array = org.json.JSONArray()
-        // Limitar a los 1000 elementos más recientes para rendimiento
+        // Limit to the 1000 most recent items for performance
         history.take(1000).forEach {
             val obj = org.json.JSONObject()
             obj.put("id", it.id)
@@ -748,8 +748,8 @@ class PreferencesManager(context: Context) {
     fun addHistoryItem(title: String, url: String) {
         if (url.isBlank() || url == "about:blank" || url.startsWith("data:") || url.startsWith("about:")) return
         val now = System.currentTimeMillis()
-        // Leer, editar y guardar ~1000 entradas en JSON se hacía en el hilo principal en cada página (dos
-        // veces): ahora va en segundo plano y en orden, sin trabar el desplazamiento ni la carga
+        // Reading, editing and saving ~1000 JSON entries happened on the main thread on every page (twice):
+        // now it runs in the background and in order, without stalling scrolling or loading
         val generation = historyGeneration.get()
         historyExecutor.execute {
             synchronized(historyLock) {
@@ -757,8 +757,8 @@ class PreferencesManager(context: Context) {
                 val current = getHistory().toMutableList()
                 val cleanUrl = url.trim()
                 val cleanTitle = title.ifBlank { cleanUrl }
-                // Misma página que la última visitada (recarga, sesión restaurada, volver a abrir Senda):
-                // se actualiza su hora en vez de repetirla en la lista
+                // Same page as the last one visited (reload, restored session, reopening Senda):
+                // its time is updated instead of repeating it in the list
                 current.removeAll { it.url == cleanUrl && now - it.timestamp < 30_000L }
                 if (current.firstOrNull()?.url == cleanUrl) current.removeAt(0)
                 current.add(0, HistoryItem(title = cleanTitle, url = cleanUrl, timestamp = now))
@@ -788,7 +788,7 @@ class PreferencesManager(context: Context) {
         }
     }
 
-    // --- sincronización y respaldo (WEBDAV / PROPIA NUBE) ---
+    // --- SYNC AND BACKUP (WEBDAV / OWN CLOUD) ---
     var webdavUrl: String
         get() = prefs.getString("webdav_url", "") ?: ""
         set(value) = prefs.edit().putString("webdav_url", value).apply()
@@ -827,7 +827,7 @@ class PreferencesManager(context: Context) {
                         .remove("webdav_password")
                         .apply()
                 } catch (e: Exception) {
-                    // Nunca se guarda en texto plano: si el chip no cifra, no se guarda
+                    // Never stored in plain text: if the chip cannot encrypt, it is not stored
                     android.util.Log.e("SendaPrefs", "No se pudo cifrar la contraseña de WebDAV: ${e.message}")
                 }
             }
@@ -837,7 +837,7 @@ class PreferencesManager(context: Context) {
         get() = prefs.getLong("last_webdav_sync", 0L)
         set(value) = prefs.edit().putLong("last_webdav_sync", value).apply()
 
-    // --- GESTOR DE DESCARGAS AVANZADO ---
+    // --- ADVANCED DOWNLOAD MANAGER ---
     fun getDownloads(): List<DownloadItem> {
         val raw = prefs.getString("user_downloads_list", null) ?: return emptyList()
         return try {
@@ -906,7 +906,7 @@ class PreferencesManager(context: Context) {
         prefs.edit().remove("user_downloads_list").apply()
     }
 
-    // --- EXPORTACIÓN E IMPORTACIÓN HTML ESTÁNDAR (NETSCAPE BOOKMARKS) ---
+    // --- STANDARD HTML EXPORT AND IMPORT (NETSCAPE BOOKMARKS) ---
     fun exportBookmarksToNetscapeHtml(bookmarks: List<BookmarkItem>): String {
         val sb = StringBuilder()
         sb.append("<!DOCTYPE NETSCAPE-Bookmark-file-1>\n")

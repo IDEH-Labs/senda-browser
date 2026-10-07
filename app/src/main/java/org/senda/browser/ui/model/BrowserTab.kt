@@ -24,9 +24,9 @@ class BrowserTab(
     var searchBaseUrl: String = "https://duckduckgo.com/?q=",
     val prefs: PreferencesManager? = null,
     initialUrl: String = "about:blank",
-    // Sesión que Gecko creó para un enlace target=_blank o window.open: Gecko la abre y carga la página
+    // Session Gecko created for a target=_blank or window.open link: Gecko opens it and loads the page
     existingSession: GeckoSession? = null,
-    // Pestaña restaurada de la sesión anterior: no carga hasta que el usuario la abre
+    // Tab restored from the previous session: it does not load until the user opens it
     lazyLoad: Boolean = false
 ) {
     private var pendingLoad: String? = if (lazyLoad && initialUrl != "about:blank") initialUrl else null
@@ -35,35 +35,35 @@ class BrowserTab(
     val session: GeckoSession = existingSession ?: SendaGeckoEngine.createSession(isPrivate)
 
     var url by mutableStateOf(initialUrl)
-    // Lo informa Gecko tras validar el certificado; no se deduce del texto de la URL
+    // Reported by Gecko after validating the certificate; not inferred from the URL text
     var isSecure by mutableStateOf(false)
         private set
-    // Seguridad de la página original mientras se ve en modo lectura (el lector es un data: local)
+    // Security of the original page while it is shown in reader mode (the reader is a local data: page)
     var readerSourceSecure by mutableStateOf(false)
         private set
 
-    /** URL que se muestra en la barra: en modo lectura, la del artículo original, no el data: del lector. */
+    /** URL shown in the bar: in reader mode, the original article's, not the reader's data: URL. */
     val displayUrl: String
         get() = if (isReaderMode) originalArticleUrl ?: url else url
 
-    /** Estado del candado: en modo lectura, el de la página original. */
+    /** Padlock state: in reader mode, that of the original page. */
     val displaySecure: Boolean
         get() = if (isReaderMode) readerSourceSecure else isSecure
-    // Pestaña desde la que se abrió (enlace target=_blank, window.open o menú): Atrás vuelve a ella
+    // Tab it was opened from (target=_blank link, window.open or menu): Back returns to it
     var parentTabId: String? = null
     var title by mutableStateOf("Nueva pestaña")
     var isLoading by mutableStateOf(false)
-    /** Captura reducida de la página para la vista de pestañas. Solo en memoria, también en privado. */
+    /** Reduced capture of the page for the tabs view. Memory only, also in private mode. */
     var thumbnail by mutableStateOf<android.graphics.Bitmap?>(null)
     var progress by mutableIntStateOf(0)
     var trackersBlocked by mutableIntStateOf(0)
     var canGoBack by mutableStateOf(false)
-    /** Posición en el historial de la pestaña (-1 si Gecko aún no la informó); sirve para detectar trampas de Atrás. */
+    /** Position in the tab's history (-1 if Gecko has not reported it yet); used to detect Back traps. */
     var historyIndex = -1
         private set
     var canGoForward by mutableStateOf(false)
     var isFullScreen by mutableStateOf(false)
-    // El video a pantalla completa es más alto que ancho (Shorts, grabaciones de móvil): no girar a horizontal
+    // The full-screen video is taller than wide (Shorts, phone recordings): do not rotate to landscape
     var isFullScreenVideoPortrait by mutableStateOf(false)
         private set
     var isReaderMode by mutableStateOf(false)
@@ -72,11 +72,11 @@ class BrowserTab(
     private val queuedPrompts = ArrayDeque<SendaPrompt>()
 
     /**
-     * Diálogo de la página a la vista. Si llega otro mientras hay uno abierto, espera su turno: antes lo
-     * reemplazaba sin resolverlo (una segunda descarga perdía la primera, un aviso de script lento dejaba la
-     * página esperando para siempre). Al ponerlo a null se muestra el siguiente. El menú de pulsación larga
-     * no se encola: si hay otro diálogo se ignora, para que no aparezca después fuera de contexto.
-     * Siempre en el hilo principal (los delegados de Gecko y los post al Looper principal lo son).
+     * Dialog of the page in view. If another arrives while one is open, it waits its turn: it used to
+     * replace it without resolving it (a second download lost the first one, a slow script notice left the
+     * page waiting forever). Setting it to null shows the next one. The long-press menu
+     * is not queued: if there is another dialog it is ignored, so it does not show up later out of context.
+     * Always on the main thread (Gecko's delegates and posts to the main Looper are).
      */
     var activePrompt: SendaPrompt?
         get() = shownPrompt
@@ -90,19 +90,19 @@ class BrowserTab(
         }
     var isCrashed by mutableStateOf(false)
 
-    // Reproducción multimedia informada por la API nativa de GeckoView (sin scripts en la página):
-    // permite enviar el video a la TV desde el mismo minuto y pausarlo en el teléfono
+    // Media playback reported by GeckoView's native API (no scripts in the page):
+    // it allows sending the video to the TV from the same minute and pausing it on the phone
     private var mediaSession: MediaSession? = null
     private var mediaPosition = 0.0
     private var mediaPositionAt = 0L
     private var mediaPlaying by mutableStateOf(false)
 
-    /** La página tiene un video o audio activo (aunque esté en pausa). */
+    /** The page has an active video or audio (even if paused). */
     var hasMedia by mutableStateOf(false)
         private set
     private var mediaRate = 1.0
     private var mediaDuration = 0.0
-    // Video de YouTube al que corresponde la posición: al pasar a otro video la posición anterior no vale
+    // YouTube video the position belongs to: when moving to another video the previous position is not valid
     private var mediaVideoId: String? = null
 
     val currentMediaSeconds: Int
@@ -122,7 +122,7 @@ class BrowserTab(
         } catch (_: Exception) {}
     }
 
-    /** Duración del video activo en segundos (0 si no se conoce). */
+    /** Duration of the active video in seconds (0 if unknown). */
     val mediaDurationSeconds: Double
         get() = mediaDuration
 
@@ -135,9 +135,9 @@ class BrowserTab(
     private var pausedPositionCallback: ((Int) -> Unit)? = null
 
     /**
-     * Pausa y entrega la posición exacta en la que quedó el video, la que GeckoView informa tras la pausa.
-     * Calcularla con el reloj se adelanta si el video se atascó cargando; si Gecko no responde a tiempo,
-     * se usa ese cálculo.
+     * Pauses and hands over the exact position where the video stopped, the one GeckoView reports after pausing.
+     * Computing it with the clock runs ahead if the video got stuck loading; if Gecko does not answer in time,
+     * that computation is used.
      */
     fun pauseMediaAndGetPosition(onPosition: (Int) -> Unit) {
         if (mediaSession == null || !mediaPlaying) {
@@ -175,7 +175,7 @@ class BrowserTab(
                 is SendaPrompt.BeforeUnload -> if (!p.prompt.isComplete) p.result.complete(p.prompt.dismiss())
                 is SendaPrompt.RepostConfirm -> if (!p.prompt.isComplete) p.result.complete(p.prompt.dismiss())
                 is SendaPrompt.File -> if (!p.prompt.isComplete) p.result.complete(p.prompt.dismiss())
-                // Cerrar el aviso sin elegir equivale a no conceder nada
+                // Closing the prompt without choosing means granting nothing
                 is SendaPrompt.DateTime -> if (!p.prompt.isComplete) p.result.complete(p.prompt.dismiss())
                 is SendaPrompt.Permission -> p.onDecision(false)
                 is SendaPrompt.OpenInApp -> p.onDecision(false)
@@ -201,9 +201,9 @@ class BrowserTab(
     }
 
     /**
-     * Abre un enlace que no es web en la app que lo maneje. Con intent: se descartan componente y selector
-     * (una web no puede elegir qué pantalla interna de otra app abrir) y, si no hay app, se usa la página
-     * alternativa que la web indicó (browser_fallback_url).
+     * Opens a non-web link in the app that handles it. With intent: the component and selector are discarded
+     * (a website cannot choose which internal screen of another app to open) and, if there is no app, the fallback
+     * page the site gave (browser_fallback_url) is used.
      */
     private fun openExternal(uri: String) {
         val context = SendaGeckoEngine.appContext ?: return
@@ -234,7 +234,7 @@ class BrowserTab(
         } catch (_: SecurityException) {
             false
         }
-        // «Nunca» en «Abrir enlaces en apps»: solo se respetan los esquemas estándar (llamar, correo, mapa)
+        // "Never" in "Open links in apps": only standard schemes are honored (call, email, map)
         if (!standard && mode == "NEVER") {
             if (fallback != null) loadUri(fallback)
             return
@@ -243,16 +243,16 @@ class BrowserTab(
             val target = try {
                 context.packageManager.resolveActivity(intent, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY)
             } catch (_: Exception) { null }
-            // Sin app que lo abra no hay nada que preguntar
+            // With no app to open it there is nothing to ask
             if (target == null) {
                 if (fallback != null) loadUri(fallback)
                 return
             }
-            // Si resuelve al selector del sistema, no hay una app concreta que nombrar
+            // If it resolves to the system chooser, there is no specific app to name
             val label = target.activityInfo?.packageName
                 ?.takeIf { it != "android" }
                 ?.let { target.loadLabel(context.packageManager)?.toString() }
-            // Una sola decisión: el diálogo decide y luego se descarta (que vuelve a avisar con «no»)
+            // A single decision: the dialog decides and is then dismissed (which notifies again with "no")
             val decided = java.util.concurrent.atomic.AtomicBoolean(false)
             activePrompt = SendaPrompt.OpenInApp(label) { open ->
                 if (decided.compareAndSet(false, true) && !(open && launch()) && fallback != null) loadUri(fallback)
@@ -263,8 +263,8 @@ class BrowserTab(
     }
 
     /**
-     * Texto legible de la página (el mismo extractor que el modo lectura), para que la IA pueda leerla.
-     * Si Gecko no responde en 4 s o la página no tiene texto, devuelve null.
+     * Readable text of the page (the same extractor as reader mode), so the AI can read it.
+     * If Gecko does not answer within 4 s or the page has no text, returns null.
      */
     @OptIn(org.mozilla.geckoview.ExperimentalGeckoViewApi::class)
     suspend fun extractPageText(): String? {
@@ -286,7 +286,7 @@ class BrowserTab(
         return text.takeIf { it.length > 20 }
     }
 
-    /** Abre [uri] en otra pestaña (menú de pulsación larga). */
+    /** Opens [uri] in another tab (long-press menu). */
     fun openInNewTab(uri: String, private: Boolean = isPrivate) {
         val tab = BrowserTab(
             isPrivate = private,
@@ -297,10 +297,10 @@ class BrowserTab(
         tabOpener?.invoke(tab, prefs?.openLinksInBackground == true)
     }
 
-    // Momento en que el usuario aceptó cámara/micrófono en el aviso previo al permiso de Android
+    // Moment the user accepted camera/microphone in the notice before Android's permission
     private var mediaApprovedAt = 0L
 
-    /** Muestra el aviso de permiso; [onDecision] se llama una sola vez (también si se cierra sin elegir). */
+    /** Shows the permission notice; [onDecision] is called only once (also if closed without choosing). */
     private fun askUser(uri: String, kinds: List<PermissionKind>, onDecision: (Boolean) -> Unit) {
         val host = try { URI(uri).host?.removePrefix("www.") } catch (_: Exception) { null } ?: uri
         val decided = java.util.concurrent.atomic.AtomicBoolean(false)
@@ -311,42 +311,42 @@ class BrowserTab(
     }
 
     companion object {
-        /** Tiempo para que la página aplique el desplegado antes de extraer el texto. */
+        /** Time for the page to apply the unfolding before extracting the text. */
         private const val UNFOLD_DELAY_MS = 350L
 
-        /** Quita el plegado de secciones (atributo hidden, <details> cerrados, bloques plegables de Wikipedia). */
+        /** Removes section folding (hidden attribute, closed <details>, Wikipedia's collapsible blocks). */
         private const val UNFOLD_SECTIONS_JS = "(function(){try{" +
             "document.querySelectorAll('[hidden=\"until-found\"]').forEach(function(e){e.removeAttribute('hidden');});" +
             "document.querySelectorAll('details:not([open])').forEach(function(d){d.open=true;});" +
             "document.querySelectorAll('.collapsible-block').forEach(function(e){e.classList.add('open-block');});" +
             "}catch(e){}})();"
 
-        // Esquemas que Gecko carga por sí mismo; el resto se entrega a otras apps
+        // Schemes Gecko loads by itself; the rest are handed to other apps
         private val GECKO_SCHEMES = setOf(
             "http", "https", "about", "data", "blob", "file", "content", "javascript",
             "view-source", "moz-extension", "resource", "chrome", "jar", "ws", "wss"
         )
 
         /**
-         * Lo asigna MainActivity: pide a Android los permisos indicados y responde si se concedieron todos.
+         * Set by MainActivity: asks Android for the given permissions and answers whether all were granted.
          */
         var androidPermissionRequester: ((List<String>, (Boolean) -> Unit) -> Unit)? = null
 
         /**
-         * Lo asigna MainActivity: añade a la lista una pestaña abierta desde la web o desde el menú
-         * de pulsación larga. El segundo parámetro indica si debe quedar en segundo plano.
+         * Set by MainActivity: adds to the list a tab opened from the web or from the long-press
+         * menu. The second parameter says whether it should stay in the background.
          */
         var tabOpener: ((BrowserTab, Boolean) -> Unit)? = null
 
-        /** Lo asigna MainActivity: abre el diálogo de impresión de Android con el PDF de la página. */
+        /** Set by MainActivity: opens Android's print dialog with the page's PDF. */
         var printer: ((java.io.InputStream, String) -> Unit)? = null
     }
 
-    // --- Traducción en el dispositivo (motor de Firefox: la página no sale del teléfono) ---
-    /** Idioma detectado de la página (BCP 47) y el del usuario según Gecko; null mientras no se sepa. */
+    // --- On-device translation (Firefox's engine: the page does not leave the phone) ---
+    /** Detected language of the page (BCP 47) and the user's according to Gecko; null while unknown. */
     var pageLanguage by mutableStateOf<String?>(null)
     var userLanguage by mutableStateOf<String?>(null)
-    /** Idioma al que está traducida la página; null si se ve el original. */
+    /** Language the page is translated into; null if the original is shown. */
     var translatedTo by mutableStateOf<String?>(null)
     var isTranslating by mutableStateOf(false)
     var translationError by mutableStateOf<String?>(null)
@@ -370,7 +370,7 @@ class BrowserTab(
         isTranslating = false
     }
 
-    /** Genera el PDF de la página con Gecko y lo pasa al diálogo de impresión («Guardar como PDF» incluido). */
+    /** Generates the page's PDF with Gecko and passes it to the print dialog ("Save as PDF" included). */
     fun printPage() {
         val context = org.senda.browser.SendaApplication.instance
         session.saveAsPdf().accept({ stream ->
@@ -382,7 +382,7 @@ class BrowserTab(
     }
 
     private fun setupDelegates() {
-        // window.print() de la página: mismo flujo que «Imprimir» del menú
+        // The page's window.print(): same flow as "Print" in the menu
         session.printDelegate = object : GeckoSession.PrintDelegate {
             override fun onPrint(session: GeckoSession) {
                 printPage()
@@ -424,7 +424,7 @@ class BrowserTab(
                     if (newUrl == "about:blank" && url.startsWith("moz-extension://")) {
                         return
                     }
-                    // Página de error de Senda: la barra conserva la dirección que falló
+                    // Senda error page: the bar keeps the address that failed
                     val failed = pendingErrorUrl
                     if (failed != null && newUrl.startsWith("data:text/html")) {
                         pendingErrorUrl = null
@@ -457,8 +457,8 @@ class BrowserTab(
                 canGoForward = canGo
             }
 
-            // Sin esto, un sitio inexistente, sin conexión o con certificado inválido dejaba ver la página de
-            // inicio sin explicar nada
+            // Without this, a nonexistent site, no connection or an invalid certificate left the home page
+            // showing without explaining anything
             override fun onLoadError(
                 session: GeckoSession,
                 uri: String?,
@@ -471,29 +471,29 @@ class BrowserTab(
                 return GeckoResult.fromValue(buildErrorPage(failed, error))
             }
 
-            // tel:, mailto:, geo:, intent:, whatsapp:… no son páginas: se entregan a la app que corresponda
+            // tel:, mailto:, geo:, intent:, whatsapp:… are not pages: they are handed to the matching app
             override fun onLoadRequest(
                 session: GeckoSession,
                 request: GeckoSession.NavigationDelegate.LoadRequest
             ): GeckoResult<org.mozilla.geckoview.AllowOrDeny>? {
-                // Vuelta del inicio de sesión con ChatGPT: se entrega dentro de Senda sin cargarla. Por la red, el
-                // modo solo HTTPS bloquea http://127.0.0.1 y la página mostraba «conexión no segura»
+                // Redirect from the ChatGPT sign-in: delivered inside Senda without loading it. Over the network,
+                // HTTPS-only mode blocks http://127.0.0.1 and the page showed "connection not secure"
                 if (org.senda.browser.core.assistant.ChatGptPlanAuth.deliverCallback(request.uri)) {
-                    // Página en blanco: volver atrás recargaba la página de OpenAI de la misma autorización justo
-                    // antes del canje y el código quedaba invalidado (invalid_grant, 2026-10-05)
+                    // Blank page: going back reloaded OpenAI's page for the same authorization right
+                    // before the exchange and the code was invalidated (invalid_grant, 2026-10-05)
                     android.os.Handler(android.os.Looper.getMainLooper()).post { session.loadUri("about:blank") }
                     return GeckoResult.fromValue(org.mozilla.geckoview.AllowOrDeny.DENY)
                 }
                 val scheme = request.uri.substringBefore(':', "").lowercase()
                 if (scheme in GECKO_SCHEMES) return null
-                // Solo tras un toque del usuario: una web no puede lanzar apps por su cuenta
+                // Only after a user tap: a website cannot launch apps on its own
                 if (request.hasUserGesture) {
                     android.os.Handler(android.os.Looper.getMainLooper()).post { openExternal(request.uri) }
                 }
                 return GeckoResult.fromValue(org.mozilla.geckoview.AllowOrDeny.DENY)
             }
 
-            // Enlaces target=_blank y window.open: sin esto Gecko no abre nada y window.open devuelve null
+            // target=_blank and window.open links: without this Gecko opens nothing and window.open returns null
             override fun onNewSession(session: GeckoSession, uri: String): GeckoResult<GeckoSession>? {
                 val opener = tabOpener ?: return null
                 val newSession = SendaGeckoEngine.createSession(isPrivate, open = false)
@@ -527,7 +527,7 @@ class BrowserTab(
             }
 
             override fun onSecurityChange(session: GeckoSession, securityInfo: GeckoSession.ProgressDelegate.SecurityInformation) {
-                // Seguro solo con certificado válido, sin excepción manual y sin contenido mixto activo cargado
+                // Secure only with a valid certificate, no manual exception and no active mixed content loaded
                 isSecure = securityInfo.isSecure && !securityInfo.isException &&
                     securityInfo.mixedModeActive != GeckoSession.ProgressDelegate.SecurityInformation.CONTENT_LOADED
             }
@@ -541,7 +541,7 @@ class BrowserTab(
                 }
 
                 if (success && prefs != null && url != "about:blank" && !isYouTubeUrl(url)) {
-                    // Senda Labs: Inyección de CSS personalizado en caliente (nunca en YouTube, que se deja tal cual)
+                    // Senda Labs: live custom CSS injection (never on YouTube, which is left as is)
                     if (prefs.userCustomCss.isNotBlank()) {
                         val escapedCss = prefs.userCustomCss
                             .replace("\\", "\\\\")
@@ -552,7 +552,7 @@ class BrowserTab(
                         session.loadUri(cssJs)
                     }
 
-                    // Senda Labs: Inyección de UserScript personalizado
+                    // Senda Labs: custom UserScript injection
                     if (prefs.userCustomScript.isNotBlank()) {
                         val jsCode = prefs.userCustomScript
                             .replace("\\", "\\\\")
@@ -610,7 +610,7 @@ class BrowserTab(
             }
         }
 
-        // App instalada como depurable (compilación de desarrollo): sin BuildConfig en este módulo
+        // App installed as debuggable (development build): there is no BuildConfig in this module
         val applicationDebuggable = (org.senda.browser.SendaApplication.instance.applicationInfo.flags and
             android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
         session.contentBlockingDelegate = object : ContentBlocking.Delegate {
@@ -619,7 +619,7 @@ class BrowserTab(
                 event: ContentBlocking.BlockEvent
             ) {
                 trackersBlocked++
-                // Solo en compilaciones de desarrollo: la versión de usuarios no registra las direcciones visitadas
+                // Only in development builds: the users' version does not log the visited addresses
                 if (applicationDebuggable) {
                     android.util.Log.d("SendaBlocked", "${event.uri} categorías=${event.antiTrackingCategory} cookies=${event.cookieBehaviorCategory} safe=${event.safeBrowsingCategory}")
                 }
@@ -637,8 +637,8 @@ class BrowserTab(
             }
 
             override fun onFullScreen(session: GeckoSession, fullScreen: Boolean) {
-                // Gecko ya ajusta el video a la pantalla con proporción correcta (object-fit: contain en su hoja
-                // de estilos de pantalla completa); un estilo añadido en vw/vh choca con el tamaño que calcula la web
+                // Gecko already fits the video to the screen with the right aspect ratio (object-fit: contain in its
+                // full-screen stylesheet); an added style in vw/vh clashes with the size the site computes
                 isFullScreen = fullScreen
                 if (!fullScreen) isFullScreenVideoPortrait = false
             }
@@ -649,7 +649,7 @@ class BrowserTab(
                 screenY: Int,
                 element: GeckoSession.ContentDelegate.ContextElement
             ) {
-                // Solo enlaces y multimedia: sobre texto Gecko ya muestra su barra de selección
+                // Only links and media: on text Gecko already shows its selection bar
                 val hasTarget = !element.linkUri.isNullOrBlank() ||
                     (element.type != GeckoSession.ContentDelegate.ContextElement.TYPE_NONE && !element.srcUri.isNullOrBlank())
                 if (hasTarget) activePrompt = SendaPrompt.ContextMenu(element)
@@ -657,7 +657,7 @@ class BrowserTab(
 
             override fun onExternalResponse(session: GeckoSession, response: org.mozilla.geckoview.WebResponse) {
                 val p = prefs ?: return
-                // Se guarda el flujo que ya trajo Gecko: misma conexión (Tor/proxy), cookies y modo privado
+                // The stream Gecko already fetched is saved: same connection (Tor/proxy), cookies and private mode
                 val save = {
                     org.senda.browser.core.SendaDownloadManager.saveResponse(
                         context = org.senda.browser.SendaApplication.instance,
@@ -666,8 +666,8 @@ class BrowserTab(
                         isPrivate = isPrivate
                     )
                 }
-                // Con «Preguntar dónde guardar» el selector ya pide permiso; sin él, la página no puede
-                // dejar un archivo en Descargas sin que el usuario lo acepte
+                // With "Ask where to save" the picker already asks for permission; without it, the page cannot
+                // leave a file in Downloads without the user accepting it
                 if (p.askDownloadLocation) { save(); return }
                 val decided = java.util.concurrent.atomic.AtomicBoolean(false)
                 val once: (Boolean) -> Unit = { accept ->
@@ -694,7 +694,7 @@ class BrowserTab(
             }
 
             override fun onSlowScript(session: GeckoSession, scriptFileName: String): GeckoResult<SlowScriptResponse> {
-                // Detenerlo sin preguntar rompía páginas que solo estaban ocupadas (editores, mapas, juegos)
+                // Stopping it without asking broke pages that were just busy (editors, maps, games)
                 val result = GeckoResult<SlowScriptResponse>()
                 val decided = java.util.concurrent.atomic.AtomicBoolean(false)
                 val once: (Boolean) -> Unit = { stop ->
@@ -713,7 +713,7 @@ class BrowserTab(
                 session: GeckoSession,
                 perm: GeckoSession.PermissionDelegate.ContentPermission
             ): GeckoResult<Int> {
-                // En navegación privada: Denegación automática de GPS/Geolocalización y Notificaciones para evitar rastreo físico o en segundo plano
+                // In private browsing: GPS/geolocation and notifications are denied automatically to prevent physical or background tracking
                 if (isPrivate) {
                     when (perm.permission) {
                         GeckoSession.PermissionDelegate.PERMISSION_GEOLOCATION,
@@ -727,7 +727,7 @@ class BrowserTab(
                         PermissionKind.LOCATION to (prefs?.sitePermissionLocation ?: "ASK")
                     GeckoSession.PermissionDelegate.PERMISSION_DESKTOP_NOTIFICATION ->
                         PermissionKind.NOTIFICATIONS to (prefs?.sitePermissionNotifications ?: "BLOCK")
-                    // Resto (almacenamiento persistente, DRM, autoplay…): decide Gecko con sus valores por defecto
+                    // Everything else (persistent storage, DRM, autoplay…): Gecko decides with its defaults
                     else -> return GeckoResult.fromValue(GeckoSession.PermissionDelegate.ContentPermission.VALUE_PROMPT)
                 }
                 val allow = GeckoSession.PermissionDelegate.ContentPermission.VALUE_ALLOW
@@ -752,7 +752,7 @@ class BrowserTab(
             ) {
                 val camPolicy = prefs?.sitePermissionCamera ?: "ASK"
                 val micPolicy = prefs?.sitePermissionMic ?: "ASK"
-                // Nunca se concede en silencio: «Preguntar» muestra el aviso y solo «Permitir» concede sin preguntar
+                // Never granted silently: "Ask" shows the notice and only "Allow" grants without asking
                 val wantedVideo = video?.firstOrNull()?.takeIf { camPolicy != "BLOCK" }
                 val wantedAudio = audio?.firstOrNull()?.takeIf { micPolicy != "BLOCK" }
                 if (wantedVideo == null && wantedAudio == null) {
@@ -763,7 +763,7 @@ class BrowserTab(
                     if (wantedVideo != null && camPolicy != "ALLOW") add(PermissionKind.CAMERA)
                     if (wantedAudio != null && micPolicy != "ALLOW") add(PermissionKind.MICROPHONE)
                 }
-                // Ya aceptado hace un momento, antes de pedir el permiso de Android: no preguntar dos veces
+                // Already accepted a moment ago, before asking for Android's permission: do not ask twice
                 val justApproved = android.os.SystemClock.elapsedRealtime() - mediaApprovedAt < 30_000L
                 mediaApprovedAt = 0L
                 if (toAsk.isEmpty() || justApproved) {
@@ -775,8 +775,8 @@ class BrowserTab(
                 }
             }
 
-            // Gecko necesita además el permiso de Android (cámara, micrófono, ubicación). Solo llega aquí
-            // después de que el usuario aceptó en el aviso de Senda o eligió «Permitir» en ajustes
+            // Gecko also needs Android's permission (camera, microphone, location). It only gets here
+            // after the user accepted Senda's notice or chose "Allow" in settings
             override fun onAndroidPermissionsRequest(
                 session: GeckoSession,
                 permissions: Array<out String>?,
@@ -790,8 +790,8 @@ class BrowserTab(
                 val askAndroid = {
                     requester(permissions.toList()) { granted -> if (granted) callback.grant() else callback.reject() }
                 }
-                // Con cámara y micrófono Gecko pide el permiso de Android antes que el del sitio: Senda pregunta
-                // primero por el sitio (o aplica el ajuste) y no vuelve a preguntar en onMediaPermissionRequest
+                // With camera and microphone Gecko asks for Android's permission before the site's: Senda asks
+                // about the site first (or applies the setting) and does not ask again in onMediaPermissionRequest
                 val kinds = buildList {
                     if (android.Manifest.permission.CAMERA in permissions) add(PermissionKind.CAMERA)
                     if (android.Manifest.permission.RECORD_AUDIO in permissions) add(PermissionKind.MICROPHONE)
@@ -913,8 +913,8 @@ class BrowserTab(
             ): GeckoResult<GeckoSession.PromptDelegate.PromptResponse> {
                 val tag = org.senda.browser.core.security.SendaVaultLoginStorage.TAG
                 android.util.Log.i(tag, "onLoginSelect: ${request.options.size} opción(es)")
-                // Tras identificarse con huella el selector anterior suele haberse cancelado: si el usuario ya
-                // eligió la cuenta, se rellena directamente sin volver a preguntar
+                // After authenticating with the fingerprint the previous selector has usually been cancelled: if the user already
+                // chose the account, it is filled directly without asking again
                 val ctx = SendaGeckoEngine.appContext
                 val pending = org.senda.browser.core.security.SendaVaultLoginStorage.takePending(request.options.map { it.value.guid })
                 if (ctx != null && pending != null) {
@@ -933,8 +933,8 @@ class BrowserTab(
                 request.setDelegate(object : GeckoSession.PromptDelegate.PromptInstanceDelegate {
                     override fun onPromptDismiss(prompt: GeckoSession.PromptDelegate.BasePrompt) {
                         android.util.Log.i(tag, "onLoginSelect: GeckoView canceló el selector")
-                        // Cambió de campo o de página: la barra no debe quedarse a la vista. Si se estaba
-                        // pidiendo la huella, ese flujo sigue y deja el relleno pendiente
+                        // Moved to another field or page: the bar must not stay in view. If the fingerprint was
+                        // being requested, that flow continues and leaves the fill pending
                         android.os.Handler(android.os.Looper.getMainLooper()).post {
                             if ((activePrompt as? SendaPrompt.LoginSelect)?.request === request) activePrompt = null
                             else queuedPrompts.removeAll { it is SendaPrompt.LoginSelect && it.request === request }
@@ -957,8 +957,8 @@ class BrowserTab(
                 if (entry == null || ctx == null || entry.password.isEmpty() || isPrivate) {
                     return GeckoResult.fromValue(request.dismiss())
                 }
-                // Si la cuenta ya está en la Bóveda no se pregunta: GeckoView solo conoce las cuentas sin contraseña
-                // (no se descifran al cargar la página) y pediría «actualizar» en cada inicio de sesión
+                // If the account is already in the vault, do not ask: GeckoView only knows the accounts without a password
+                // (they are not decrypted on page load) and would ask to "update" at every sign-in
                 val domain = org.senda.browser.core.security.SendaVaultManager.extractCanonicalDomain(entry.origin)
                 val known = org.senda.browser.core.security.SendaVaultManager.getCredentials(ctx)
                     .any { it.domain.equals(domain, ignoreCase = true) && it.username == entry.username }
@@ -982,7 +982,7 @@ class BrowserTab(
                 return result
             }
 
-            // Ventanas emergentes que la página abre sin que el usuario pulse nada
+            // Pop-up windows the page opens without the user pressing anything
             override fun onPopupPrompt(
                 session: GeckoSession,
                 prompt: GeckoSession.PromptDelegate.PopupPrompt
@@ -1095,11 +1095,11 @@ class BrowserTab(
     }
 
     fun reload() {
-        // En la página de error, «recargar» es volver a intentar la dirección que falló
+        // On the error page, "reload" means retrying the address that failed
         if (showingError) loadUri(url) else session.reload()
     }
 
-    // Dirección que falló, mientras Gecko carga la página de error que la sustituye
+    // Address that failed, while Gecko loads the error page that replaces it
     private var pendingErrorUrl: String? = null
     var showingError by mutableStateOf(false)
         private set
@@ -1118,7 +1118,7 @@ class BrowserTab(
         }
         val host = try { URI(failedUrl).host ?: failedUrl } catch (_: Exception) { failedUrl }
         val href = escapeHtml(failedUrl)
-        // Solo se ofrece reintentar en direcciones web; nunca un botón para saltarse un certificado inválido
+        // Retrying is only offered for web addresses; never a button to bypass an invalid certificate
         val retry = if (failedUrl.startsWith("http://") || failedUrl.startsWith("https://"))
             "<a class=\"btn\" href=\"$href\">${escapeHtml(strings.err_retry)}</a>" else ""
         val html = """
@@ -1159,7 +1159,7 @@ class BrowserTab(
         } else {
             org.mozilla.geckoview.GeckoSessionSettings.USER_AGENT_MODE_MOBILE
         }
-        // Sin la ventana de escritorio, muchas webs siguen maquetando para móvil aunque cambie el agente
+        // Without the desktop viewport, many sites keep the mobile layout even if the user agent changes
         session.settings.viewportMode = if (isDesktopMode) {
             org.mozilla.geckoview.GeckoSessionSettings.VIEWPORT_MODE_DESKTOP
         } else {
@@ -1215,8 +1215,8 @@ class BrowserTab(
         }
         val fontScale = (prefs?.readerFontSizePercent ?: 100) / 100.0
 
-        // Wikipedia móvil y otras webs pliegan secciones al cargar. El extractor de GeckoView descarta lo que no se
-        // ve, y el lector perdía hasta el 95 % del artículo: se despliegan antes de extraer
+        // Mobile Wikipedia and other sites fold sections on load. GeckoView's extractor drops what is not
+        // visible, and the reader lost up to 95 % of the article: they are unfolded before extracting
         session.loadUri("javascript:" + URLEncoder.encode(UNFOLD_SECTIONS_JS, "UTF-8").replace("+", "%20"))
         android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
         val extractor = session.sessionPageExtractor
@@ -1224,8 +1224,8 @@ class BrowserTab(
             { extractedHtml ->
                 if (!extractedHtml.isNullOrBlank() && extractedHtml.length > 50) {
                     val wordCount = extractedHtml.split(Regex("\\s+")).size
-                    // El extractor entrega texto, no HTML: se escapa y cada línea pasa a ser un párrafo. Antes se
-                    // insertaba tal cual y el título de la página podía ejecutar código dentro del lector
+                    // The extractor delivers text, not HTML: it is escaped and each line becomes a paragraph. It used to be
+                    // inserted as is, and the page title could run code inside the reader
                     val bodyHtml = markdownToSafeHtml(extractedHtml)
                     val safeTitle = escapeHtml(articleTitle)
                     val readTime = Math.max(1, Math.round(wordCount / 200.0))
@@ -1337,9 +1337,9 @@ class BrowserTab(
                                         return;
                                     }
 
-                                    // Frases de texto corrido: fuera referencias, enlaces, ISBN, fechas de consulta y listas
-                                    // de datos. Antes se tomaban la primera, la del medio y la última de todo el texto, y
-                                    // en Wikipedia dos de tres salían de la bibliografía («Consultado el 19 de mayo…»)
+                                    // Running-text sentences: no references, links, ISBNs, access dates or data
+                                    // lists. It used to take the first, middle and last sentence of the whole text, and
+                                    // on Wikipedia two of three came from the bibliography ("Consultado el 19 de mayo…")
                                     function isProse(s) {
                                         if (s.length < 60 || s.length > 400) return false;
                                         if (/https?:|www\.|isbn|doi:|^[↑^\[]/i.test(s)) return false;
@@ -1353,7 +1353,7 @@ class BrowserTab(
                                     var sentences = allSentences.filter(isProse);
                                     if (sentences.length === 0) sentences = allSentences;
 
-                                    // La primera y otras dos repartidas por el 70 % inicial, donde está el cuerpo del texto
+                                    // The first one and two more spread over the first 70 %, where the body of the text is
                                     var selectedPoints = [];
                                     if (sentences.length <= 3) {
                                         selectedPoints = sentences;
@@ -1397,7 +1397,7 @@ class BrowserTab(
                                 return (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
                             }
 
-                            // El texto del artículo es de la página: escaparlo siempre antes de usar innerHTML
+                            // The article text comes from the page: always escape it before using innerHTML
                             function escapeHtml(s) {
                                 return String(s).replace(/[&<>"']/g, function(c) {
                                     return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
@@ -1408,7 +1408,7 @@ class BrowserTab(
                                 if (!text) return '';
                                 if (!terms || terms.length === 0) return escapeHtml(text);
                                 var normTerms = terms.map(function(t){ return stripAccents(t.toLowerCase()); });
-                                // split con grupo: los índices impares son palabras, los pares lo que hay entre ellas
+                                // split with a group: odd indexes are words, even ones what lies between them
                                 return text.split(/([\p{L}\p{N}_]+)/u).map(function(part, idx) {
                                     if (idx % 2 === 1) {
                                         var normToken = stripAccents(part.toLowerCase());
@@ -1456,7 +1456,7 @@ class BrowserTab(
                                         return;
                                     }
 
-                                    // Palabras vacías del idioma de Senda (antes solo español)
+                                    // Stop words of Senda's language (it used to be Spanish only)
                                     var stopWords = new Set(SR.stop);
 
                                     var normQuery = stripAccents(query.toLowerCase());
@@ -1601,11 +1601,11 @@ class BrowserTab(
     }
 
     /**
-     * Convierte el Markdown del extractor en HTML del lector. Todo se escapa primero; luego solo se
-     * reconstruyen encabezados, listas, citas, negritas, cursivas, enlaces e imágenes con http(s).
+     * Converts the extractor's Markdown into reader HTML. Everything is escaped first; then only
+     * headings, lists, quotes, bold, italics, links and http(s) images are rebuilt.
      */
     private fun markdownToSafeHtml(markdown: String): String {
-        // Texto del enlace con corchetes escapados (\[1\]) incluidos; destino cualquiera
+        // Link text including escaped brackets (\[1\]); any destination
         val link = Regex("""(!?)\[((?:\\.|[^\]\\])*)]\(([^)\s]*)\)""")
         fun unescapeMd(t: String) = t.replace(Regex("""\\([\\\[\]()*_#`>~-])"""), "$1")
         fun inline(raw: String): String {
@@ -1615,7 +1615,7 @@ class BrowserTab(
                 val text = unescapeMd(rawText)
                 val web = href.startsWith("http://") || href.startsWith("https://")
                 when {
-                    // Destinos internos (anclas de citas, moz-nullprincipal): solo el texto
+                    // Internal destinations (citation anchors, moz-nullprincipal): text only
                     !web -> if (bang == "!") "" else text
                     bang == "!" -> "<img src=\"$href\" alt=\"$text\" loading=\"lazy\">"
                     else -> "<a href=\"$href\">$text</a>"
@@ -1652,8 +1652,8 @@ class BrowserTab(
     }
 
     /**
-     * Textos del lector en el idioma de Senda, como objeto JSON para su JavaScript. Ya van escapados para HTML
-     * porque el lector los inserta con innerHTML; JSONObject escapa también «</» para no cerrar el <script>.
+     * Reader texts in Senda's language, as a JSON object for its JavaScript. They are already HTML-escaped
+     * because the reader inserts them with innerHTML; JSONObject also escapes "</" so as not to close the <script>.
      */
     private fun readerTextsJson(rs: org.senda.browser.core.SendaStringPack, lang: String): String {
         fun plain(t: String) = java.text.Normalizer.normalize(t, java.text.Normalizer.Form.NFD).replace(Regex("\\p{Mn}+"), "")
@@ -1664,7 +1664,7 @@ class BrowserTab(
             "pt" -> "o a os as um uma de do da dos das em no na com por para que quem qual como quando onde porque e ou mas é são foi era se"
             "it" -> "il lo la i gli le un una di del della da in con per su che chi quale come quando dove perché e o ma è sono era fu si"
             "es" -> "el la los las un una unos unas de del a al en con por para hacia desde sin sobre entre tras hasta durante mediante que quien quienes cual cuales como cuando donde porque y e ni o u pero sino si no es son era eran fue fueron ser sido siendo ha han habia hay hubo tener tiene tienen tuvo se su sus lo le les me nos te"
-            else -> "" // japonés y chino no separan palabras con espacios
+            else -> "" // Japanese and Chinese do not separate words with spaces
         }
         val texts = mapOf(
             "reader" to rs.tb_reader_mode,
@@ -1711,7 +1711,7 @@ class BrowserTab(
         fontScale: Double,
         readerTexts: String
     ) {
-        // Barra invertida primero: si no, un título con «\\» deshacía el escape de las comillas
+        // Backslash first: otherwise a title with "\\" undid the escaping of the quotes
         val safeTitle = articleTitle.replace("\\", "\\\\").replace("'", "\\'").replace("\"", "\\\"")
             .replace("\n", " ").replace("\r", " ").replace("<", "\\u003c")
         val js = "(function(){" +
@@ -1793,7 +1793,7 @@ class BrowserTab(
     }
 
     fun close() {
-        // Resolver también los que esperaban turno: un GeckoResult sin completar deja a Gecko esperando
+        // Also resolve the ones waiting their turn: an uncompleted GeckoResult leaves Gecko waiting
         while (activePrompt != null) dismissActivePrompt()
         thumbnail = null
         try {
@@ -1813,7 +1813,7 @@ object SendaUrlResolver {
 
         val lower = trimmed.lowercase()
 
-        // 1. Esquemas directos
+        // 1. Direct schemes
         if (lower.startsWith("http://") ||
             lower.startsWith("https://") ||
             lower.startsWith("about:") ||
@@ -1828,25 +1828,25 @@ object SendaUrlResolver {
             return trimmed
         }
 
-        // 2. Si no tiene espacios, evaluar si es un dominio, IP o localhost
+        // 2. If it has no spaces, check whether it is a domain, IP or localhost
         if (!trimmed.any { it.isWhitespace() }) {
             // Localhost
             if (lower == "localhost" || lower.startsWith("localhost:") || lower.startsWith("localhost/")) {
                 return "http://$trimmed"
             }
 
-            // Direcciones IP
+            // IP addresses
             if (IP_PATTERN.matches(trimmed)) {
                 return "http://$trimmed"
             }
 
-            // Nombres de dominio con TLD válido
+            // Domain names with a valid TLD
             if (DOMAIN_PATTERN.matches(trimmed) || android.util.Patterns.WEB_URL.matcher(trimmed).matches()) {
                 return "https://$trimmed"
             }
         }
 
-        // 3. De lo contrario, derivar al motor de búsqueda ético
+        // 3. Otherwise, send it to the ethical search engine
         return if (searchBaseUrl.contains("%s")) {
             searchBaseUrl.replace("%s", UriEncoder.encode(trimmed))
         } else {

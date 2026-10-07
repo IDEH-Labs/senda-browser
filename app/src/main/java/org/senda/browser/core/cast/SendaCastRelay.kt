@@ -16,12 +16,12 @@ import java.security.SecureRandom
 import java.util.concurrent.Executors
 
 /**
- * Relé local del video que se muestra en la TV ([org.senda.browser.ui.components.TvPresentationHost]). El
- * reproductor de Android no usa el proxy de Senda ni sabe el Referer que exigen muchos sitios: el relé pide el
- * video como lo pidió la página (por el mismo proxy o Tor) y se lo pasa sin recomprimir.
+ * Local relay for the video shown on the TV ([org.senda.browser.ui.components.TvPresentationHost]). Android's
+ * player does not use Senda's proxy and does not know the Referer many sites require: the relay requests the
+ * video the way the page did (through the same proxy or Tor) and passes it on without re-encoding.
  *
- * Solo atiende a la dirección indicada (127.0.0.1) y a rutas con un secreto aleatorio, y se cierra al terminar.
- * Las listas HLS se reescriben para que también sus trozos pasen por aquí.
+ * It only serves the given address (127.0.0.1) and paths with a random secret, and it closes when done.
+ * HLS playlists are rewritten so their chunks also go through here.
  */
 class SendaCastRelay private constructor(
     private val server: ServerSocket,
@@ -39,10 +39,10 @@ class SendaCastRelay private constructor(
             return "http://${if (server.inetAddress is java.net.Inet6Address) "[$host]" else host}:${server.localPort}/$secret/"
         }
 
-    /** Dirección local que se le da a la TV para [original]. */
+    /** Local address given to the TV for [original]. */
     fun urlFor(original: String): String {
         val encoded = Base64.encodeToString(original.toByteArray(Charsets.UTF_8), Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
-        // Algunas TVs deciden el reproductor por la extensión: se conserva el nombre del archivo original
+        // Some TVs choose the player by the extension: the original file name is kept
         val name = original.substringBefore('?').substringAfterLast('/').ifBlank { "video" }
             .replace(Regex("[^A-Za-z0-9._-]"), "_").take(60)
         return "$baseUrl$encoded/$name"
@@ -57,7 +57,7 @@ class SendaCastRelay private constructor(
                     break
                 }
                 if (socket.inetAddress != tvAddress) {
-                    // Nadie más en la red puede usar el relé
+                    // Nobody else on the network can use the relay
                     try { socket.close() } catch (_: Exception) {}
                     continue
                 }
@@ -108,7 +108,7 @@ class SendaCastRelay private constructor(
                 }
                 relay(original, method, headers["range"], out)
             } catch (e: Exception) {
-                // La TV corta conexiones a menudo (salta, cambia de calidad): no es un error
+                // The TV drops connections often (seeking, quality changes): it is not an error
                 if (!closed) Log.d(TAG, "Relé: ${e.message}")
             }
         }
@@ -133,7 +133,7 @@ class SendaCastRelay private constructor(
             }
             if (isPlaylist) {
                 val text = conn.inputStream.bufferedReader().use { it.readText() }
-                // La URL final (tras redirecciones) es la base de las rutas relativas de la lista
+                // The final URL (after redirects) is the base for the playlist's relative paths
                 val body = rewritePlaylist(text, conn.url.toString()).toByteArray(Charsets.UTF_8)
                 writeStatus(out, 200, "OK", mapOf(
                     "Content-Type" to "application/vnd.apple.mpegurl",
@@ -158,7 +158,7 @@ class SendaCastRelay private constructor(
         }
     }
 
-    /** Cada dirección de la lista (variantes, trozos, claves, subtítulos) pasa también por el relé. */
+    /** Every address in the playlist (variants, chunks, keys, subtitles) also goes through the relay. */
     private fun rewritePlaylist(text: String, base: String): String {
         val baseUrl = URL(base)
         fun relayed(uri: String): String = try {
@@ -210,7 +210,7 @@ class SendaCastRelay private constructor(
         private const val TAG = "SendaCastRelay"
         private const val USER_AGENT = "Mozilla/5.0 (Android 15; Mobile; rv:157.0) Gecko/157.0 Firefox/157.0"
 
-        /** El mismo camino que la navegación (ver senda_proxy/background.js): con Tor el video también va por Tor. */
+        /** The same path as browsing (see senda_proxy/background.js): with Tor the video also goes through Tor. */
         fun proxyFrom(prefs: org.senda.browser.core.PreferencesManager): Proxy = when (prefs.proxyMode) {
             "TOR_ORBOT" -> Proxy(Proxy.Type.SOCKS, InetSocketAddress.createUnresolved("127.0.0.1", 9050))
             "CUSTOM_SOCKS5" -> Proxy(Proxy.Type.SOCKS, InetSocketAddress.createUnresolved(prefs.proxyHost, prefs.proxyPort))
@@ -219,13 +219,13 @@ class SendaCastRelay private constructor(
         }
 
         /**
-         * Abre el relé en la interfaz de red por la que se llega a [tvAddress] (el Wi‑Fi de la casa), en un puerto libre.
-         * Con una TV debe llamarse fuera del hilo principal; con [tvAddress] 127.0.0.1 (reproductor del teléfono) no.
+         * Opens the relay on the network interface that reaches [tvAddress] (the home Wi‑Fi), on a free port.
+         * With a TV it must be called off the main thread; with [tvAddress] 127.0.0.1 (the phone's player) it need not.
          */
         fun open(tvAddress: InetAddress, referer: String?, proxy: Proxy): SendaCastRelay {
-            // Para el reproductor del propio teléfono basta 127.0.0.1 (y así no hay red en el hilo principal)
+            // For the phone's own player 127.0.0.1 is enough (and so there is no networking on the main thread)
             val local = if (tvAddress.isLoopbackAddress) tvAddress else java.net.DatagramSocket().use { probe ->
-                // Sin enviar nada: solo pregunta al sistema qué IP propia usaría para hablar con la TV
+                // Without sending anything: it only asks the system which own IP it would use to talk to the TV
                 probe.connect(tvAddress, 1900)
                 probe.localAddress
             }

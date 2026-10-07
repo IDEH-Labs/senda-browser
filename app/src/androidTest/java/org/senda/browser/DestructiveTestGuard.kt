@@ -4,8 +4,8 @@ import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assume.assumeTrue
 
 /**
- * Las pruebas instrumentadas corren sobre los datos reales del teléfono. Las que borran el historial o
- * cambian la contraseña de WebDAV solo corren si se piden expresamente:
+ * Instrumented tests run on the phone's real data. Those that clear the history or
+ * change the WebDAV password only run when explicitly requested:
  * adb shell am instrument -w -e allowDestructive 1 …
  */
 object DestructiveTestGuard {

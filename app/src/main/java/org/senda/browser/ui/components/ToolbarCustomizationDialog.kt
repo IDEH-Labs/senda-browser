@@ -86,7 +86,7 @@ fun ToolbarCustomizationDialog(
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
             ) {
-                // VISTA PREVIA EN VIVO
+                // LIVE PREVIEW
                 Surface(
                     shape = RoundedCornerShape(14.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
@@ -108,7 +108,7 @@ fun ToolbarCustomizationDialog(
                         )
                         Spacer(modifier = Modifier.height(6.dp))
 
-                        // Mini barra simulada
+                        // Simulated mini bar
                         val btnSize = when (widgetSize) {
                             ToolbarWidgetSize.COMPACT -> 28.dp
                             ToolbarWidgetSize.BALANCED -> 34.dp
@@ -140,7 +140,7 @@ fun ToolbarCustomizationDialog(
                             if (showForward) MiniPreviewButton(Icons.AutoMirrored.Filled.ArrowForward, btnSize, iconSize)
                             if (showHome) MiniPreviewButton(Icons.Default.Home, btnSize, iconSize)
 
-                            // Barra de direcciones simulada
+                            // Simulated address bar
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
@@ -225,7 +225,7 @@ fun ToolbarCustomizationDialog(
                     }
                 }
 
-                // POSICIÓN DE LA BARRA
+                // BAR POSITION
                 Text(
                     text = strings.dlg_toolbar_pos_title,
                     style = MaterialTheme.typography.titleSmall,
@@ -264,7 +264,7 @@ fun ToolbarCustomizationDialog(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // ESTILO DE BARRA
+                // BAR STYLE
                 Text(
                     text = strings.dlg_toolbar_style_title,
                     style = MaterialTheme.typography.titleSmall,
@@ -301,7 +301,7 @@ fun ToolbarCustomizationDialog(
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
 
-                // SELECTOR DE TAMAÑO DE WIDGETS
+                // WIDGET SIZE SELECTOR
                 Text(
                     text = strings.tc_widget_size_title,
                     style = MaterialTheme.typography.titleSmall,
@@ -335,7 +335,7 @@ fun ToolbarCustomizationDialog(
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
 
-                // SECCIÓN: BOTONES PRINCIPALES
+                // SECTION: MAIN BUTTONS
                 Text(
                     text = strings.tc_sec_nav,
                     style = MaterialTheme.typography.titleSmall,
@@ -406,7 +406,7 @@ fun ToolbarCustomizationDialog(
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
 
-                // SECCIÓN: WIDGETS ADICIONALES
+                // SECTION: ADDITIONAL WIDGETS
                 Text(
                     text = strings.tc_sec_extra,
                     style = MaterialTheme.typography.titleSmall,
@@ -477,7 +477,7 @@ fun ToolbarCustomizationDialog(
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
 
-                // SECCIÓN: DENTRO DE LA BARRA DE DIRECCIONES
+                // SECTION: INSIDE THE ADDRESS BAR
                 Text(
                     text = strings.tc_sec_address,
                     style = MaterialTheme.typography.titleSmall,
@@ -524,7 +524,7 @@ fun ToolbarCustomizationDialog(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Botón Restablecer
+                // Reset button
                 TextButton(
                     onClick = {
                         widgetSize = ToolbarWidgetSize.BALANCED

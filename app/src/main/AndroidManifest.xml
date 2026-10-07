@@ -2,13 +2,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Permisos éticos mínimos y necesarios para navegación web -->
+    <!-- Minimal permissions needed for web browsing -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 
-    <!-- Solo para webs (videollamadas, mapas): Android los pide únicamente después de que el usuario
-         acepta el aviso de Senda para ese sitio. Nunca se usan en segundo plano -->
+    <!-- Only for websites (video calls, maps): Android asks for them only after the user
+         accepts Senda's notice for that site. Never used in the background -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
@@ -18,20 +18,20 @@
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
     <uses-feature android:name="android.hardware.location" android:required="false" />
 
-    <!-- Modo TV: adaptar el teléfono mientras se duplica la pantalla en una TV (ver SendaTvMode) -->
+    <!-- TV mode: adapt the phone while the screen is mirrored to a TV (see SendaTvMode) -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
-    <!-- Solo para la notificación del modo TV, con su botón «Detener transmisión»; se pide al duplicar la pantalla -->
+    <!-- Only for the TV mode notification, with its "Stop casting" button; requested when mirroring the screen -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- Si el móvil se reinicia o Senda se actualiza en plena transmisión, devolver la pantalla a la normalidad -->
+    <!-- If the phone restarts or Senda is updated while casting, return the screen to normal -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <!-- Solo se concede por ADB (pm grant); sin él la TV conserva la proporción del móvil -->
+    <!-- Only granted through ADB (pm grant); without it the TV keeps the phone's aspect ratio -->
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"
         tools:ignore="ProtectedPermissions" />
 
-    <!-- Solo los navegadores (apps que abren enlaces https): para ofrecer otro navegador al iniciar sesión con
-         ChatGPT. Desde Android 11 las demás apps no son visibles sin declararlo -->
+    <!-- Only browsers (apps that open https links): to offer another browser when signing in with
+         ChatGPT. Since Android 11 other apps are not visible unless declared -->
     <queries>
         <intent>
             <action android:name="android.intent.action.VIEW" />
@@ -65,7 +65,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Soporte para abrir enlaces web directamente en Senda -->
+            <!-- Support for opening web links directly in Senda -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />

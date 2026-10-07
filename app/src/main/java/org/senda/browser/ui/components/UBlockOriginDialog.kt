@@ -69,7 +69,7 @@ fun UBlockOriginDialog(
                 )
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Opción 1: Filtros Regionales (AR, CO, FR...)
+                // Option 1: Regional filters (AR, CO, FR...)
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -106,7 +106,7 @@ fun UBlockOriginDialog(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Opción 2: Escudo Rápido Móvil
+                // Option 2: Quick mobile shield
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -143,7 +143,7 @@ fun UBlockOriginDialog(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Opción 3: Panel de Control Avanzado
+                // Option 3: Advanced dashboard
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()

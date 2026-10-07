@@ -12,8 +12,8 @@ import org.senda.browser.core.security.SendaVaultManager
 import org.senda.browser.core.SendaStrings
 
 /**
- * Pruebas de evidencia de la auditoría del 2026-10-04. No afirman nada: registran en logcat (etiqueta AUDIT)
- * lo que el código hace de verdad, para que cada hallazgo se apoye en una salida observable.
+ * Evidence tests for the 2026-10-04 audit. They assert nothing: they log to logcat (tag AUDIT)
+ * what the code really does, so that each finding rests on observable output.
  */
 @RunWith(AndroidJUnit4::class)
 class AuditEvidenceTest {

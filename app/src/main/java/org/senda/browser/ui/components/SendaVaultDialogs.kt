@@ -41,8 +41,8 @@ import org.senda.browser.core.security.VaultAuditReport
 import org.senda.browser.core.security.VaultCredential
 
 /**
- * Diálogo principal de la Bóveda Soberana de Contraseñas de Senda.
- * Brinda control total de credenciales, generador criptográfico y auditoría forense en tiempo real.
+ * Main dialog of Senda's password vault.
+ * Gives full control over credentials, a cryptographic generator and a real-time audit.
  */
 @Composable
 fun SendaVaultDialog(
@@ -52,12 +52,12 @@ fun SendaVaultDialog(
     onRequireBiometricAuth: ((Boolean) -> Unit) -> Unit
 ) {
     val context = LocalContext.current
-    // Clave anulada por Android (se quitó o restableció el bloqueo de pantalla): antes solo salía un aviso y la
-    // Bóveda quedaba inservible para siempre
+    // Key invalidated by Android (the screen lock was removed or reset): before, only a notice appeared and the
+    // vault was unusable forever
     var showVaultReset by remember { mutableStateOf(false) }
 
-    // Ejecuta una operación con la clave de la Bóveda. Si pasaron más de 30 s desde la última identificación,
-    // el chip la rechaza: se pide huella o PIN y se reintenta una vez
+    // Runs an operation with the vault key. If more than 30 s have passed since the last authentication,
+    // the chip rejects it: fingerprint or PIN is asked for and it is retried once
     fun secure(action: () -> Unit) {
         fun explain(e: org.senda.browser.core.security.VaultUnavailableException) {
             when (e.reason) {
@@ -91,7 +91,7 @@ fun SendaVaultDialog(
     val coroutineScope = rememberCoroutineScope()
 
     var activeSubView by rememberSaveable { mutableStateOf("main") } // main, list, generator, audit, add, edit
-    // Edición: la contraseña descifrada vive solo en memoria mientras el formulario está abierto
+    // Editing: the decrypted password lives only in memory while the form is open
     var editId by remember { mutableStateOf<String?>(null) }
     var editSite by remember { mutableStateOf("") }
     var editUser by remember { mutableStateOf("") }
@@ -106,7 +106,7 @@ fun SendaVaultDialog(
     var credentials by remember { mutableStateOf(SendaVaultManager.getCredentials(context)) }
     var searchQuery by remember { mutableStateOf("") }
 
-    // Se comprueba al abrir: sin contraseñas guardadas no se pierde nada y se crea una clave nueva sin preguntar
+    // Checked on open: with no saved passwords nothing is lost and a new key is created without asking
     LaunchedEffect(Unit) {
         if (SendaVaultManager.isVaultKeyInvalidated()) {
             if (credentials.isEmpty()) SendaVaultManager.resetInvalidatedVaultKey(context) else showVaultReset = true
@@ -135,7 +135,7 @@ fun SendaVaultDialog(
         )
     }
 
-    // Generador de claves
+    // Password generator
     var genLength by rememberSaveable { mutableFloatStateOf(18f) }
     var genUpper by rememberSaveable { mutableStateOf(true) }
     var genLower by rememberSaveable { mutableStateOf(true) }
@@ -161,10 +161,10 @@ fun SendaVaultDialog(
         refreshGeneratedPassword()
     }
 
-    // Dónde guarda Android realmente la clave maestra (se muestra tal cual, sin suponer hardware seguro)
+    // Where Android really keeps the master key (shown as is, without assuming secure hardware)
     val keyLevel = remember { SendaVaultManager.keySecurityLevel() }
 
-    // Auditoría & Estrés
+    // Audit & stress
     var isRunningAudit by remember { mutableStateOf(false) }
     var auditReport by remember { mutableStateOf<VaultAuditReport?>(null) }
 
@@ -213,7 +213,7 @@ fun SendaVaultDialog(
                                 .fillMaxWidth()
                                 .verticalScroll(rememberScrollState())
                         ) {
-                            // Chip de estado de hardware
+                            // Hardware status chip
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
                                 color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
@@ -254,7 +254,7 @@ fun SendaVaultDialog(
 
                             Spacer(modifier = Modifier.height(14.dp))
 
-                            // Guardar y rellenar en las páginas: SendaVaultLoginStorage + SendaPrompt.LoginSelect/LoginSave
+                            // Save and fill in pages: SendaVaultLoginStorage + SendaPrompt.LoginSelect/LoginSave
                             Text(
                                 text = strings.dlg_passwords_info,
                                 fontSize = 12.sp,
@@ -263,7 +263,7 @@ fun SendaVaultDialog(
 
                             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), thickness = 0.5.dp)
 
-                            // Botón: Ver credenciales guardadas
+                            // Button: View saved credentials
                             OutlinedButton(
                                 onClick = {
                                     onRequireBiometricAuth { success ->
@@ -285,7 +285,7 @@ fun SendaVaultDialog(
 
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            // Botón: Generador de claves
+                            // Button: Password generator
                             OutlinedButton(
                                 onClick = { activeSubView = "generator" },
                                 modifier = Modifier.fillMaxWidth(),
@@ -298,7 +298,7 @@ fun SendaVaultDialog(
 
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            // Botón: Auditoría y Estrés
+                            // Button: Audit and stress
                             Button(
                                 onClick = {
                                     activeSubView = "audit"
@@ -324,12 +324,12 @@ fun SendaVaultDialog(
 
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            // Botón: Abrir autocompletado del sistema
+                            // Button: Open system autofill
                             TextButton(
                                 onClick = {
                                     try {
-                                        // Pantalla de Android para elegir gestor de contraseñas (Android 14+). La acción
-                                        // anterior intentaba registrar a Senda como proveedor y no hacía nada útil
+                                        // Android screen to choose the password manager (Android 14+). The previous
+                                        // action tried to register Senda as a provider and did nothing useful
                                         context.startActivity(
                                             Intent(
                                                 if (android.os.Build.VERSION.SDK_INT >= 34) "android.settings.CREDENTIAL_PROVIDER"
@@ -350,7 +350,7 @@ fun SendaVaultDialog(
                     }
 
                     "list" -> {
-                        // Lista de credenciales
+                        // Credential list
                         Column(modifier = Modifier.fillMaxWidth()) {
                             OutlinedTextField(
                                 value = searchQuery,
@@ -430,7 +430,7 @@ fun SendaVaultDialog(
                     }
 
                     "add" -> {
-                        // Formulario de añadir cuenta
+                        // Add account form
                         var addDomain by rememberSaveable { mutableStateOf("") }
                         var addUser by rememberSaveable { mutableStateOf("") }
                         var addPass by rememberSaveable { mutableStateOf("") }
@@ -596,7 +596,7 @@ fun SendaVaultDialog(
                     }
 
                     "generator" -> {
-                        // Generador de claves
+                        // Password generator
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -676,7 +676,7 @@ fun SendaVaultDialog(
                     }
 
                     "audit" -> {
-                        // Vista de Auditoría y Prueba de Estrés
+                        // Audit and stress test view
                         if (isRunningAudit) {
                             Box(
                                 modifier = Modifier
@@ -778,7 +778,7 @@ fun SendaVaultDialog(
 }
 
 /**
- * Tarjeta individual de credencial con revelado seguro y portapapeles higiénico.
+ * Individual credential card with safe reveal and clipboard hygiene.
  */
 @Composable
 private fun CredentialItemCard(
@@ -810,7 +810,7 @@ private fun CredentialItemCard(
                 }
 
                 Row {
-                    // Revelar / Ocultar
+                    // Reveal / Hide
                     IconButton(
                         onClick = {
                             if (!isRevealed) {
@@ -834,7 +834,7 @@ private fun CredentialItemCard(
                         )
                     }
 
-                    // Copiar al portapapeles seguro
+                    // Copy to the secure clipboard
                     IconButton(
                         onClick = {
                             runSecure {
@@ -849,7 +849,7 @@ private fun CredentialItemCard(
                         Icon(Icons.Default.ContentCopy, contentDescription = strings.vault_copy_cd, modifier = Modifier.size(16.dp))
                     }
 
-                    // Modificar
+                    // Edit
                     IconButton(
                         onClick = onEdit,
                         modifier = Modifier.size(32.dp)
@@ -857,7 +857,7 @@ private fun CredentialItemCard(
                         Icon(Icons.Default.Edit, contentDescription = strings.vault_edit_cd, modifier = Modifier.size(16.dp))
                     }
 
-                    // Borrar
+                    // Delete
                     IconButton(
                         onClick = onDelete,
                         modifier = Modifier.size(32.dp)

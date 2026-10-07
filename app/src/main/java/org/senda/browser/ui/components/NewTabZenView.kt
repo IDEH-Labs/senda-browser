@@ -131,16 +131,16 @@ fun NewTabZenView(
         ZenHomeLayout.CUSTOM -> showNews
     }
 
-    // Solo se contacta a los medios si este diseño muestra noticias («Enfocado» no debe tocar la red)
-    val wantsNews = displayNewsFeed || currentLayout == ZenHomeLayout.INSPIRATIONAL // artículo destacado
-    // null mientras se descarga; vacía si ninguna fuente respondió (antes se mostraban titulares fijos como si fueran noticias)
+    // News outlets are only contacted if this layout shows news ("Focused" must not touch the network)
+    val wantsNews = displayNewsFeed || currentLayout == ZenHomeLayout.INSPIRATIONAL // featured article
+    // null while downloading; empty if no source answered (fixed headlines used to be shown as if they were news)
     val newsResult by produceState<List<EthicalNewsItem>?>(initialValue = null, wantsNews) {
         value = if (wantsNews) EthicalNewsRepository.fetchEthicalNews() else emptyList()
     }
     val newsList = newsResult.orEmpty()
     val newsUnavailable = displayNewsFeed && newsResult?.isEmpty() == true
 
-    // Rotación de fondos: el turno se guarda en preferencias para que siga igual entre pestañas y reinicios
+    // Wallpaper rotation: the turn is saved in preferences so it stays the same across tabs and restarts
     var rotatingWallpaper by remember { mutableStateOf<FreeWallpaper?>(null) }
     LaunchedEffect(rotationMinutes, displayWallpaper, selectedWallpaperId) {
         if (!displayWallpaper || rotationMinutes == 0) {
@@ -154,7 +154,7 @@ fun NewTabZenView(
             return next
         }
         if (rotationMinutes < 0) {
-            // Recién elegido en el selector: se muestra ese; si no, uno nuevo por cada pestaña
+            // Just chosen in the picker: that one is shown; otherwise, a new one for each tab
             val justChosen = System.currentTimeMillis() - prefs.wallpaperRotationChangedAt < 3_000L
             val current = prefs.wallpaperRotationCurrentId?.let { id -> FreeWallpapers.items.find { it.id == id } }
             rotatingWallpaper = if (justChosen && current != null) current else advance()
@@ -172,7 +172,7 @@ fun NewTabZenView(
     val shownWallpaper = rotatingWallpaper ?: activeWallpaper
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Fondo artístico libre (GPL/CC0) si está activo en el modo elegido
+        // Free art wallpaper (GPL/CC0) if it is on in the chosen mode
         if (displayWallpaper) {
             androidx.compose.animation.Crossfade(
                 targetState = shownWallpaper,
@@ -192,9 +192,9 @@ fun NewTabZenView(
             )
         }
 
-        // Contenido principal según el modo seleccionado
+        // Main content according to the selected mode
         if (currentLayout == ZenHomeLayout.INFORMATIONAL) {
-            // MODO INFORMATIVO: Feed continuo ético con selector en cabecera y barra de búsqueda
+            // INFORMATIVE MODE: continuous feed with a selector in the header and a search bar
             InformationalLayout(
                 currentLayout = currentLayout,
                 onOpenLayoutSelector = { showLayoutSelectorSheet = true },
@@ -205,7 +205,7 @@ fun NewTabZenView(
                 newsUnavailable = newsUnavailable
             )
         } else {
-            // MODO ENFOCADO / INSPIRADOR / PERSONALIZADO
+            // FOCUSED / INSPIRING / CUSTOM MODE
             FocusedOrInspirationalLayout(
                 currentLayout = currentLayout,
                 onOpenLayoutSelector = { showLayoutSelectorSheet = true },
@@ -225,7 +225,7 @@ fun NewTabZenView(
             )
         }
 
-        // Diálogo para agregar acceso directo
+        // Dialog to add a shortcut
         if (showAddShortcutDialog) {
             var newTitle by remember { mutableStateOf("") }
             var newUrl by remember { mutableStateOf("") }
@@ -278,7 +278,7 @@ fun NewTabZenView(
             )
         }
 
-        // Diálogo para editar o eliminar acceso directo
+        // Dialog to edit or delete a shortcut
         editingShortcut?.let { targetShortcut ->
             var editTitle by remember(targetShortcut) { mutableStateOf(targetShortcut.title) }
             var editUrl by remember(targetShortcut) { mutableStateOf(targetShortcut.url) }
@@ -344,7 +344,7 @@ fun NewTabZenView(
             )
         }
 
-        // Hoja inferior para elegir diseño (Edge Preset Selector)
+        // Bottom sheet to choose the layout (Edge preset selector)
         if (showLayoutSelectorSheet) {
             HomeLayoutSelectorSheet(
                 prefs = prefs,
@@ -427,7 +427,7 @@ fun HomeLayoutSelectorSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Opciones predefinidas (Inspiradas en presets modernos)
+            // Predefined options (inspired by modern presets)
             LayoutOptionItem(
                 icon = Icons.Default.FilterCenterFocus,
                 title = strings.preset_focused,
@@ -485,7 +485,7 @@ fun HomeLayoutSelectorSheet(
                 }
             )
 
-            // Opciones detalladas para Personalizado
+            // Detailed options for Custom
             if (currentLayout == ZenHomeLayout.CUSTOM) {
                 Spacer(modifier = Modifier.height(16.dp))
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
@@ -508,7 +508,7 @@ fun HomeLayoutSelectorSheet(
                 }
             }
 
-            // Selector de fondo libre
+            // Free wallpaper picker
             if (currentLayout == ZenHomeLayout.INSPIRATIONAL || (currentLayout == ZenHomeLayout.CUSTOM && showWallpaper)) {
                 Spacer(modifier = Modifier.height(14.dp))
                 Text(
@@ -524,7 +524,7 @@ fun HomeLayoutSelectorSheet(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     contentPadding = PaddingValues(horizontal = 2.dp)
                 ) {
-                    // Opción de subir fondo personalizado propio
+                    // Option to upload your own wallpaper
                     item {
                         val isCustomSelected = selectedWallpaperId == "custom_user"
                         Surface(
@@ -700,7 +700,7 @@ fun FocusedOrInspirationalLayout(
             .padding(horizontal = 16.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Barra superior con selector de diseño integrado elegantemente
+        // Top bar with the layout selector built in
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.End
@@ -714,7 +714,7 @@ fun FocusedOrInspirationalLayout(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Identidad de marca Senda compacta
+        // Compact Senda brand identity
         Image(
             painter = painterResource(id = R.drawable.ic_senda_logo),
             contentDescription = "Senda Logo",
@@ -748,7 +748,7 @@ fun FocusedOrInspirationalLayout(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // Barra de búsqueda central estilizada
+        // Styled central search bar
         OutlinedTextField(
             value = queryText,
             onValueChange = onQueryChange,
@@ -808,7 +808,7 @@ fun FocusedOrInspirationalLayout(
             modifier = Modifier.fillMaxWidth(0.98f).searchOnEnterRelease { if (queryText.isNotBlank()) onSearch(queryText) }
         )
 
-        // Accesos directos éticos en cuadrícula responsiva (4 por fila) aprovechando todo el ancho
+        // Shortcuts in a responsive grid (4 per row) using the full width
         if (displayShortcuts) {
             Spacer(modifier = Modifier.height(14.dp))
 
@@ -858,7 +858,7 @@ fun FocusedOrInspirationalLayout(
             NewsUnavailableNote()
         }
 
-        // Feed completo de noticias éticas si está activo
+        // Full news feed if it is on
         if (displayNewsFeed && newsList.isNotEmpty()) {
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -918,7 +918,7 @@ fun FocusedOrInspirationalLayout(
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                 )
                             },
-                            // Fondo propio también sin seleccionar: transparentes se perdían sobre el fondo de pantalla
+                            // Own background even when not selected: transparent ones got lost over the wallpaper
                             colors = FilterChipDefaults.filterChipColors(
                                 containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
                                 labelColor = MaterialTheme.colorScheme.onSurface,
@@ -949,7 +949,7 @@ fun FocusedOrInspirationalLayout(
             )
         }
 
-        // Crédito y licencia de fondo libre
+        // Credit and license of the free wallpaper
         if (displayWallpaper) {
             Spacer(modifier = Modifier.height(20.dp))
             Surface(
@@ -1000,7 +1000,7 @@ fun InformationalLayout(
     ) {
         item {
             Column(modifier = Modifier.fillMaxWidth()) {
-                // Cabecera con selector de diseño
+                // Header with the layout selector
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -1033,7 +1033,7 @@ fun InformationalLayout(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Barra de búsqueda central en modo Informativo
+                // Central search bar in Informative mode
                 OutlinedTextField(
                     value = queryText,
                     onValueChange = onQueryChange,
@@ -1095,7 +1095,7 @@ fun InformationalLayout(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Cabecera del feed de noticias éticas
+                // News feed header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -1140,7 +1140,7 @@ fun InformationalLayout(
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                 )
                             },
-                            // Fondo propio también sin seleccionar: transparentes se perdían sobre el fondo de pantalla
+                            // Own background even when not selected: transparent ones got lost over the wallpaper
                             colors = FilterChipDefaults.filterChipColors(
                                 containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
                                 labelColor = MaterialTheme.colorScheme.onSurface,
@@ -1380,7 +1380,7 @@ fun QuickLinkTile(
                         fontSize = if (monogram.length > 1) 13.sp else 21.sp,
                         fontWeight = FontWeight.Black,
                         fontFamily = if (isSerif) FontFamily.Serif else FontFamily.SansSerif,
-                        // Sobre el recuadro oscuro, un color de marca muy oscuro (la «W» de Wikipedia) no se veía
+                        // On the dark box, a very dark brand color (Wikipedia's "W") could not be seen
                         color = if (displayWallpaper && iconColor.luminance() < 0.2f) Color.White else iconColor
                     )
                 }
@@ -1397,7 +1397,7 @@ fun QuickLinkTile(
             letterSpacing = (-0.3).sp,
             overflow = TextOverflow.Ellipsis,
             color = if (displayWallpaper) Color.White else MaterialTheme.colorScheme.onSurface,
-            // Sombra sobre el fondo de pantalla: en zonas claras el nombre blanco no se leía
+            // Shadow over the wallpaper: on light areas the white name could not be read
             style = if (displayWallpaper) androidx.compose.material3.LocalTextStyle.current.merge(wallpaperLabelStyle) else androidx.compose.material3.LocalTextStyle.current
         )
     }
@@ -1544,10 +1544,10 @@ private val wallpaperLabelStyle = androidx.compose.ui.text.TextStyle(
 )
 
 /**
- * Intro de un teclado físico: se busca al SOLTAR la tecla y el campo se queda con las dos pulsaciones. Si se buscaba
- * al pulsarla, la portada desaparecía, el foco pasaba a la barra y al soltar Intro se activaba el botón Inicio, que
- * volvía a la página en blanco (medido: fallaba 5 de 11 arranques). El botón «Buscar» del teclado en pantalla no
- * envía teclas y sigue usando keyboardActions.
+ * Enter on a physical keyboard: the search runs when the key is RELEASED and the field takes both events. When it searched
+ * on press, the home page disappeared, focus moved to the bar and releasing Enter triggered the Home button, which
+ * went back to the blank page (measured: it failed 5 of 11 startups). The on-screen keyboard's "Search" button does not
+ * send keys and still uses keyboardActions.
  */
 private fun Modifier.searchOnEnterRelease(onEnter: () -> Unit): Modifier = onPreviewKeyEvent { event ->
     if (event.key == Key.Enter || event.key == Key.NumPadEnter) {

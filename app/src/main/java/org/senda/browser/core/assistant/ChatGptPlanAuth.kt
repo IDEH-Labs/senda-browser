@@ -23,11 +23,11 @@ import java.security.spec.RSAPublicKeySpec
 import java.util.UUID
 
 /**
- * «Sign in with ChatGPT» para usar el plan Plus/Pro del usuario (OpenAI, disponible para proyectos de código
- * abierto desde el 29-09-2026). Contrato oficial de developers.openai.com/siwc/token-sharing-open-source:
- * OAuth con PKCE S256, registro dinámico (client_id=dynamic_agent_client), vuelta a un puerto local
- * 127.0.0.1, validación del ID token contra el JWKS de auth.openai.com y tokens guardados cifrados.
- * Todo por SendaNet (el mismo Tor o proxy que la navegación).
+ * "Sign in with ChatGPT" to use the user's Plus/Pro plan (OpenAI, available to open source
+ * projects since 2026-09-29). Official contract at developers.openai.com/siwc/token-sharing-open-source:
+ * OAuth with PKCE S256, dynamic registration (client_id=dynamic_agent_client), redirect to a local port on
+ * 127.0.0.1, ID token validation against the auth.openai.com JWKS and tokens stored encrypted.
+ * Everything goes through SendaNet (the same Tor or proxy as browsing).
  */
 object ChatGptPlanAuth {
 
@@ -42,10 +42,10 @@ object ChatGptPlanAuth {
     private const val CALLBACK_PATH = "/auth/callback"
     private const val REDIRECT = "http://127.0.0.1:$PORT$CALLBACK_PATH"
     private const val APP_NAME = "Senda"
-    /** Tiempo para iniciar sesión en el navegador antes de cancelar. */
+    /** Time to sign in in the browser before cancelling. */
     private const val LOGIN_TIMEOUT_MS = 5 * 60_000L
 
-    /** Sesión guardada (sin el token en claro fuera de memoria). */
+    /** Saved session (the token is never in clear text outside memory). */
     data class Session(val clientId: String, val email: String?, val accessToken: String, val refreshToken: String?, val idToken: String, val expiresAt: Long)
 
     class AuthException(val code: String) : Exception(code)
@@ -59,15 +59,15 @@ object ChatGptPlanAuth {
 
     private val _signInState = kotlinx.coroutines.flow.MutableStateFlow<SignInState>(SignInState.Idle)
 
-    /** Progreso del inicio de sesión, para la pantalla que esté abierta cuando vuelva el navegador. */
+    /** Sign-in progress, for whichever screen is open when the browser comes back. */
     val signInState: kotlinx.coroutines.flow.StateFlow<SignInState> = _signInState
 
     private val appScope = kotlinx.coroutines.CoroutineScope(Dispatchers.IO + kotlinx.coroutines.SupervisorJob())
     private var signInJob: kotlinx.coroutines.Job? = null
 
     /**
-     * Inicia sesión fuera de la pantalla: abrir la página de OpenAI cambia a una pestaña y puede cerrar Ajustes,
-     * y con ello cancelaría la espera de la vuelta a 127.0.0.1.
+     * Signs in independently of the screen: opening OpenAI's page switches to a tab and may close Settings,
+     * which would cancel the wait for the redirect to 127.0.0.1.
      */
     fun startSignIn(context: Context, prefs: PreferencesManager, openUrl: (String) -> Unit) {
         if (_signInState.value == SignInState.Waiting) return
@@ -76,7 +76,7 @@ object ChatGptPlanAuth {
         signInJob = appScope.launch {
             _signInState.value = try {
                 SignInState.Done(signIn(context.applicationContext, prefs, openUrl).email).also { done ->
-                    // El usuario está en la pestaña de OpenAI, no en Ajustes: confirmarle que ya puede volver
+                    // The user is on the OpenAI tab, not in Settings: confirm they can go back now
                     val strings = org.senda.browser.core.SendaStrings.get(prefs.appLanguage, context)
                     kotlinx.coroutines.withContext(Dispatchers.Main) {
                         android.widget.Toast.makeText(context.applicationContext,
@@ -84,7 +84,7 @@ object ChatGptPlanAuth {
                     }
                 }
             } catch (e: AuthException) {
-                // Solo el código del error (nunca tokens ni el código de autorización)
+                // Only the error code (never tokens or the authorization code)
                 android.util.Log.w("SendaChatGpt", "Inicio de sesión fallido: ${e.code}")
                 SignInState.Failed(e.code)
             } catch (e: kotlinx.coroutines.CancellationException) {
@@ -98,24 +98,24 @@ object ChatGptPlanAuth {
         }
     }
 
-    /** Vuelve a Idle tras mostrar el resultado. */
+    /** Returns to Idle after showing the result. */
     fun acknowledge() { if (_signInState.value != SignInState.Waiting) _signInState.value = SignInState.Idle }
 
     fun isSignedIn(prefs: PreferencesManager): Boolean = load(prefs) != null
 
     fun email(prefs: PreferencesManager): String? = load(prefs)?.email
 
-    /** Identificador estable y distinto por instalación (ext_agent_host_id), guardado antes del primer inicio. */
+    /** Stable identifier, different for each installation (ext_agent_host_id), saved before the first sign-in. */
     private fun hostId(prefs: PreferencesManager): String =
-        // Formato «urn:uuid:…» de la guía oficial: un UUID suelto lo rechaza OpenAI (invalid_authorize_request)
+        // "urn:uuid:…" format from the official guide: OpenAI rejects a bare UUID (invalid_authorize_request)
         prefs.assistantChatGptHostId.ifBlank { "urn:uuid:${UUID.randomUUID()}".also { prefs.assistantChatGptHostId = it } }
 
     /**
-     * Inicia sesión: abre el navegador del sistema (Senda u otro) en la página de OpenAI y espera la vuelta en
-     * 127.0.0.1. [openUrl] abre la URL; la función vuelve cuando la sesión queda guardada.
+     * Signs in: opens the system browser (Senda or another) on OpenAI's page and waits for the redirect on
+     * 127.0.0.1. [openUrl] opens the URL; the function returns once the session is saved.
      */
     suspend fun signIn(context: Context, prefs: PreferencesManager, openUrl: (String) -> Unit): Session {
-        // 32 bytes en base64url (43 caracteres) para verificador, state y nonce: igual que el kit oficial de OpenAI
+        // 32 bytes in base64url (43 characters) for verifier, state and nonce: same as OpenAI's official kit
         val verifier = randomUrlSafe(32)
         val challenge = b64url(MessageDigest.getInstance("SHA-256").digest(verifier.toByteArray()))
         val state = randomUrlSafe(32)
@@ -145,7 +145,7 @@ object ChatGptPlanAuth {
             }
             server.use { srv ->
                 withContext(Dispatchers.Main) { openUrl(url) }
-                // accept() bloquea el hilo: con soTimeout se revisa cada segundo si se canceló o venció el plazo
+                // accept() blocks the thread: with soTimeout it checks every second whether it was cancelled or timed out
                 srv.soTimeout = 1_000
                 val callback = awaitCallback(srv, System.currentTimeMillis() + LOGIN_TIMEOUT_MS)
                 if (callback["state"] != state) throw AuthException("state_mismatch")
@@ -153,8 +153,8 @@ object ChatGptPlanAuth {
                 val code = callback["code"] ?: throw AuthException("no_code")
                 val clientId = callback["client_id"] ?: params.getValue("client_id")
                 if (clientId == "dynamic_agent_client" || !Regex("^[a-zA-Z0-9_-]{1,200}$").matches(clientId)) throw AuthException("registration_incomplete")
-                // Como el kit oficial: guardar el cliente emitido antes del canje, para que un nuevo intento no
-                // registre otra app si el código caduca o falla
+                // Like the official kit: save the issued client before the exchange, so a new attempt does not
+                // register another app if the code expires or fails
                 prefs.assistantChatGptClientId = clientId
                 val tokens = postForm(TOKEN, mapOf(
                     "grant_type" to "authorization_code", "code" to code, "client_id" to clientId,
@@ -177,7 +177,7 @@ object ChatGptPlanAuth {
         }
     }
 
-    /** Token de acceso vigente; renueva antes de que caduque. Null si no hay sesión o ya no sirve. */
+    /** Current access token; refreshes it before it expires. Null if there is no session or it no longer works. */
     suspend fun accessToken(prefs: PreferencesManager): String = withContext(Dispatchers.IO) {
         val s = load(prefs) ?: throw RemoteAiException(RemoteAiException.Kind.NOT_CONFIGURED)
         if (s.expiresAt - 120_000 > System.currentTimeMillis()) return@withContext s.accessToken
@@ -185,7 +185,7 @@ object ChatGptPlanAuth {
         val json = try {
             postForm(TOKEN, mapOf("grant_type" to "refresh_token", "client_id" to s.clientId, "refresh_token" to refresh, "resource" to RESOURCE))
         } catch (e: AuthException) {
-            // Token de renovación inválido o caducado: hay que volver a iniciar sesión (guía «Errors and recovery»)
+            // Invalid or expired refresh token: the user must sign in again ("Errors and recovery" guide)
             clear(prefs)
             throw RemoteAiException(RemoteAiException.Kind.AUTH, e.code)
         }
@@ -199,10 +199,10 @@ object ChatGptPlanAuth {
         updated.accessToken
     }
 
-    /** Cierra sesión: revoca el token de renovación en OpenAI y borra todo lo guardado. */
+    /** Signs out: revokes the refresh token at OpenAI and deletes everything stored. */
     fun signOut(prefs: PreferencesManager) {
         val s = load(prefs) ?: return
-        // Primero se borra del teléfono (inmediato); la revocación en OpenAI sigue aunque se cierre la pantalla
+        // First it is deleted from the phone (immediately); revocation at OpenAI continues even if the screen closes
         clear(prefs)
         val rt = s.refreshToken ?: return
         kotlinx.coroutines.CoroutineScope(Dispatchers.IO + kotlinx.coroutines.SupervisorJob()).launch {
@@ -210,12 +210,12 @@ object ChatGptPlanAuth {
         }
     }
 
-    /** Vuelta entregada por la propia Senda (ver deliverCallback) mientras se espera. */
+    /** Redirect delivered by Senda itself (see deliverCallback) while waiting. */
     @Volatile private var injectedCallback: Map<String, String>? = null
 
     /**
-     * Si [url] es la vuelta del inicio de sesión en curso, la entrega y devuelve true (la pestaña no debe cargarla).
-     * Cuando el inicio de sesión ocurre en la propia Senda, el modo solo HTTPS impide cargar http://127.0.0.1.
+     * If [url] is the redirect of the sign-in in progress, delivers it and returns true (the tab must not load it).
+     * When signing in happens inside Senda, HTTPS-only mode prevents loading http://127.0.0.1.
      */
     fun deliverCallback(url: String): Boolean {
         if (_signInState.value != SignInState.Waiting || !url.startsWith(REDIRECT)) return false
@@ -227,7 +227,7 @@ object ChatGptPlanAuth {
         URLDecoder.decode(it.substringBefore('='), "UTF-8") to URLDecoder.decode(it.substringAfter('='), "UTF-8")
     }
 
-    /** Espera una sola petición GET /auth/callback?… y responde una página sencilla. */
+    /** Waits for a single GET /auth/callback?… request and answers with a simple page. */
     private suspend fun awaitCallback(server: ServerSocket, deadline: Long): Map<String, String> {
         while (true) {
             kotlinx.coroutines.currentCoroutineContext().ensureActive()
@@ -270,7 +270,7 @@ object ChatGptPlanAuth {
             if (code !in 200..299) {
                 val json = runCatching { JSONObject(text) }.getOrNull()
                 val err = json?.optString("error").orEmpty()
-                // La descripción de OpenAI explica el rechazo; no contiene el código ni los tokens
+                // OpenAI's description explains the rejection; it contains neither the code nor the tokens
                 android.util.Log.w("SendaChatGpt", "HTTP $code en ${url.substringAfterLast('/')}: $err")
                 throw AuthException(err.ifBlank { "http_$code" })
             }
@@ -282,7 +282,7 @@ object ChatGptPlanAuth {
         }
     }
 
-    /** Firma RS256 contra el JWKS de OpenAI y comprobaciones de emisor, audiencia, caducidad y nonce. */
+    /** RS256 signature against OpenAI's JWKS and checks of issuer, audience, expiry and nonce. */
     private fun verifyIdToken(jwt: String, clientId: String, nonce: String): JSONObject {
         val parts = jwt.split('.')
         if (parts.size != 3) throw AuthException("bad_id_token")
@@ -310,7 +310,7 @@ object ChatGptPlanAuth {
         return claims
     }
 
-    // Tokens cifrados con el almacén de claves del teléfono (mismo mecanismo que las claves de API)
+    // Tokens encrypted with the phone's keystore (same mechanism as the API keys)
     private fun save(prefs: PreferencesManager, s: Session) {
         val json = JSONObject().put("clientId", s.clientId).put("email", s.email ?: "").put("access", s.accessToken)
             .put("refresh", s.refreshToken ?: "").put("id", s.idToken).put("exp", s.expiresAt)

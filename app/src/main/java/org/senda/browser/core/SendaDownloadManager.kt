@@ -22,9 +22,9 @@ import java.net.URLDecoder
 import java.util.concurrent.Executors
 
 /**
- * Descargas de Senda. El archivo siempre lo trae Gecko (la misma conexión que la página: Tor o proxy,
- * cookies de la sesión, modo privado, blob:) y Senda solo guarda el flujo en Descargas. Nunca se vuelve
- * a pedir por fuera con el DownloadManager de Android, que saldría sin proxy, con la IP real y sin sesión.
+ * Senda's downloads. Gecko always fetches the file (the same connection as the page: Tor or proxy,
+ * session cookies, private mode, blob:) and Senda only saves the stream to Downloads. It is never
+ * requested again separately with Android's DownloadManager, which would go out without the proxy, with the real IP and no session.
  */
 object SendaDownloadManager {
 
@@ -32,8 +32,8 @@ object SendaDownloadManager {
     private val mainHandler = Handler(Looper.getMainLooper())
 
     /**
-     * Selector de ubicación del sistema (lo registra MainActivity). Recibe nombre sugerido y tipo MIME y
-     * devuelve la Uri elegida, o null si el usuario canceló. Sin él se guarda directamente en Descargas.
+     * System location picker (registered by MainActivity). Receives a suggested name and MIME type and
+     * returns the chosen Uri, or null if the user cancelled. Without it the file is saved directly to Downloads.
      */
     @Volatile
     var locationPicker: ((fileName: String, mime: String, onResult: (Uri?) -> Unit) -> Unit)? = null
@@ -41,7 +41,7 @@ object SendaDownloadManager {
     fun suggestedFileName(response: WebResponse): String =
         sanitizeFileName(fileNameFromDisposition(response.headers["Content-Disposition"]) ?: fileNameFromUrl(response.uri))
 
-    /** Guarda la respuesta que Gecko no puede mostrar (onExternalResponse). */
+    /** Saves the response Gecko cannot display (onExternalResponse). */
     fun saveResponse(context: Context, prefs: PreferencesManager, response: WebResponse, isPrivate: Boolean) {
         val mime = response.headers["Content-Type"]?.substringBefore(";")?.trim()?.ifBlank { null }
         val name = fileNameFromDisposition(response.headers["Content-Disposition"])
@@ -55,7 +55,7 @@ object SendaDownloadManager {
         save(context.applicationContext, prefs, body, name, mime, response.uri, length, isPrivate)
     }
 
-    /** Descarga [url] a través de Gecko (menú de pulsación larga: enlace, imagen o video). */
+    /** Downloads [url] through Gecko (long-press menu: link, image or video). */
     fun downloadUrl(context: Context, prefs: PreferencesManager, url: String, isPrivate: Boolean, referrer: String? = null) {
         val appContext = context.applicationContext
         if (url.startsWith("data:")) {
@@ -103,7 +103,7 @@ object SendaDownloadManager {
         val fileName = sanitizeFileName(rawName)
         val mime = mimeType?.takeIf { it != "application/octet-stream" } ?: getMimeType(fileName)
         val id = System.currentTimeMillis().toString()
-        // En privado no queda rastro en la lista de Senda; el archivo sí se guarda porque el usuario lo pidió
+        // In private mode nothing is left in Senda's list; the file is saved because the user asked for it
         if (!isPrivate) {
             prefs.addDownload(
                 DownloadItem(id = id, fileName = fileName, url = url, totalBytes = expectedBytes,
@@ -112,7 +112,7 @@ object SendaDownloadManager {
         }
         val picker = locationPicker
         if (prefs.askDownloadLocation && picker != null) {
-            // «Preguntar dónde guardar»: el usuario elige carpeta y nombre; si cancela, no se guarda nada
+            // "Ask where to save": the user picks folder and name; if they cancel, nothing is saved
             mainHandler.post {
                 picker(fileName, mime) { uri ->
                     if (uri == null) {
@@ -142,8 +142,8 @@ object SendaDownloadManager {
     }
 
     /**
-     * Copia [body] en [uri]. Si falla y el archivo lo creó Senda ([ownsTarget]) se borra; uno elegido por el
-     * usuario se deja, porque el proveedor de documentos puede haber sobrescrito un archivo que ya existía.
+     * Copies [body] into [uri]. If it fails and Senda created the file ([ownsTarget]) it is deleted; one chosen by the
+     * user is left alone, because the document provider may have overwritten a file that already existed.
      */
     private fun write(
         context: Context,
@@ -171,7 +171,7 @@ object SendaDownloadManager {
                 }
             }
             finishTarget(context, uri)
-            // Android puede renombrar al publicar (« (1)» si ya existía): registrar el nombre real
+            // Android may rename on publish (" (1)" if it already existed): record the real name
             val savedName = displayName(context, uri) ?: fileName
             if (!isPrivate) {
                 prefs.updateDownload(
@@ -194,7 +194,7 @@ object SendaDownloadManager {
         toast(context) { it.dl_failed.format(fileName) }
     }
 
-    /** Crea el archivo en Descargas y devuelve su Uri y el nombre definitivo (Android añade « (1)» si ya existe). */
+    /** Creates the file in Downloads and returns its Uri and final name (Android adds " (1)" if it already exists). */
     private fun createTarget(context: Context, fileName: String, mime: String): Pair<Uri, String> {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val values = ContentValues().apply {
@@ -209,7 +209,7 @@ object SendaDownloadManager {
                 ?.use { c -> if (c.moveToFirst()) c.getString(0) else null } ?: fileName
             return uri to finalName
         }
-        // Android 8-9: carpeta de descargas propia de la app (no requiere permiso de almacenamiento)
+        // Android 8-9: the app's own downloads folder (needs no storage permission)
         val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: context.filesDir
         var file = File(dir, fileName)
         var n = 1
@@ -238,7 +238,7 @@ object SendaDownloadManager {
             val uri = if (item.filePath.startsWith("content://")) {
                 Uri.parse(item.filePath)
             } else {
-                // Descargas registradas por versiones anteriores de Senda (ruta de archivo)
+                // Downloads recorded by earlier versions of Senda (file path)
                 val file = File(item.filePath)
                 if (!file.exists()) {
                     Toast.makeText(context, strings.dl_file_not_found, Toast.LENGTH_SHORT).show()
@@ -271,7 +271,7 @@ object SendaDownloadManager {
         prefs.deleteDownload(item.id)
     }
 
-    /** Admite filename*=UTF-8''… (RFC 5987), que es como mandan los nombres con acentos la mayoría de webs. */
+    /** Accepts filename*=UTF-8''… (RFC 5987), which is how most sites send names with accents. */
     private fun fileNameFromDisposition(header: String?): String? {
         if (header.isNullOrBlank()) return null
         Regex("""filename\*\s*=\s*([\w-]+)'[^']*'([^;]+)""", RegexOption.IGNORE_CASE).find(header)?.let { m ->
@@ -288,7 +288,7 @@ object SendaDownloadManager {
         return segment?.takeIf { it.isNotBlank() } ?: "descarga_${System.currentTimeMillis()}"
     }
 
-    /** Quita rutas y caracteres prohibidos, pero conserva acentos, eñes y espacios. */
+    /** Removes paths and forbidden characters, but keeps accents, ñ and spaces. */
     private fun sanitizeFileName(raw: String): String =
         File(raw).name
             .replace(Regex("""[\\/:*?"<>|\u0000-\u001F]"""), "_")

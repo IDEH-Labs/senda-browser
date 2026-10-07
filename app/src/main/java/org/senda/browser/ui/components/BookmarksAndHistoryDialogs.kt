@@ -40,8 +40,8 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 /**
- * Dirección legible solo para mostrar: «García» en vez de «Garc%C3%ADa». Si al decodificar aparecen caracteres
- * invisibles o de control (que podrían disfrazar la dirección) se muestra tal cual, codificada.
+ * Readable address for display only: "García" instead of "Garc%C3%ADa". If decoding produces invisible
+ * or control characters (which could disguise the address) it is shown as is, encoded.
  */
 fun displayUrl(url: String): String {
     if ('%' !in url) return url
@@ -54,7 +54,7 @@ fun displayUrl(url: String): String {
 }
 
 /**
- * Barra horizontal de marcadores / favoritos estilo GNOME Libadwaita.
+ * Horizontal bookmarks bar in GNOME Libadwaita style.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -67,7 +67,7 @@ fun BookmarksBar(
     modifier: Modifier = Modifier
 ) {
     val strings = org.senda.browser.core.LocalSendaStrings.current
-    // Se relee al navegar, por si se editaron favoritos desde el gestor u otra pestaña
+    // Re-read on navigation, in case bookmarks were edited from the manager or another tab
     var bookmarks by remember(currentUrl) { mutableStateOf(prefs.getBookmarks()) }
     var editingBookmark by remember { mutableStateOf<BookmarkItem?>(null) }
     val isCurrentBookmarked = remember(currentUrl, bookmarks) {
@@ -85,7 +85,7 @@ fun BookmarksBar(
                 .padding(horizontal = 6.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Botón de acceso rápido a favoritos / añadir favorito
+            // Quick access button to bookmarks / add bookmark
             IconButton(
                 onClick = {
                     if (currentUrl.isNotBlank() && currentUrl != "about:blank") {
@@ -109,7 +109,7 @@ fun BookmarksBar(
 
             Spacer(modifier = Modifier.width(4.dp))
 
-            // Lista horizontal de favoritos
+            // Horizontal list of bookmarks
             Row(
                 modifier = Modifier
                     .weight(1f)
@@ -156,7 +156,7 @@ fun BookmarksBar(
 
             Spacer(modifier = Modifier.width(4.dp))
 
-            // Botón para abrir el gestor completo de marcadores
+            // Button to open the full bookmarks manager
             IconButton(
                 onClick = onOpenManager,
                 modifier = Modifier
@@ -192,7 +192,7 @@ fun BookmarksBar(
 }
 
 /**
- * Diálogo gestor de Favoritos (Marcadores).
+ * Bookmarks manager dialog.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -233,7 +233,7 @@ fun BookmarksManagerDialog(
         },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
-                // Barra de búsqueda de favoritos
+                // Bookmarks search bar
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
@@ -248,7 +248,7 @@ fun BookmarksManagerDialog(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Añadir página actual si no está guardada
+                // Add the current page if it is not saved
                 if (currentUrl.isNotBlank() && currentUrl != "about:blank") {
                     FilledTonalButton(
                         onClick = {
@@ -395,7 +395,7 @@ fun BookmarksManagerDialog(
 }
 
 /**
- * Diálogo para editar el título y la dirección web (URL) de un favorito.
+ * Dialog to edit a bookmark's title and web address (URL).
  */
 @Composable
 fun EditBookmarkDialog(
@@ -510,7 +510,7 @@ fun EditBookmarkDialog(
 }
 
 /**
- * Diálogo gestor de Historial de Navegación Local.
+ * Local browsing history manager dialog.
  */
 @Composable
 fun HistoryManagerDialog(
@@ -548,7 +548,7 @@ fun HistoryManagerDialog(
         },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
-                // Buscador de historial
+                // History search
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
@@ -563,7 +563,7 @@ fun HistoryManagerDialog(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Botón para borrar datos de navegación
+                // Button to clear browsing data
                 FilledTonalButton(
                     onClick = onOpenClearData,
                     modifier = Modifier.fillMaxWidth(),
@@ -682,7 +682,7 @@ fun HistoryManagerDialog(
 }
 
 /**
- * Diálogo estándar de "Borrar datos de navegación" (con selección de elementos e intervalos).
+ * Standard "Clear browsing data" dialog (with item and time range selection).
  */
 @Composable
 fun ClearBrowsingDataDialog(
@@ -694,7 +694,7 @@ fun ClearBrowsingDataDialog(
     var clearHistory by remember { mutableStateOf(true) }
     var clearCookies by remember { mutableStateOf(true) }
     var clearCache by remember { mutableStateOf(true) }
-    var selectedRange by remember { mutableLongStateOf(0L) } // 0L = Todo
+    var selectedRange by remember { mutableLongStateOf(0L) } // 0L = All
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -720,7 +720,7 @@ fun ClearBrowsingDataDialog(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Selector de intervalo
+                // Time range picker
                 Text(strings.cbd_time_range, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
                 Spacer(modifier = Modifier.height(6.dp))
                 val ranges = listOf(
@@ -752,7 +752,7 @@ fun ClearBrowsingDataDialog(
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
 
-                // Casillas de verificación de datos
+                // Data checkboxes
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()

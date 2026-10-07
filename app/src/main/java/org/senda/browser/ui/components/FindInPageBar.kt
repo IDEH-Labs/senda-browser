@@ -36,7 +36,7 @@ import org.mozilla.geckoview.GeckoSession
 import org.senda.browser.core.LocalSendaStrings
 import org.senda.browser.ui.model.BrowserTab
 
-/** Barra de «Buscar en la página»: resalta todas las coincidencias y salta entre ellas. */
+/** "Find in page" bar: highlights all matches and jumps between them. */
 @Composable
 fun FindInPageBar(tab: BrowserTab, onClose: () -> Unit, modifier: Modifier = Modifier) {
     val strings = LocalSendaStrings.current

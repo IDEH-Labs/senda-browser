@@ -170,7 +170,7 @@ fun SendaToolbar(
         mutableStateOf(TextFieldValue(if (activeTab?.url == "about:blank") "" else (activeTab?.url ?: "")))
     }
 
-    // Interceptor directo del botón/gesto Atrás de Android: descarta edición y restaura la barra
+    // Direct interceptor of Android's Back button/gesture: discards editing and restores the bar
     BackHandler(enabled = effectiveIsEditing) {
         focusManager.clearFocus()
         keyboardController?.hide()
@@ -236,7 +236,7 @@ fun SendaToolbar(
     val canGoForward = activeTab?.canGoForward == true
     val isLoading = activeTab?.isLoading == true
 
-    // Si es modo borde a borde (diámetro completo) o cápsula flotante
+    // Whether it is edge-to-edge mode (full width) or a floating capsule
     val isFullWidthMode = isFullWidth && position != ToolbarPosition.FLOATING
     val containerShape = if (isFullWidthMode) RectangleShape else RoundedCornerShape(28.dp)
 
@@ -302,7 +302,7 @@ fun SendaToolbar(
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 if (effectiveIsEditing) {
-                    // Modo de Edición Expandido estilo GNOME Web (Adwaita Entry Focus)
+                    // Expanded editing mode in GNOME Web style (Adwaita entry focus)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -311,7 +311,7 @@ fun SendaToolbar(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(itemSpacing)
                     ) {
-                        // Botón de Volver / Cancelar (Adwaita flat button)
+                        // Back / Cancel button (Adwaita flat button)
                         IconButton(
                             onClick = {
                                 focusManager.clearFocus()
@@ -330,7 +330,7 @@ fun SendaToolbar(
                             )
                         }
 
-                        // Caja de entrada estilo Omnibox Pill con anillo de foco
+                        // Omnibox pill style input box with a focus ring
                         Box(
                             modifier = Modifier
                                 .weight(1f)
@@ -407,7 +407,7 @@ fun SendaToolbar(
                             }
                         }
 
-                        // Botón Ir / Navegar (Adwaita Suggestion Button)
+                        // Go / Navigate button (Adwaita suggestion button)
                         IconButton(
                             onClick = {
                                 focusManager.clearFocus()
@@ -432,7 +432,7 @@ fun SendaToolbar(
                         }
                     }
 
-                    // Píldoras de acción rápida en modo edición: Pegar e ir, Copiar enlace actual, Compartir
+                    // Quick action pills in editing mode: Paste and go, Copy current link, Share
                     val clipboardManager = remember {
                         context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     }
@@ -554,8 +554,8 @@ fun SendaToolbar(
                         }
                     }
 
-                    // Sugerencias mientras se escribe: solo de favoritos e historial guardados en el teléfono,
-                    // nunca se envía lo tecleado a un buscador
+                    // Suggestions while typing: only from bookmarks and history stored on the phone,
+                    // what is typed is never sent to a search engine
                     if (prefs?.searchSuggestionsEnabled == true) {
                         val sources = remember(effectiveIsEditing) {
                             prefs.getBookmarks().map { Triple(it.title, it.url, true) } +
@@ -605,7 +605,7 @@ fun SendaToolbar(
                                         overflow = TextOverflow.Ellipsis
                                     )
                                 }
-                                // Llevar la dirección al campo para seguir editándola
+                                // Put the address in the field to keep editing it
                                 IconButton(
                                     onClick = { textFieldValue = TextFieldValue(url, TextRange(url.length)) },
                                     modifier = Modifier.size(32.dp)
@@ -621,7 +621,7 @@ fun SendaToolbar(
                         }
                     }
                 } else {
-                    // Barra de Navegación estilo GNOME Web (Epiphany Adwaita HeaderBar)
+                    // Navigation bar in GNOME Web style (Epiphany Adwaita HeaderBar)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -630,7 +630,7 @@ fun SendaToolbar(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(itemSpacing)
                     ) {
-                        // 1. Botón Atrás
+                        // 1. Back button
                         if (prefs?.showBackButton != false) {
                             Box {
                                 Surface(
@@ -697,7 +697,7 @@ fun SendaToolbar(
                             }
                         }
 
-                        // 2. Botón Adelante
+                        // 2. Forward button
                         if (prefs?.showForwardButton == true) {
                             IconButton(
                                 onClick = onForward,
@@ -715,7 +715,7 @@ fun SendaToolbar(
                             }
                         }
 
-                        // 3. Botón de Inicio / Home
+                        // 3. Home button
                         if (prefs?.showHomeButton == true && !isHomeTab) {
                             IconButton(
                                 onClick = { onGoHome?.invoke() },
@@ -732,7 +732,7 @@ fun SendaToolbar(
                             }
                         }
 
-                        // 4. Barra Central estilo Omnibox Pill
+                        // 4. Central omnibox pill style bar
                         Box(
                             modifier = Modifier
                                 .weight(1f)
@@ -757,7 +757,7 @@ fun SendaToolbar(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                // Indicador de pestaña privada
+                                // Private tab indicator
                                 if (activeTab?.isPrivate == true) {
                                     Icon(
                                         imageVector = Icons.Default.Security,
@@ -769,7 +769,7 @@ fun SendaToolbar(
                                     )
                                 }
 
-                                // Indicador de seguridad / búsqueda
+                                // Security / search indicator
                                 if (prefs?.showSecurityIndicator != false) {
                                     if (isHomeTab) {
                                         Icon(
@@ -781,7 +781,7 @@ fun SendaToolbar(
                                                 .size((iconSize.value - 2).coerceAtLeast(14f).dp)
                                         )
                                     } else if (activeTab.trackersBlocked > 0 && activeTab.displaySecure) {
-                                        // En páginas sin cifrar se muestra el candado abierto, no el escudo
+                                        // On unencrypted pages the open padlock is shown, not the shield
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
                                             modifier = Modifier
@@ -812,7 +812,7 @@ fun SendaToolbar(
                                                 .size((btnSize.value - 10).coerceAtLeast(22f).dp)
                                                 .clip(RoundedCornerShape(4.dp))
                                         ) {
-                                            // El candado solo aparece si Gecko validó el certificado de la página
+                                            // The padlock only appears if Gecko validated the page's certificate
                                             val secure = activeTab.displaySecure
                                             Icon(
                                                 imageVector = if (secure) Icons.Default.Lock else Icons.Default.LockOpen,
@@ -825,7 +825,7 @@ fun SendaToolbar(
                                     }
                                 }
 
-                                // Texto de URL
+                                // URL text
                                 val urlTextStyle = TextStyle(
                                     fontFamily = MaterialTheme.typography.bodyLarge.fontFamily,
                                     color = if (isHomeTab) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
@@ -849,7 +849,7 @@ fun SendaToolbar(
                                     )
                                 }
 
-                                // Acciones dentro de la barra
+                                // Actions inside the bar
                                 if (!isHomeTab) {
                                     if (prefs?.showReaderButton != false) {
                                         IconButton(
@@ -902,7 +902,7 @@ fun SendaToolbar(
                             }
                         }
 
-                        // Botón Nueva Pestaña rápida (+)
+                        // Quick New Tab button (+)
                         if (prefs?.showNewTabButton == true) {
                             IconButton(
                                 onClick = { onNewTab?.invoke("about:blank") },
@@ -919,7 +919,7 @@ fun SendaToolbar(
                             }
                         }
 
-                        // Botón Compartir
+                        // Share button
                         if (prefs?.showShareButton == true && !isHomeTab) {
                             IconButton(
                                 onClick = {
@@ -946,7 +946,7 @@ fun SendaToolbar(
                             }
                         }
 
-                        // Botón Marcadores
+                        // Bookmarks button
                         if (prefs?.showBookmarksButton == true) {
                             IconButton(
                                 onClick = onOpenBookmarks,
@@ -963,7 +963,7 @@ fun SendaToolbar(
                             }
                         }
 
-                        // Botón DevTools (si está habilitado)
+                        // DevTools button (if enabled)
                         if (showDevToolsButton && prefs?.showDevToolsButton == true) {
                             IconButton(
                                 onClick = onOpenDevTools,
@@ -980,7 +980,7 @@ fun SendaToolbar(
                             }
                         }
 
-                        // Contador / Selector de pestañas
+                        // Tab counter / selector
                         if (prefs?.showTabsButton != false) {
                             Box {
                                 Surface(
@@ -1081,8 +1081,8 @@ fun SendaToolbar(
                             }
                         }
 
-                        // Botón Transmitir - Ubicado al lado derecho del selector de pestañas. Con una TV conectada
-                        // aparece siempre y en color: es la señal del modo TV y la entrada a sus controles
+                        // Cast button - placed to the right of the tab selector. With a TV connected
+                        // it always appears, in color: it is the TV mode signal and the entry point to its controls
                         val tvConnected = org.senda.browser.core.cast.SendaTvMode.tvConnected
                         if (tvConnected || (showCastButton && prefs?.showCastButton == true)) {
                             IconButton(
@@ -1100,7 +1100,7 @@ fun SendaToolbar(
                             }
                         }
 
-                        // Menú Principal
+                        // Main menu
                         if (prefs?.showMenuButton != false) {
                             Box {
                                 IconButton(
@@ -1122,7 +1122,7 @@ fun SendaToolbar(
                                 onDismissRequest = { showMenu = false },
                                 modifier = Modifier.width(260.dp)
                             ) {
-                            // Fila superior rápida de navegación estilo GNOME Web dentro del menú (sin duplicados)
+                            // Quick top navigation row in GNOME Web style inside the menu (no duplicates)
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -1162,8 +1162,8 @@ fun SendaToolbar(
                                     )
                                 }
 
-                                // Igual que el botón de la barra: «Detener» mientras carga (la barra ya no lo trae por
-                                // defecto, para dejar sitio al dominio)
+                                // Same as the bar button: "Stop" while loading (the bar no longer has it by
+                                // default, to leave room for the domain)
                                 IconButton(
                                     onClick = {
                                         showMenu = false
@@ -1198,7 +1198,7 @@ fun SendaToolbar(
 
                             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
-                            // Asistente con IA externa (el proveedor que configure el usuario)
+                            // Assistant with an external AI (the provider the user sets up)
                             DropdownMenuItem(
                                 text = {
                                     Column {
@@ -1217,7 +1217,7 @@ fun SendaToolbar(
 
                             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
-                            // Red Tor y Proxy
+                            // Tor network and proxy
                             DropdownMenuItem(
                                 text = {
                                     Column {
@@ -1245,7 +1245,7 @@ fun SendaToolbar(
                                 }
                             )
 
-                            // Transmitir por Chromecast (accesible aquí solo si el usuario ocultó el botón de la barra de navegación, evitando duplicados innecesarios)
+                            // Cast (available here only if the user hid the navigation bar button, avoiding unnecessary duplicates)
                             if (!showCastButton && !org.senda.browser.core.cast.SendaTvMode.tvConnected) {
                                 DropdownMenuItem(
                                     text = { Text(strings.st_chromecast_title) },
@@ -1264,7 +1264,7 @@ fun SendaToolbar(
                                 )
                             }
 
-                            // Sitio para escritorio
+                            // Desktop site
                             DropdownMenuItem(
                                 text = { Text(strings.tb_desktop_site) },
                                 leadingIcon = {
@@ -1290,9 +1290,9 @@ fun SendaToolbar(
                                 }
                             )
 
-                            // Compartir, copiar y demás acciones de página: en la pestaña de inicio no hay página
+                            // Share, copy and other page actions: the home tab has no page
                             if (!isHomeTab) {
-                                // Compartir
+                                // Share
                                 DropdownMenuItem(
                                     text = { Text("${strings.tb_share}...") },
                                     leadingIcon = {
@@ -1317,7 +1317,7 @@ fun SendaToolbar(
                                     }
                                 )
 
-                                // Copiar enlace
+                                // Copy link
                                 DropdownMenuItem(
                                     text = { Text(strings.ctx_copy_link) },
                                     leadingIcon = {
@@ -1336,7 +1336,7 @@ fun SendaToolbar(
                                     }
                                 )
 
-                                // Buscar en la página
+                                // Find in page
                                 DropdownMenuItem(
                                     text = { Text(strings.find_in_page) },
                                     leadingIcon = {
@@ -1353,7 +1353,7 @@ fun SendaToolbar(
                                     }
                                 )
 
-                                // Traducir en el teléfono (o volver al original)
+                                // Translate on the phone (or go back to the original)
                                 DropdownMenuItem(
                                     text = {
                                         Text(
@@ -1378,7 +1378,7 @@ fun SendaToolbar(
                                     }
                                 )
 
-                                // Imprimir o guardar como PDF (el diálogo de Android ofrece ambas cosas)
+                                // Print or save as PDF (Android's dialog offers both)
                                 DropdownMenuItem(
                                     text = { Text(strings.page_print) },
                                     leadingIcon = {
@@ -1395,7 +1395,7 @@ fun SendaToolbar(
                                     }
                                 )
 
-                                // Acceso directo en la pantalla de inicio
+                                // Home screen shortcut
                                 DropdownMenuItem(
                                     text = { Text(strings.page_add_to_home) },
                                     leadingIcon = {
@@ -1415,7 +1415,7 @@ fun SendaToolbar(
                                 )
                             }
 
-                            // Favoritos y marcadores
+                            // Bookmarks
                             DropdownMenuItem(
                                 text = { Text(strings.tb_bookmarks) },
                                 leadingIcon = {
@@ -1432,7 +1432,7 @@ fun SendaToolbar(
                                 }
                             )
 
-                            // Historial de navegación
+                            // Browsing history
                             DropdownMenuItem(
                                 text = { Text(strings.tb_history) },
                                 leadingIcon = {
@@ -1449,7 +1449,7 @@ fun SendaToolbar(
                                 }
                             )
 
-                            // Descargas
+                            // Downloads
                             DropdownMenuItem(
                                 text = { Text(strings.tb_downloads) },
                                 leadingIcon = {
@@ -1468,7 +1468,7 @@ fun SendaToolbar(
 
                             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
-                            // Ajustes / Configuración
+                            // Settings
                             DropdownMenuItem(
                                 text = { Text(strings.tb_settings) },
                                 leadingIcon = {
@@ -1490,7 +1490,7 @@ fun SendaToolbar(
             }
         }
 
-            // Barra de progreso de carga suave integrada
+            // Built-in smooth loading progress bar
             if (isLoading) {
                     LinearProgressIndicator(
                         progress = { ((activeTab?.progress ?: 0) / 100f).coerceIn(0.05f, 1f) },
@@ -1506,7 +1506,7 @@ fun SendaToolbar(
         }
     }
 
-    // Diálogo de Seguridad del Sitio Web
+    // Website security dialog
     if (showSecurityDialog && activeTab != null && !isHomeTab) {
         AlertDialog(
             onDismissRequest = { showSecurityDialog = false },
@@ -1584,7 +1584,7 @@ fun SendaToolbar(
         )
     }
 
-    // DIÁLOGO: ENRUTAMIENTO TOR & PROXY SOBERANO
+    // DIALOG: TOR & PROXY ROUTING
     if (showProxyDialog) {
         val prefs = activeTab?.prefs
         var selectedMode by remember { mutableStateOf(prefs?.proxyMode ?: "OFF") }
@@ -1615,7 +1615,7 @@ fun SendaToolbar(
                     )
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // 1. Tor Integrado / Orbot
+                    // 1. Built-in Tor / Orbot
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1649,7 +1649,7 @@ fun SendaToolbar(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // 2. SOCKS5 Personalizado
+                    // 2. Custom SOCKS5
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1699,7 +1699,7 @@ fun SendaToolbar(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // 4. Conexión Directa (OFF)
+                    // 4. Direct connection (OFF)
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1792,8 +1792,8 @@ fun SendaToolbar(
 }
 
 /**
- * Dominio de la barra. Si no cabe, se recorta por la IZQUIERDA (…wikipedia.org) y nunca por la derecha: el final
- * del dominio es lo que distingue la web real de una falsa (banco.com.otro-sitio.net). Antes se veía «es.wiki…».
+ * Domain in the address bar. If it does not fit, it is trimmed on the LEFT (…wikipedia.org) and never on the right: the end
+ * of the domain is what tells the real site from a fake one (banco.com.otro-sitio.net). It used to show "es.wiki…".
  */
 @Composable
 private fun HostText(host: String, style: TextStyle, modifier: Modifier = Modifier) {
@@ -1807,11 +1807,11 @@ private fun HostText(host: String, style: TextStyle, modifier: Modifier = Modifi
     }
 }
 
-/** Texto más largo que cabe en [maxPx]: el dominio entero, o quitando subdominios por la izquierda, o letras. */
+/** Longest text that fits in [maxPx]: the whole domain, or removing subdomains from the left, or letters. */
 internal fun fitHostFromEnd(host: String, maxPx: Int, widthOf: (String) -> Int): String {
     if (host.isEmpty() || widthOf(host) <= maxPx) return host
     val labels = host.split('.')
-    // Primero se quitan subdominios enteros, dejando al menos dominio y terminación (wikipedia.org)
+    // First whole subdomains are removed, leaving at least the domain and the suffix (wikipedia.org)
     for (drop in 1..(labels.size - 2).coerceAtLeast(0)) {
         val candidate = "…" + labels.drop(drop).joinToString(".")
         if (widthOf(candidate) <= maxPx) return candidate

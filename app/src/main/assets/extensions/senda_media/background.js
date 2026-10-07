@@ -1,10 +1,10 @@
-// Solo observa las respuestas de la red: cuando una página descarga un video (MP4, WebM, HLS) se avisa a Senda
-// con la dirección del video y la de la página, para mostrarlo en la TV al duplicar la pantalla. No se inyecta nada en
-// las páginas ni se modifica ninguna petición
+// Only watches network responses: when a page downloads a video (MP4, WebM, HLS) Senda is told
+// the video's address and the page's, to show it on the TV while mirroring. Nothing is injected into
+// pages and no request is modified
 
 const VIDEO_TYPES = /^(video\/(mp4|webm|quicktime|x-matroska|x-m4v)|application\/(vnd\.apple\.mpegurl|x-mpegurl)|audio\/mpegurl)/i;
 const VIDEO_PATH = /\.(mp4|m4v|webm|mov|mkv|m3u8)$/i;
-// Trozos sueltos de un video en streaming: no se pueden reproducir solos
+// Loose chunks of a streaming video: they cannot be played on their own
 const SEGMENT_PATH = /\.(ts|m4s|aac|vtt|webvtt)$/i;
 
 let port = null;
@@ -19,7 +19,7 @@ function header(headers, name) {
     return h ? h.value : null;
 }
 
-// Cabeceras con las que la página pidió el video: algunos servidores solo lo entregan con su Referer
+// Headers the page used to request the video: some servers only deliver it with their Referer
 const requestHeaders = new Map();
 
 browser.webRequest.onSendHeaders.addListener((details) => {
@@ -41,7 +41,7 @@ browser.webRequest.onHeadersReceived.addListener((details) => {
     if (SEGMENT_PATH.test(path)) return;
     const type = (header(details.responseHeaders, 'content-type') || '').split(';')[0].trim();
     if (!VIDEO_TYPES.test(type) && !VIDEO_PATH.test(path)) return;
-    // Página en la que se ve el video: la principal, aunque el reproductor esté en un iframe de otro sitio
+    // Page where the video is shown: the top-level one, even if the player is in an iframe from another site
     const ancestors = details.frameAncestors || [];
     const page = ancestors.length > 0 ? ancestors[ancestors.length - 1].url : (details.documentUrl || details.originUrl);
     if (!page) return;
@@ -66,7 +66,7 @@ browser.webRequest.onHeadersReceived.addListener((details) => {
     }
 }, { urls: ['<all_urls>'], types: ['media', 'xmlhttprequest', 'other'] }, ['responseHeaders']);
 
-// Las peticiones que no llegan a respuesta no deben quedarse en memoria
+// Requests that never get a response must not stay in memory
 browser.webRequest.onErrorOccurred.addListener((details) => {
     requestHeaders.delete(details.requestId);
 }, { urls: ['<all_urls>'] });

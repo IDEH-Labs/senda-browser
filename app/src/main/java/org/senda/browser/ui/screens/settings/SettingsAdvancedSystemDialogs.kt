@@ -62,7 +62,7 @@ fun SettingsSitePermissionsDialog(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Peso y margen: «Notificaciones» chocaba con el botón «Preguntar»
+                        // Weight and margin: "Notifications" collided with the "Ask" button
                         FitText(
                             text = name,
                             maxSize = 14.sp,
@@ -274,7 +274,7 @@ fun SettingsSendaLabsDialog(
                         prefs.userCustomCss = it
                     },
                     placeholder = { Text(strings.dlg_senda_labs_css_hint, style = MaterialTheme.typography.bodySmall.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)) },
-                    // Código: letra monoespaciada, como en cualquier editor
+                    // Code: monospaced font, as in any editor
                     textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -291,7 +291,7 @@ fun SettingsSendaLabsDialog(
                         prefs.userCustomScript = it
                     },
                     placeholder = { Text(strings.dlg_senda_labs_js_hint, style = MaterialTheme.typography.bodySmall.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)) },
-                    // Código: letra monoespaciada, como en cualquier editor
+                    // Code: monospaced font, as in any editor
                     textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace),
                     modifier = Modifier
                         .fillMaxWidth()

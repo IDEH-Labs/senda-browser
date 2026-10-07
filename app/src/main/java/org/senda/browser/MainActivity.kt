@@ -48,7 +48,7 @@ class MainActivity : FragmentActivity() {
     private lateinit var prefs: PreferencesManager
     private var onNewIntentCallback: ((String) -> Unit)? = null
 
-    // Permisos de Android que pide Gecko (cámara, micrófono, ubicación) tras aceptar el aviso de un sitio
+    // Android permissions Gecko asks for (camera, microphone, location) after accepting a site's notice
     private var pendingPermissionResult: ((Boolean) -> Unit)? = null
     private val androidPermissionLauncher = registerForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
@@ -64,13 +64,13 @@ class MainActivity : FragmentActivity() {
             onResult(true)
             return
         }
-        // Una petición a la vez: si había otra pendiente se da por denegada
+        // One request at a time: if another was pending it is treated as denied
         pendingPermissionResult?.invoke(false)
         pendingPermissionResult = onResult
         androidPermissionLauncher.launch(missing.toTypedArray())
     }
 
-    // «Preguntar dónde guardar»: una petición del selector de archivos a la vez; las demás esperan su turno
+    // "Ask where to save": one file picker request at a time; the others wait their turn
     private class SaveRequest(val fileName: String, val mime: String, val onResult: (android.net.Uri?) -> Unit)
     private val pendingSaves = ArrayDeque<SaveRequest>()
     private val saveLocationLauncher: androidx.activity.result.ActivityResultLauncher<SaveRequest> = registerForActivityResult(
@@ -96,25 +96,25 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Desde Android 15 (targetSdk 35+) la ventana siempre ocupa también la zona de las barras del sistema.
-        // Se activa igual en todas las versiones y la interfaz reserva ese espacio con WindowInsets.safeDrawing
+        // Since Android 15 (targetSdk 35+) the window always also covers the system bars area.
+        // It is enabled the same way on all versions and the UI reserves that space with WindowInsets.safeDrawing
         enableEdgeToEdge()
         prefs = PreferencesManager(this)
         SendaLocaleManager.applyLocale(this, prefs.appLanguage)
-        // Protección contra espionaje en vista multitarea (FLAG_SECURE) si el usuario la activó
+        // Protection against snooping in the recents view (FLAG_SECURE) if the user turned it on
         updateAntiSnoopingFlag()
 
-        // Recreada por Android (no debería: configChanges cubre los cambios de pantalla del modo TV): se reabren las
-        // pestañas tal como estaban, sin repetir el enlace con el que se abrió ni poner una pestaña de inicio delante
+        // Recreated by Android (it should not be: configChanges covers TV mode screen changes): the tabs are reopened
+        // as they were, without repeating the link that opened the app or putting a home tab in front
         val recreated = savedInstanceState != null
-        // Verificar si se abrió mediante un enlace externo o texto compartido
+        // Check whether it was opened through an external link or shared text
         val initialUrl = (if (recreated) null else externalUrlFrom(intent)) ?: "about:blank"
 
         setContent {
             var isUnlocked by remember { mutableStateOf(!prefs.requireBiometrics) }
             var currentScreen by remember { mutableStateOf("browser") }
 
-            // Estado reactivo para refrescar temas e idioma al cambiar ajustes
+            // Reactive state to refresh themes and language when settings change
             var themeRecomposeKey by remember { mutableIntStateOf(0) }
             var appLanguage by remember { mutableStateOf(prefs.appLanguage) }
             val currentStrings: SendaStringPack = remember(appLanguage, themeRecomposeKey) {
@@ -124,11 +124,11 @@ class MainActivity : FragmentActivity() {
             val tabs = remember { mutableStateListOf<BrowserTab>() }
             var activeTabId by remember { mutableStateOf("") }
 
-            // Inicializar con la primera pestaña
+            // Initialize with the first tab
             LaunchedEffect(Unit) {
                 if (tabs.isEmpty()) {
                     val startupMode = if (recreated) "RESUME" else prefs.startupMode
-                    // Reabrir las pestañas de la sesión anterior (las privadas nunca se guardan)
+                    // Reopen the tabs of the previous session (private ones are never saved)
                     if (!prefs.alwaysPrivateMode && startupMode != "CLEAN") {
                         val (saved, activeIndex) = prefs.loadOpenTabs()
                         saved.forEach { savedTab ->
@@ -146,14 +146,14 @@ class MainActivity : FragmentActivity() {
                         }
                         tabs.getOrNull(activeIndex)?.let { activeTabId = it.id }
                     }
-                    // «Página de inicio limpia»: se arranca en una pestaña vacía; si ya había una (la última
-                    // usada o cualquier otra), se reutiliza para no acumular pestañas vacías en cada inicio
+                    // "Clean home page": start on an empty tab; if there already was one (the last
+                    // used or any other), reuse it so empty tabs don't pile up at every startup
                     val reusableHome = if (startupMode == "HOME" && initialUrl == "about:blank") {
                         tabs.firstOrNull { it.id == activeTabId && it.url == "about:blank" }
                             ?: tabs.firstOrNull { it.url == "about:blank" }
                     } else null
                     if (reusableHome != null) activeTabId = reusableHome.id
-                    // Un enlace abierto desde otra app va en una pestaña nueva y al frente
+                    // A link opened from another app goes into a new tab, in front
                     if (tabs.isEmpty() || initialUrl != "about:blank" || (startupMode == "HOME" && reusableHome == null)) {
                         val firstTab = BrowserTab(
                             initialUrl = initialUrl,
@@ -167,7 +167,7 @@ class MainActivity : FragmentActivity() {
                 }
 
                 if (prefs.requireBiometrics && !isUnlocked) {
-                    // Nunca se cierra la app si falla: queda la pantalla de bloqueo para reintentar
+                    // The app never closes on failure: the lock screen stays so the user can try again
                     showBiometricAuth { success -> if (success) isUnlocked = true }
                 }
             }
@@ -184,7 +184,7 @@ class MainActivity : FragmentActivity() {
                     activeTabId = newTab.id
                     currentScreen = "browser"
                 }
-                // Pestañas abiertas por la web (target=_blank, window.open) o desde el menú de pulsación larga
+                // Tabs opened by the website (target=_blank, window.open) or from the long-press menu
                 BrowserTab.tabOpener = { newTab, background ->
                     if (!background) newTab.parentTabId = activeTabId
                     val parentIndex = tabs.indexOfFirst { it.id == activeTabId }
@@ -207,21 +207,21 @@ class MainActivity : FragmentActivity() {
             }
 
             val activeTab = tabs.find { it.id == activeTabId } ?: tabs.firstOrNull()
-            // Pantalla completa inmersiva solo cuando el usuario lo solicita explícitamente en la pestaña
+            // Immersive full screen only when the user explicitly asks for it in the tab
             val isFullScreen = activeTab?.isFullScreen == true
             val keepPortrait = activeTab?.isFullScreenVideoPortrait == true
 
-            // Modo inmersivo total para reproducción de video en pantalla completa solicitada por el usuario
+            // Fully immersive mode for full-screen video playback requested by the user
             LaunchedEffect(isFullScreen, keepPortrait) {
                 val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
-                // El espacio de las barras lo reserva la interfaz (safeDrawing), salvo en pantalla completa
+                // The UI reserves the bars' space (safeDrawing), except in full screen
                 if (isFullScreen) {
                     windowInsetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
                     windowInsetsController.hide(WindowInsetsCompat.Type.systemBars())
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                        // SHORT_EDGES: en horizontal la cámara queda en un lado corto; con DEFAULT Android reserva
-                        // esa franja y el video se centra en un área más estrecha, descentrado y más pequeño
-                        // (en la TV se ve con bordes desiguales)
+                        // SHORT_EDGES: in landscape the camera sits on a short edge; with DEFAULT Android reserves
+                        // that strip and the video is centered in a narrower area, off-center and smaller
+                        // (on the TV it shows with uneven borders)
                         val lp = window.attributes
                         lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
                         window.attributes = lp
@@ -242,9 +242,9 @@ class MainActivity : FragmentActivity() {
                 }
             }
 
-            // Al salir de la app (Inicio, Recientes, otra app) abandonar la pantalla completa: si no, Senda queda
-            // con barras ocultas y orientación bloqueada, y al volver al sistema la ventana inmersiva sigue reclamando la pantalla
-            // Guardar las pestañas abiertas al salir de Senda, para reabrirlas la próxima vez
+            // When leaving the app (Home, Recents, another app) exit full screen: otherwise Senda is left
+            // with hidden bars and locked orientation, and back in the system the immersive window keeps claiming the screen
+            // Save the open tabs when leaving Senda, to reopen them next time
             DisposableEffect(Unit) {
                 val observer = LifecycleEventObserver { _, event ->
                     if (event == Lifecycle.Event.ON_STOP) {
@@ -273,25 +273,25 @@ class MainActivity : FragmentActivity() {
                 onDispose { lifecycle.removeObserver(observer) }
             }
 
-            // Asignar prioridades de memoria: sólo la pestaña activa consume buffers en primer plano
+            // Assign memory priorities: only the active tab uses foreground buffers
             LaunchedEffect(activeTab?.id) {
                 tabs.forEach { tab ->
                     tab.setActiveState(tab.id == activeTab?.id)
                 }
             }
 
-            // Blindaje de privacidad a nivel de hardware/SO: Activar FLAG_SECURE automáticamente si la pestaña es privada
+            // OS-level privacy shield: turn on FLAG_SECURE automatically if the tab is private
             LaunchedEffect(activeTab?.isPrivate, prefs.enableAntiSnooping, org.senda.browser.core.cast.SendaTvMode.tvConnected) {
                 privateTabActive = activeTab?.isPrivate == true
                 updateAntiSnoopingFlag()
             }
 
-            // Solo interceptar Atrás en MainActivity si estamos dentro de la pantalla de ajustes
+            // Only intercept Back in MainActivity when we are inside the settings screen
             BackHandler(enabled = currentScreen == "settings") {
                 currentScreen = "browser"
             }
 
-            // Referenciar themeRecomposeKey para provocar recomposición de SendaTheme sin destruir el árbol UI ni cerrar diálogos
+            // Reference themeRecomposeKey to recompose SendaTheme without destroying the UI tree or closing dialogs
             @Suppress("UNUSED_VARIABLE")
             val themeRecomposeTrigger = themeRecomposeKey
 
@@ -307,8 +307,8 @@ class MainActivity : FragmentActivity() {
                     recomposeKey = themeRecomposeKey
                 ) {
                     Surface(modifier = Modifier.fillMaxSize()) {
-                    // Fuera de pantalla completa, el contenido no se mete bajo las barras, la cámara ni el teclado;
-                    // el fondo del Surface sí se extiende detrás de las barras
+                    // Outside full screen, content does not go under the bars, the camera or the keyboard;
+                    // the Surface background does extend behind the bars
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -325,7 +325,7 @@ class MainActivity : FragmentActivity() {
                                 showBiometricAuth { success -> if (success) isUnlocked = true }
                             })
                         }
-                        // Volver a bloquear si Senda pasó más de 30 s en segundo plano
+                        // Lock again if Senda spent more than 30 s in the background
                         DisposableEffect(Unit) {
                             var hiddenAt = 0L
                             val observer = LifecycleEventObserver { _, event ->
@@ -446,8 +446,8 @@ class MainActivity : FragmentActivity() {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        // La actividad gestiona ella misma los giros (configChanges), así que Gecko no se entera solo:
-        // sin esto la web conserva el tamaño de pantalla anterior y el video queda en negro al girar
+        // The activity handles rotations itself (configChanges), so Gecko is not told on its own:
+        // without this the page keeps the previous screen size and the video goes black on rotation
         try {
             val runtime = SendaGeckoEngine.getRuntime()
             runtime.configurationChanged(newConfig)
@@ -467,8 +467,8 @@ class MainActivity : FragmentActivity() {
         System.gc()
     }
 
-    // Mientras se duplica la pantalla a la TV, pedir 60 Hz en vez de 120 Hz: la TV no muestra más de 60
-    // y componer/codificar el doble de fotogramas es lo que retrasa la imagen en la TV
+    // While mirroring to the TV, ask for 60 Hz instead of 120 Hz: the TV shows no more than 60
+    // and composing/encoding twice as many frames is what delays the picture on the TV
     private val displayListener = object : DisplayManager.DisplayListener {
         override fun onDisplayAdded(displayId: Int) = updateRefreshRateForMirroring()
         override fun onDisplayRemoved(displayId: Int) = updateRefreshRateForMirroring()
@@ -512,12 +512,12 @@ class MainActivity : FragmentActivity() {
         updateAntiSnoopingFlag()
     }
 
-    // Pestaña activa privada: se recuerda aquí para que onResume no retire la protección de una pestaña privada
+    // Active private tab: remembered here so onResume does not remove a private tab's protection
     private var privateTabActive = false
 
     private fun updateAntiSnoopingFlag() {
-        // La protección anti-espionaje hace que Senda se vea en negro en la TV: mientras se duplica la pantalla
-        // se levanta para las pestañas normales. Las privadas siguen protegidas siempre
+        // Anti-snooping protection makes Senda show black on the TV: while mirroring it is
+        // lifted for normal tabs. Private tabs always stay protected
         val tvConnected = org.senda.browser.core.cast.SendaTvMode.tvConnected
         if ((prefs.enableAntiSnooping && !tvConnected) || privateTabActive) {
             window.setFlags(
@@ -538,14 +538,14 @@ class MainActivity : FragmentActivity() {
     }
 
     /**
-     * Lo que llega de otras apps no es de fiar: javascript:, data:, about:, resource: o un file:// hacia la
-     * carpeta privada de Senda se ejecutaban o se listaban como si el usuario los hubiera escrito.
+     * What arrives from other apps is not trusted: javascript:, data:, about:, resource: or a file:// pointing to
+     * Senda's private folder used to run or be listed as if the user had typed them.
      */
     private fun externalUrlFrom(intent: Intent?): String? {
         val raw = (intent?.dataString ?: intent?.getStringExtra("url") ?: intent?.getStringExtra(Intent.EXTRA_TEXT))
             ?.trim()?.takeIf { it.isNotEmpty() } ?: return null
         val scheme = Regex("^([a-zA-Z][a-zA-Z0-9+.-]*):").find(raw)?.groupValues?.get(1)?.lowercase()
-            ?: return raw // Texto compartido sin esquema: la barra lo trata como dirección o búsqueda
+            ?: return raw // Shared text without a scheme: the address bar treats it as an address or a search
         return when (scheme) {
             "http", "https", "content" -> raw
             "file" -> raw.takeIf { isPublicFile(it) }
@@ -565,13 +565,13 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun showBiometricAuth(onResult: (Boolean) -> Unit) {
-        // Huella o, si no hay o falla, el PIN/patrón del teléfono. Sin esto, un móvil sin huella registrada
-        // (o con el sensor roto) dejaba al usuario fuera de Senda para siempre
+        // Fingerprint or, if there is none or it fails, the phone's PIN/pattern. Without this, a phone with no enrolled
+        // fingerprint (or a broken sensor) locked the user out of Senda forever
         val authenticators = androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_WEAK or
             androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
         val canAuth = androidx.biometric.BiometricManager.from(this).canAuthenticate(authenticators)
         if (canAuth != androidx.biometric.BiometricManager.BIOMETRIC_SUCCESS) {
-            // El teléfono no tiene ningún bloqueo configurado: no hay con qué verificar, se avisa y se entra
+            // The phone has no lock set up: there is nothing to verify with, so the user is warned and let in
             android.widget.Toast.makeText(this, getString(R.string.biometric_no_device_lock), android.widget.Toast.LENGTH_LONG).show()
             onResult(true)
             return
@@ -603,7 +603,7 @@ class MainActivity : FragmentActivity() {
     }
 }
 
-/** Pantalla mientras Senda está bloqueada: nada del contenido queda a la vista. */
+/** Screen shown while Senda is locked: none of the content is visible. */
 @androidx.compose.runtime.Composable
 private fun SendaLockScreen(onUnlock: () -> Unit) {
     androidx.compose.foundation.layout.Box(

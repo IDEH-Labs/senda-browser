@@ -11,8 +11,8 @@ import org.senda.browser.ui.model.BrowserTab
 import org.senda.browser.ui.model.SendaPrompt
 
 /**
- * Cola de diálogos de una pestaña: dos descargas seguidas no se pisan y cerrar la pestaña resuelve todo.
- * Pestaña privada en about:blank, sin preferencias: no toca datos del usuario.
+ * A tab's dialog queue: two downloads in a row do not overwrite each other, and closing the tab resolves everything.
+ * Private tab on about:blank, no preferences: it does not touch user data.
  */
 @RunWith(AndroidJUnit4::class)
 class SendaPromptQueueTest {

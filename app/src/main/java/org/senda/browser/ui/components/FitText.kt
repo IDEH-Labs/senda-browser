@@ -18,8 +18,8 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 
 /**
- * Texto de una línea que reduce su tamaño hasta [minSize] si no cabe, en vez de partir la palabra
- * («Compact / o») o cortarla con «…». Para botones y chips de ancho fijo.
+ * Single-line text that shrinks down to [minSize] if it does not fit, instead of breaking the word
+ * ("Compact / o") or cutting it with "…". For fixed-width buttons and chips.
  */
 @Composable
 fun FitText(
@@ -32,7 +32,7 @@ fun FitText(
     color: Color = Color.Unspecified,
     textAlign: TextAlign = TextAlign.Center,
     style: TextStyle = LocalTextStyle.current,
-    // Varios FitText de una misma fila comparten este estado: todos quedan del tamaño del que menos cabe
+    // Several FitText in the same row share this state: all end up the size of the one that fits least
     sharedSize: androidx.compose.runtime.MutableState<TextUnit>? = null
 ) {
     val ownSize = remember(text, maxSize) { mutableStateOf(maxSize) }
@@ -60,6 +60,6 @@ fun FitText(
     )
 }
 
-/** Tamaño compartido para [FitText] de una misma fila. */
+/** Shared size for [FitText] in the same row. */
 @Composable
 fun rememberFitGroup(maxSize: TextUnit = 12.sp) = remember { mutableStateOf(maxSize) }

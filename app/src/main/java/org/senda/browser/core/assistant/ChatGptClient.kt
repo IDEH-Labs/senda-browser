@@ -10,36 +10,36 @@ import org.senda.browser.core.SendaNet
 import java.io.IOException
 import java.net.HttpURLConnection
 
-/** Foto o PDF adjunto a un mensaje, en base64 (se manda dentro de la petición; nada se sube aparte). */
+/** Photo or PDF attached to a message, in base64 (sent inside the request; nothing is uploaded separately). */
 data class Attachment(val name: String, val mime: String, val base64: String) {
     val isImage: Boolean get() = mime.startsWith("image/")
 }
 
-/** Un turno de la conversación tal como se envía. */
+/** One conversation turn as it is sent. */
 data class ChatTurn(val role: Role, val text: String, val attachments: List<Attachment> = emptyList()) {
     enum class Role { USER, ASSISTANT }
 }
 
 /**
- * Fuente que la IA consultó: una página web (con [url], se abre en una pestaña) o un servicio de datos de OpenAI
- * sin página (p. ej. «oai-weather» para el tiempo: [url] vacía).
+ * Source the AI consulted: a web page (with [url], opened in a tab) or an OpenAI data service
+ * without a page (e.g. "oai-weather" for the weather: empty [url]).
  */
 data class Source(val url: String, val title: String)
 
 data class ChatReply(val text: String, val sources: List<Source>)
 
-/** Fallo explicable al usuario. */
+/** Failure that can be explained to the user. */
 class RemoteAiException(val kind: Kind, detail: String = "") : Exception(detail) {
     enum class Kind { NOT_CONFIGURED, AUTH, RATE_LIMIT, NETWORK, BAD_RESPONSE, USAGE_LIMIT, NOT_ELIGIBLE }
 }
 
 /**
- * El plan de ChatGPT del usuario («Sign in with ChatGPT»): /v1/models y /v1/responses con store=false y stream=true,
- * como exige la guía oficial (developers.openai.com/siwc/token-sharing-open-source/models-and-inference).
+ * The user's ChatGPT plan ("Sign in with ChatGPT"): /v1/models and /v1/responses with store=false and stream=true,
+ * as the official guide requires (developers.openai.com/siwc/token-sharing-open-source/models-and-inference).
  *
- * Capacidades medidas con la cuenta real el 2026-10-06 (SendaChatGptCapabilitiesTest): búsqueda en internet
- * (herramienta web_search, con fuentes), fotos (input_image), PDF (input_file) y razonamiento alto funcionan; crear
- * imágenes no: OpenAI responde «subscription_sharing_unsupported_capability» ('image_generation' is not supported).
+ * Capabilities measured with the real account on 2026-10-06 (SendaChatGptCapabilitiesTest): internet search
+ * (web_search tool, with sources), photos (input_image), PDF (input_file) and high reasoning work; creating
+ * images does not: OpenAI answers "subscription_sharing_unsupported_capability" ('image_generation' is not supported).
  */
 class ChatGptPlanClient(private val prefs: org.senda.browser.core.PreferencesManager) : AssistantBackend {
 
@@ -61,8 +61,8 @@ class ChatGptPlanClient(private val prefs: org.senda.browser.core.PreferencesMan
     }
 
     /**
-     * Respuesta completa; [onDelta] recibe el texto acumulado mientras llega. [deep]: razonamiento alto (más lento y
-     * cuidadoso). La búsqueda en internet está siempre disponible: el modelo decide cuándo usarla.
+     * Full answer; [onDelta] receives the accumulated text as it arrives. [deep]: high reasoning (slower and
+     * more careful). Internet search is always available: the model decides when to use it.
      */
     override suspend fun chat(
         model: String,
@@ -77,12 +77,12 @@ class ChatGptPlanClient(private val prefs: org.senda.browser.core.PreferencesMan
             .put("model", model)
             .put("input", input)
             .put("tools", JSONArray().put(JSONObject().put("type", "web_search")))
-            // Las páginas consultadas aunque la respuesta no las cite en el texto (p. ej. el tiempo)
+            // Pages consulted even if the answer does not cite them in the text (e.g. the weather)
             .put("include", JSONArray().put("web_search_call.action.sources"))
             .put("store", false)
             .put("stream", true)
         if (deep) payload.put("reasoning", JSONObject().put("effort", "high"))
-        // «usage_unavailable» (503) es temporal: reintento acotado antes de empezar a mostrar texto
+        // "usage_unavailable" (503) is temporary: bounded retry before starting to show text
         var attempt = 0
         while (true) {
             try {
@@ -160,7 +160,7 @@ class ChatGptPlanClient(private val prefs: org.senda.browser.core.PreferencesMan
                     }
                 }
             }
-            // La guía exige response.completed para dar la respuesta por buena
+            // The guide requires response.completed to accept the answer as valid
             if (!completed) throw RemoteAiException(RemoteAiException.Kind.BAD_RESPONSE, "incomplete")
             return ChatReply(out.toString(), sources.values.toList())
         } catch (e: IOException) {
@@ -172,7 +172,7 @@ class ChatGptPlanClient(private val prefs: org.senda.browser.core.PreferencesMan
 
     private fun open(url: String, token: String): HttpURLConnection = SendaNet.open(url).apply {
         connectTimeout = 20_000
-        // Con razonamiento alto y búsquedas la respuesta puede tardar minutos
+        // With high reasoning and searches the answer can take minutes
         readTimeout = 300_000
         setRequestProperty("Authorization", "Bearer $token")
     }
@@ -187,7 +187,7 @@ class ChatGptPlanClient(private val prefs: org.senda.browser.core.PreferencesMan
         throw planError(errCode, code)
     }
 
-    /** Códigos de la guía «Errors and recovery» y la acción que piden. */
+    /** Codes from the "Errors and recovery" guide and the action they call for. */
     private fun planError(code: String, http: Int): RemoteAiException {
         android.util.Log.w("SendaChatGpt", "Respuesta del plan: HTTP $http código=$code")
         return when (code) {
@@ -205,12 +205,12 @@ class ChatGptPlanClient(private val prefs: org.senda.browser.core.PreferencesMan
 
     companion object {
         private const val BASE = "https://api.openai.com/v1"
-        /** Página de OpenAI donde el usuario ve y ajusta lo que esta app puede usar de su plan. */
+        /** OpenAI page where the user sees and adjusts what this app can use from their plan. */
         const val MANAGE_USAGE_URL = "https://chatgpt.com/settings/usage"
-        /** Donde sí se pueden crear imágenes con el plan (aquí OpenAI no lo permite). */
+        /** Where images can be created with the plan (OpenAI does not allow it here). */
         const val CHATGPT_WEB = "https://chatgpt.com"
 
-        /** Lo que puede hacer aquí, para el modelo (no se muestra al usuario). */
+        /** What it can do here, for the model (not shown to the user). */
         private const val CAPABILITIES = "Capabilities in Senda: you have a web_search tool; use it for current events, " +
             "prices, schedules, people, places or anything you are not sure about, and cite the sources. You can read " +
             "the photos and PDF files the user attaches. You cannot create or edit images here: if asked, say that " +
