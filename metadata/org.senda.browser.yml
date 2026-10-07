@@ -2,22 +2,23 @@ Categories:
   - Internet
   - Security
 License: GPL-3.0-only
-SourceCode: https://codeberg.org/tu-usuario/senda
-IssueTracker: https://codeberg.org/tu-usuario/senda/issues
+SourceCode: https://github.com/IDEH-Labs/senda-browser
+IssueTracker: https://github.com/IDEH-Labs/senda-browser/issues
 
 AutoName: Senda
-Summary: Navegador web ético, personalizable y sin rastreo basado en GeckoView
+Summary: Navegador web libre y privado basado en GeckoView
 Description: |-
-  Senda es un navegador web móvil soberano que te devuelve el control absoluto.
-  Construido con el motor GeckoView y con la filosofía de LibreWolf:
-  * Sin telemetría ni rastreo comercial (sin PPA).
-  * Personalización visual total (barra reubicable, colores hex, modo OLED).
-  * Consola web y DevTools en el propio teléfono.
-  * Instalación libre de extensiones .xpi locales sin restricciones de cuentas.
-  * Bloqueo opcional por huella dactilar y protección de pantalla.
+  Senda es un navegador web libre para Android con el motor GeckoView de Mozilla.
+  * Protección estricta contra rastreo, uBlock Origin integrado, solo HTTPS y DNS sobre HTTPS.
+  * Red Tor integrada (opcional) o proxy propio.
+  * Bóveda de contraseñas cifrada en el teléfono, con huella o PIN.
+  * Modo lectura y traducción en el propio teléfono.
+  * Sin telemetría. Interfaz en 8 idiomas.
+
+  Versión alfa: probada en un solo modelo de teléfono.
 
 RepoType: git
-Repo: https://codeberg.org/tu-usuario/senda.git
+Repo: https://github.com/IDEH-Labs/senda-browser.git
 
 Builds:
   - versionName: 0.1.0-alpha

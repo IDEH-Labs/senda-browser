@@ -5,7 +5,7 @@ plugins {
 
 import java.util.Properties
 
-// Firma de publicación: variables de entorno (ver ~/.local/share/jpi59/senda-signing.env) o keystore.properties
+// Firma de publicación: variables de entorno (KEYSTORE_PATH, KEY_ALIAS, STORE_PASSWORD, KEY_PASSWORD) o keystore.properties
 // en la raíz del proyecto (no se sube a git). Sin ellas, la release sale SIN FIRMAR, nunca con la clave de depuración
 def signingProperties = new Properties()
 def signingPropertiesFile = rootProject.file('keystore.properties')
