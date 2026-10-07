@@ -11,6 +11,7 @@ Senda is distributed under the **GNU GPL v3** (see `LICENSE`). It includes or us
 | [Kotlin and kotlinx.coroutines](https://kotlinlang.org) | JetBrains | Apache 2.0 | Language and concurrency |
 | [HiddenApiBypass](https://github.com/LSPosed/AndroidHiddenApiBypass) | LSPosed | Apache 2.0 | GeckoView compatibility on some Android versions |
 | [Cantarell](https://gitlab.gnome.org/GNOME/cantarell-fonts) | The Cantarell Project Authors | SIL OFL 1.1 (notice included in the font metadata) | Optional interface typeface |
+| [Mozilla Public Suffix List](https://publicsuffix.org/) | Mozilla | MPL 2.0 | Domain canonicalization and anti-phishing in Password Vault (`app/src/main/assets/public_suffix_list.dat`) |
 
 ## Wallpapers
 

@@ -28,7 +28,7 @@ The interface is available in 8 languages: Spanish, English, German, French, Por
 - Built-in uBlock Origin.
 - HTTPS-only mode and DNS over HTTPS, both on by default.
 - Built-in Tor network (optional), or your own SOCKS5/HTTP proxy.
-- Password vault encrypted with the phone's key store. It requires a fingerprint or PIN, and it fills in and saves accounts on web pages.
+- Password vault encrypted with AES-256-GCM. The key is generated and used only inside the phone's secure hardware (StrongBox or TEE); on phones without secure hardware the vault stays disabled. It requires a fingerprint or PIN, and it fills in and saves accounts on web pages. It is designed to offer an account only on the site where it was saved (domains are resolved with Mozilla's Public Suffix List); this has not yet been tested across different sites.
 - Optional app lock with fingerprint, and optional screenshot protection.
 
 **Other**

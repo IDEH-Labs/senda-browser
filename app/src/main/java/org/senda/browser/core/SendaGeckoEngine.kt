@@ -102,6 +102,8 @@ object SendaGeckoEngine {
                 "  network.connectivity-service.enabled: false\n" +
                 // Contraseñas: nada se rellena solo al cargar la página; se elige la cuenta al tocar el campo
                 "  signon.autofillForms: false\n" +
+                // Seguridad: restringe el autocompletado al origen exacto y no a cualquier subdominio
+                "  signon.includeOtherSubdomainsInLookup: false\n" +
                 // Control multimedia (MediaSession): sin él Senda no sabe cuándo suena un video ni puede pausarlo
                 // al pasarlo a la TV (podría oírse a la vez en el teléfono y en la TV)
                 "  media.hardwaremediakeys.enabled: true\n"
