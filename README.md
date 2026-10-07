@@ -1,55 +1,55 @@
 # Senda
 
-**Navegador web libre y privado para Android, con el motor GeckoView de Mozilla.**
+**A free and private web browser for Android, built on Mozilla GeckoView.**
 
-*Free and private web browser for Android built on Mozilla GeckoView. Interface in 8 languages: Spanish, English, German, French, Portuguese, Italian, Japanese and Chinese.*
+The interface is available in 8 languages: Spanish, English, German, French, Portuguese, Italian, Japanese and Chinese.
 
-> **Estado: alfa avanzada (0.1.0-alpha).** Su autor la usa a diario, pero todavía **no se recomienda para datos sensibles**:
-> - Probada en un solo modelo de teléfono (Motorola moto g34 5G, Android 15).
-> - La versión de publicación (optimizada con R8) aún no se ha probado en un dispositivo, y no hay APK firmado oficial.
-> - No ha pasado una auditoría de seguridad externa.
+> **Status: advanced alpha (0.1.1-alpha).** Its author uses it every day, but it is **not yet recommended for sensitive data**:
+> - Tested on a single phone model (Motorola moto g34 5G, Android 15).
+> - The signed release build has been tested on that phone (startup, browsing, reader mode, Tor, uBlock Origin and Settings). The password vault, TV casting and the assistant have not been tested on it yet.
+> - It has not had an external security audit.
 >
-> Los informes de errores son bienvenidos.
+> Bug reports are welcome.
 
 ---
 
-## Funciones
+## Features
 
-**Navegación**
-- Motor GeckoView 157 (Mozilla), independiente de Chromium.
-- Pestañas normales y privadas separadas, con vista en cuadrícula o lista; al abrir, página de inicio limpia, continuar donde lo dejaste o empezar de cero.
-- Marcadores, historial y descargas; buscar en la página; versión de escritorio; imprimir o guardar como PDF; acceso directo en la pantalla de inicio de Android.
-- Modo lectura en 8 idiomas, con «frases clave» y búsqueda dentro del texto (sin conexión: solo muestra frases literales del artículo).
-- Traducción de páginas en el teléfono, con el traductor local de Gecko (el texto no sale del teléfono).
-- Página de inicio con accesos directos y cuatro diseños (Enfocado, Inspirador, Informativo y Personalizado); 64 fondos de pantalla con licencia libre.
+**Browsing**
+- GeckoView 157 engine (Mozilla), independent of Chromium.
+- Separate normal and private tabs, in grid or list view. On launch: a clean home page, resume where you left off, or start fresh.
+- Bookmarks, history and downloads; find in page; desktop site; print or save as PDF; shortcut on the Android home screen.
+- Reader mode in 8 languages, with "key sentences" and search within the text. It works offline and only shows literal sentences from the article.
+- On-device page translation using Gecko's local translator; the text never leaves the phone.
+- Home page with shortcuts and four layouts (Focused, Inspirational, Informational and Custom); 64 freely licensed wallpapers.
 
-**Privacidad y seguridad**
-- Protección estricta contra rastreo, cookies de terceros aisladas, limpieza de parámetros de rastreo en las URL y Global Privacy Control.
-- uBlock Origin integrado.
-- Modo solo HTTPS y DNS sobre HTTPS (activados por defecto).
-- Red Tor integrada (opcional) o proxy SOCKS5/HTTP propio.
-- Bóveda de contraseñas cifrada con el almacén de claves del teléfono: exige huella o PIN, y rellena y guarda las cuentas en las páginas.
-- Bloqueo de la app con huella y protección contra capturas de pantalla (opcionales).
+**Privacy and security**
+- Strict tracking protection, isolated third-party cookies, tracking-parameter stripping in URLs, and Global Privacy Control.
+- Built-in uBlock Origin.
+- HTTPS-only mode and DNS over HTTPS, both on by default.
+- Built-in Tor network (optional), or your own SOCKS5/HTTP proxy.
+- Password vault encrypted with the phone's key store. It requires a fingerprint or PIN, and it fills in and saves accounts on web pages.
+- Optional app lock with fingerprint, and optional screenshot protection.
 
-**Otras**
-- Transmisión a la TV mediante la duplicación de pantalla de Android (Miracast), con modo TV opcional al girar el teléfono.
-- Asistente opcional: con tu plan de ChatGPT o con tu propia clave de API (Claude, Gemini, Grok o Mistral). Solo envía algo cuando tú lo usas, y únicamente al servicio que elijas.
-- Extensiones desde archivos `.xpi`, CSS y scripts propios (Senda Labs), y consola de desarrollo en el propio teléfono.
+**Other**
+- Casting to a TV through Android screen mirroring (Miracast), with an optional TV mode when you rotate the phone.
+- Optional assistant: with your ChatGPT plan, or with your own API key (Claude, Gemini, Grok or Mistral). It only sends something when you use it, and only to the service you choose.
+- Extensions from `.xpi` files, custom CSS and scripts (Senda Labs), and a developer console on the phone itself.
 
-## Conexiones que hace Senda por su cuenta
+## Connections Senda makes on its own
 
-Para que sepas exactamente qué sale de tu teléfono sin que lo pidas:
+So you know exactly what leaves your phone without you asking:
 
-- **Safe Browsing (Google)**, activado por defecto: descarga listas de sitios peligrosos. Se puede desactivar en Ajustes.
-- **uBlock Origin**: actualiza periódicamente sus listas de filtros desde los servidores de cada lista.
-- **Noticias de la página de inicio**, en los diseños «Inspirador» e «Informativo», y en «Personalizado» si activas las noticias: lee los RSS de MuyLinux, EFF y FSF. El diseño «Enfocado» no muestra noticias ni las descarga.
-- **Traducción**: la primera vez que traduces un idioma, descarga de Mozilla el modelo de ese idioma. La traducción se hace después en el teléfono.
+- **Safe Browsing (Google)**, on by default: downloads lists of dangerous sites. It can be turned off in Settings.
+- **uBlock Origin**: periodically updates its filter lists from each list's servers.
+- **Home page news**, in the Inspirational and Informational layouts, and in Custom if you turn news on: reads the RSS feeds of MuyLinux, EFF and FSF. The Focused layout neither shows nor downloads news.
+- **Translation**: the first time you translate a language, it downloads that language's model from Mozilla. Translation then runs on the phone.
 
-Senda no incluye telemetría ni informes de uso. La detección de portal cautivo de Firefox está desactivada.
+Senda includes no telemetry or usage reports. Firefox's captive portal detection is turned off.
 
-## Compilar
+## Building
 
-Requisitos: JDK 17 y Android SDK con la plataforma 37. El APK solo incluye `arm64-v8a`, y la app funciona desde Android 8.0 (API 26).
+Requirements: JDK 17 and the Android SDK with platform 37. The APK only includes `arm64-v8a`, and the app runs on Android 8.0 (API 26) and later.
 
 ```bash
 git clone https://github.com/IDEH-Labs/senda-browser.git
@@ -58,11 +58,11 @@ cd senda-browser
 # APK: app/build/outputs/apk/debug/app-debug.apk
 ```
 
-**Versión de publicación.** Sin clave, `./gradlew assembleRelease` genera un APK **sin firmar**: nunca se usa la clave de depuración. Para firmarla, define `KEYSTORE_PATH`, `KEY_ALIAS`, `STORE_PASSWORD` y `KEY_PASSWORD`, o crea `keystore.properties` en la raíz con `storeFile`, `keyAlias`, `storePassword` y `keyPassword`. Ese archivo está en `.gitignore`.
+**Release build.** Without a key, `./gradlew assembleRelease` produces an **unsigned** APK; the debug key is never used. To sign it, set `KEYSTORE_PATH`, `KEY_ALIAS`, `STORE_PASSWORD` and `KEY_PASSWORD`, or create `keystore.properties` in the project root with `storeFile`, `keyAlias`, `storePassword` and `keyPassword`. That file is listed in `.gitignore`.
 
-## Pruebas
+## Tests
 
-Las pruebas son instrumentadas (`app/src/androidTest`) y necesitan un teléfono conectado.
+The tests are instrumented (`app/src/androidTest`) and need a connected phone.
 
 ```bash
 ./gradlew assembleDebug assembleDebugAndroidTest
@@ -71,12 +71,12 @@ adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 adb shell am instrument -w org.senda.browser.test/androidx.test.runner.AndroidJUnitRunner
 ```
 
-> **Cuidado:** `./gradlew connectedAndroidTest` desinstala la app y **borra sus datos** (contraseñas, historial…). Las pruebas que borran datos solo se ejecutan si se pasa `-e allowDestructive 1`. Las de ChatGPT y Gemini usan cuentas reales y consumen cuota.
+> **Warning:** `./gradlew connectedAndroidTest` uninstalls the app and **deletes its data** (passwords, history…). Tests that delete data only run if you pass `-e allowDestructive 1`. The ChatGPT and Gemini tests use real accounts and consume quota.
 
-## Licencia
+## License
 
-Senda es software libre bajo la **GNU General Public License v3** (ver [`LICENSE`](LICENSE)). Los componentes de terceros y sus licencias están en [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md).
+Senda is free software under the **GNU General Public License v3** (see [`LICENSE`](LICENSE)). Third-party components and their licenses are listed in [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md).
 
 ---
 
-Un proyecto de **[IDEH Labs](https://github.com/IDEH-Labs)** · [GitHub](https://github.com/IDEH-Labs/senda-browser) · [GitLab](https://gitlab.com/ideh-labs/senda-browser)
+An **[IDEH Labs](https://github.com/IDEH-Labs)** project · [GitHub](https://github.com/IDEH-Labs/senda-browser) · [GitLab](https://gitlab.com/ideh-labs/senda-browser)

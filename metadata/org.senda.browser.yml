@@ -6,16 +6,16 @@ SourceCode: https://github.com/IDEH-Labs/senda-browser
 IssueTracker: https://github.com/IDEH-Labs/senda-browser/issues
 
 AutoName: Senda
-Summary: Navegador web libre y privado basado en GeckoView
+Summary: Free and private web browser built on GeckoView
 Description: |-
-  Senda es un navegador web libre para Android con el motor GeckoView de Mozilla.
-  * Protección estricta contra rastreo, uBlock Origin integrado, solo HTTPS y DNS sobre HTTPS.
-  * Red Tor integrada (opcional) o proxy propio.
-  * Bóveda de contraseñas cifrada en el teléfono, con huella o PIN.
-  * Modo lectura y traducción en el propio teléfono.
-  * Sin telemetría. Interfaz en 8 idiomas.
+  Senda is a free web browser for Android built on Mozilla's GeckoView engine.
+  * Strict tracking protection, built-in uBlock Origin, HTTPS-only mode and DNS over HTTPS.
+  * Built-in Tor network (optional) or your own proxy.
+  * Password vault encrypted on the phone, unlocked with fingerprint or PIN.
+  * Reader mode and on-device translation.
+  * No telemetry. Interface in 8 languages.
 
-  Versión alfa: probada en un solo modelo de teléfono.
+  Alpha version: tested on a single phone model.
 
 RepoType: git
 Repo: https://github.com/IDEH-Labs/senda-browser.git
@@ -24,5 +24,11 @@ Builds:
   - versionName: 0.1.0-alpha
     versionCode: 1
     commit: v0.1.0-alpha
+    gradle:
+      - yes
+
+  - versionName: 0.1.1-alpha
+    versionCode: 2
+    commit: v0.1.1-alpha
     gradle:
       - yes
