@@ -1,4 +1,5 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/apk/res-auto"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
@@ -6,11 +7,24 @@
     <path
         android:fillColor="#0D1117"
         android:pathData="M0,0h108v108h-108z" />
-    <!-- Senda S-Curve Path in Mint Gradient / Color -->
+    <!-- Senda S-Curve in Gradient Mint -->
     <path
         android:pathData="M66,34 C66,26 58,22 48,22 C36,22 30,28 30,38 C30,50 42,54 54,58 C68,62 76,68 76,78 C76,90 64,96 50,96 C36,96 28,88 28,78"
-        android:strokeColor="#00D2A0"
         android:strokeWidth="10"
         android:strokeLineCap="round"
-        android:strokeLineJoin="round" />
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="28"
+                android:startY="22"
+                android:endX="76"
+                android:endY="96"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#2DD4BF" />
+                <item android:offset="0.5" android:color="#00D2A0" />
+                <item android:offset="1.0" android:color="#38BDF8" />
+            </gradient>
+        </aapt:attr>
+    </path>
 </vector>
