@@ -66,4 +66,13 @@ class PublicSuffixListTest {
     fun ipAddressesAreKeptWhole() {
         assertEquals("192.168.1.8", domain("192.168.1.8"))
     }
+
+    @Test
+    fun atSignInPathOrQueryIsNotTheHost() {
+        // Exported URLs often carry the e-mail in the query: the site is still the host before it
+        assertEquals("google.com", SendaVaultManager.extractCanonicalDomain("https://accounts.google.com/signin?email=ana@gmail.com"))
+        assertEquals("example.org", SendaVaultManager.extractCanonicalDomain("https://www.example.org/u/@ana#x@y.com"))
+        // Real user info before the host is still removed
+        assertEquals("example.com", SendaVaultManager.extractCanonicalDomain("https://user:pass@login.example.com:8443/path"))
+    }
 }

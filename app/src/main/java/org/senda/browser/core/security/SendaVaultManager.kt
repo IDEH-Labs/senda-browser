@@ -389,13 +389,13 @@ object SendaVaultManager {
             if (clean.startsWith("http://")) clean = clean.substring(7)
             if (clean.startsWith("https://")) clean = clean.substring(8)
 
-            // Remove user:pass@ credentials
-            val atIdx = clean.indexOf('@')
-            if (atIdx != -1) clean = clean.substring(atIdx + 1)
+            // Remove path, query and fragment first: an "@" there (e.g. ?email=ana@example.com) is not part of the host
+            val endIdx = clean.indexOfAny(charArrayOf('/', '?', '#'))
+            if (endIdx != -1) clean = clean.substring(0, endIdx)
 
-            // Remove path and query
-            val slashIdx = clean.indexOf('/')
-            if (slashIdx != -1) clean = clean.substring(0, slashIdx)
+            // Remove user:pass@ credentials
+            val atIdx = clean.lastIndexOf('@')
+            if (atIdx != -1) clean = clean.substring(atIdx + 1)
 
             // Remove port :8080
             val colonIdx = clean.indexOf(':')
@@ -499,6 +499,48 @@ object SendaVaultManager {
         return credential
     }
 
+    /** What an import did: new accounts, accounts replaced with the file's password, accounts kept as they were. */
+    data class ImportSummary(val added: Int, val replaced: Int, val kept: Int)
+
+    /**
+     * Saves many logins at once (CSV import). An account that already exists (same site and username) keeps
+     * Senda's password unless [replaceExisting]. Everything is encrypted first and written in a single atomic
+     * save: if the key is locked half-way ([VaultLockedException]) nothing has been changed.
+     */
+    @Synchronized
+    fun importLogins(context: Context, logins: List<VaultCsv.Login>, replaceExisting: Boolean): ImportSummary {
+        val list = getCredentials(context).toMutableList()
+        var added = 0; var replaced = 0; var kept = 0
+        for (login in logins) {
+            val domain = extractCanonicalDomain(login.url, context)
+            if (domain.isBlank()) continue
+            val index = list.indexOfFirst { it.domain.equals(domain, ignoreCase = true) && it.username == login.username }
+            if (index >= 0 && !replaceExisting) { kept++; continue }
+            val chars = login.password.toCharArray()
+            val (enc, iv) = try { encryptPassword(chars) } finally { wipe(chars) }
+            if (index >= 0) {
+                list[index] = list[index].copy(encryptedPasswordBase64 = enc, ivBase64 = iv, updatedAt = System.currentTimeMillis(),
+                    notes = login.note.ifBlank { list[index].notes })
+                replaced++
+            } else {
+                list.add(VaultCredential(domain = domain, originUrl = login.url, username = login.username,
+                    encryptedPasswordBase64 = enc, ivBase64 = iv, notes = login.note))
+                added++
+            }
+        }
+        writeAll(context, list)
+        return ImportSummary(added, replaced, kept)
+    }
+
+    /** Decrypts every saved password for an export the user asked for. Requires a recent fingerprint or PIN. */
+    @Synchronized
+    fun exportLogins(context: Context): List<VaultCsv.Login> = getCredentials(context).map { c ->
+        val chars = decryptPassword(c.encryptedPasswordBase64, c.ivBase64)
+        val password = try { String(chars) } finally { wipe(chars) }
+        val url = c.originUrl.takeIf { it.startsWith("http://") || it.startsWith("https://") } ?: "https://${c.domain}"
+        VaultCsv.Login(url, c.username, password, c.notes)
+    }
+
     /**
      * Edits an existing credential (site, username and password). Returns false if there is already another account
      * with the same site and username, so two identical entries are not left.
@@ -541,32 +583,37 @@ object SendaVaultManager {
 
     private fun saveAll(context: Context, list: List<VaultCredential>) {
         try {
-            val array = JSONArray()
-            for (item in list) {
-                val obj = JSONObject().apply {
-                    put("id", item.id)
-                    put("domain", item.domain)
-                    put("originUrl", item.originUrl)
-                    put("username", item.username)
-                    put("encPass", item.encryptedPasswordBase64)
-                    put("iv", item.ivBase64)
-                    put("createdAt", item.createdAt)
-                    put("updatedAt", item.updatedAt)
-                    put("notes", item.notes)
-                }
-                array.put(obj)
-            }
-            val atomicFile = AtomicFile(File(context.filesDir, VAULT_FILE_NAME))
-            val fos = atomicFile.startWrite()
-            try {
-                fos.write(array.toString(2).toByteArray(Charsets.UTF_8))
-                atomicFile.finishWrite(fos)
-            } catch (e: Exception) {
-                atomicFile.failWrite(fos)
-                throw e
-            }
+            writeAll(context, list)
         } catch (e: Exception) {
             Log.e(TAG, "Error persistiendo bóveda: ${e.message}")
+        }
+    }
+
+    /** Like [saveAll], but a failed write is reported to the caller instead of only logged. */
+    private fun writeAll(context: Context, list: List<VaultCredential>) {
+        val array = JSONArray()
+        for (item in list) {
+            val obj = JSONObject().apply {
+                put("id", item.id)
+                put("domain", item.domain)
+                put("originUrl", item.originUrl)
+                put("username", item.username)
+                put("encPass", item.encryptedPasswordBase64)
+                put("iv", item.ivBase64)
+                put("createdAt", item.createdAt)
+                put("updatedAt", item.updatedAt)
+                put("notes", item.notes)
+            }
+            array.put(obj)
+        }
+        val atomicFile = AtomicFile(File(context.filesDir, VAULT_FILE_NAME))
+        val fos = atomicFile.startWrite()
+        try {
+            fos.write(array.toString(2).toByteArray(Charsets.UTF_8))
+            atomicFile.finishWrite(fos)
+        } catch (e: Exception) {
+            atomicFile.failWrite(fos)
+            throw e
         }
     }
 
