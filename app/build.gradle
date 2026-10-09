@@ -44,6 +44,14 @@ android {
         localeFilters += ['es', 'en', 'de', 'fr', 'pt', 'it', 'ja', 'zh']
     }
 
+    // Play Store app bundles split resources by language; Senda changes its language inside the app, so every
+    // one of its 8 languages must be installed
+    bundle {
+        language {
+            enableSplit = false
+        }
+    }
+
     signingConfigs {
         release {
             if (releaseSigningConfigured) {
