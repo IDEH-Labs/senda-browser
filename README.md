@@ -53,6 +53,18 @@ So you know exactly what leaves your phone without you asking:
 
 Senda includes no telemetry or usage reports. Firefox's captive portal detection is turned off.
 
+## Installing
+
+- **Releases**: signed APKs on [GitHub](https://github.com/IDEH-Labs/senda-browser/releases) (mirrored on
+  [GitLab](https://gitlab.com/ideh-labs/senda-browser/-/releases)), each with its SHA-256.
+- **F-Droid client**: add the IDEH Labs repository `https://senda-fdroid-7a0636.gitlab.io/fdroid/repo` and check that its
+  fingerprint is `2A4DF40FECF9E96C3986E500F42C2EC99065BAA5AA7CA90B50F887D7A886FCF2`. It serves the same APKs as the releases.
+- Every APK is signed by IDEH Labs with certificate SHA-256
+  `431d64a9a39e299956aef5880b88c4830fc81add2acdd9571c76d5323c775309`.
+
+Senda is not in the official F-Droid repository yet: F-Droid builds everything from source, and Senda still uses
+Mozilla's prebuilt GeckoView.
+
 ## Building
 
 Requirements: JDK 17, the Android SDK with platform 37, and network access: Gradle downloads the dependencies and the official signed uBlock Origin release, which is checked against a pinned SHA-256 (see `app/bundled-assets.gradle`). The APK only includes `arm64-v8a`, and the app runs on Android 8.0 (API 26) and later.
