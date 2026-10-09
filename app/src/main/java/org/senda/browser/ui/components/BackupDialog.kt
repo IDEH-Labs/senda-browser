@@ -6,6 +6,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -16,6 +17,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -219,9 +221,10 @@ fun BackupDialog(prefs: PreferencesManager, onDismiss: () -> Unit) {
                         SendaBackup.Section.HISTORY to strings.bk_sec_history,
                         SendaBackup.Section.PASSWORDS to strings.bk_sec_passwords
                     ).forEach { (section, label) ->
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(checked = section in sections, enabled = busy == null,
-                                onCheckedChange = { sections = if (it) sections + section else sections - section })
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().toggleable(
+                            value = section in sections, enabled = busy == null, role = Role.Checkbox,
+                            onValueChange = { sections = if (it) sections + section else sections - section })) {
+                            Checkbox(checked = section in sections, onCheckedChange = null, enabled = busy == null)
                             Text(label, fontSize = 13.sp)
                         }
                     }
@@ -320,14 +323,17 @@ fun BackupDialog(prefs: PreferencesManager, onDismiss: () -> Unit) {
                         SendaBackup.Section.HISTORY to strings.bk_count_history.format(c.history.size),
                         SendaBackup.Section.PASSWORDS to strings.bk_count_passwords.format(c.passwords.size)
                     ).filter { it.first in c.sections }.forEach { (section, label) ->
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(checked = section in restoreSections, enabled = busy == null,
-                                onCheckedChange = { restoreSections = if (it) restoreSections + section else restoreSections - section })
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().toggleable(
+                            value = section in restoreSections, enabled = busy == null, role = Role.Checkbox,
+                            onValueChange = { restoreSections = if (it) restoreSections + section else restoreSections - section })) {
+                            Checkbox(checked = section in restoreSections, onCheckedChange = null, enabled = busy == null)
                             Text(label, fontSize = 13.sp)
                         }
                     }
-                    if (SendaBackup.Section.PASSWORDS in restoreSections) Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = replacePasswords, onCheckedChange = { replacePasswords = it }, enabled = busy == null)
+                    if (SendaBackup.Section.PASSWORDS in restoreSections) Row(verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().toggleable(value = replacePasswords, enabled = busy == null, role = Role.Checkbox,
+                            onValueChange = { replacePasswords = it })) {
+                        Checkbox(checked = replacePasswords, onCheckedChange = null, enabled = busy == null)
                         Text(strings.vault_import_replace, fontSize = 12.sp)
                     }
                     Spacer(Modifier.height(6.dp))

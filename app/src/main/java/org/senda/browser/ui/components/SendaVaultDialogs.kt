@@ -1,5 +1,6 @@
 package org.senda.browser.ui.components
 
+import androidx.compose.foundation.selection.toggleable
 import android.content.Intent
 import android.os.Build
 import android.provider.Settings
@@ -135,6 +136,26 @@ fun SendaVaultDialog(
         )
     }
 
+    // Password waiting for the user to confirm its deletion
+    var confirmDelete by remember { mutableStateOf<VaultCredential?>(null) }
+    confirmDelete?.let { item ->
+        AlertDialog(
+            onDismissRequest = { confirmDelete = null },
+            icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text(strings.vault_delete_confirm_title) },
+            text = { Text(strings.vault_delete_confirm_body.format(item.username.ifBlank { "—" }, item.domain)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    SendaVaultManager.deleteCredential(context, item.id)
+                    credentials = SendaVaultManager.getCredentials(context)
+                    confirmDelete = null
+                    Toast.makeText(context, strings.vault_deleted, Toast.LENGTH_SHORT).show()
+                }) { Text(strings.general_delete, color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text(strings.general_cancel) } }
+        )
+    }
+
     // ---- Import and export (CSV) ----
     class ImportPreview(val uri: android.net.Uri, val fileName: String, val result: org.senda.browser.core.security.VaultCsv.ImportResult, val existing: Int)
     var importPreview by remember { mutableStateOf<ImportPreview?>(null) }
@@ -238,8 +259,10 @@ fun SendaVaultDialog(
                     if (preview.existing > 0) {
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(strings.vault_import_existing.format(preview.existing), fontSize = 12.sp)
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(checked = replaceExisting, onCheckedChange = { replaceExisting = it }, enabled = !importing)
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().toggleable(
+                            value = replaceExisting, enabled = !importing, role = androidx.compose.ui.semantics.Role.Checkbox,
+                            onValueChange = { replaceExisting = it })) {
+                            Checkbox(checked = replaceExisting, onCheckedChange = null, enabled = !importing)
                             Text(strings.vault_import_replace, fontSize = 12.sp)
                         }
                     }
@@ -621,11 +644,8 @@ fun SendaVaultDialog(
                                     items(filtered, key = { it.id }) { item ->
                                         CredentialItemCard(
                                             item = item,
-                                            onDelete = {
-                                                SendaVaultManager.deleteCredential(context, item.id)
-                                                credentials = SendaVaultManager.getCredentials(context)
-                                                Toast.makeText(context, strings.vault_deleted, Toast.LENGTH_SHORT).show()
-                                            },
+                                            // Deleting a password cannot be undone: always confirm first
+                                            onDelete = { confirmDelete = item },
                                             runSecure = { action -> secure(action) },
                                             onEdit = {
                                                 secure {
