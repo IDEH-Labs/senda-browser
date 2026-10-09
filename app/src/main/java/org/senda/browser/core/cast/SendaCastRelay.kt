@@ -119,7 +119,7 @@ class SendaCastRelay private constructor(
         conn.connectTimeout = 10_000
         conn.readTimeout = 30_000
         conn.instanceFollowRedirects = true
-        conn.setRequestProperty("User-Agent", USER_AGENT)
+        conn.setRequestProperty("User-Agent", org.senda.browser.core.SendaNet.USER_AGENT)
         referer?.let { conn.setRequestProperty("Referer", it) }
         if (range != null) conn.setRequestProperty("Range", range)
         try {
@@ -208,7 +208,6 @@ class SendaCastRelay private constructor(
 
     companion object {
         private const val TAG = "SendaCastRelay"
-        private const val USER_AGENT = "Mozilla/5.0 (Android 15; Mobile; rv:157.0) Gecko/157.0 Firefox/157.0"
 
         /** The same path as browsing (see senda_proxy/background.js): with Tor the video also goes through Tor. */
         fun proxyFrom(prefs: org.senda.browser.core.PreferencesManager): Proxy = when (prefs.proxyMode) {

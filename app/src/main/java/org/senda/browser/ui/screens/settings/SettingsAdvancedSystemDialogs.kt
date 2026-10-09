@@ -320,6 +320,14 @@ fun SettingsAboutDialog(
     strings: SendaStringPack,
     onDismiss: () -> Unit
 ) {
+    // The installed version, read from Android (it used to be a fixed "0.1.0-alpha (Build 1)")
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val (versionName, versionCode) = androidx.compose.runtime.remember {
+        runCatching {
+            val info = context.packageManager.getPackageInfo(context.packageName, 0)
+            (info.versionName ?: "?") to androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(info)
+        }.getOrDefault("?" to 0L)
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -336,7 +344,7 @@ fun SettingsAboutDialog(
                 when (activeDialog) {
                     "about_senda" -> {
                         Text(
-                            text = strings.dlg_about_senda_build,
+                            text = strings.dlg_about_senda_build.format(versionName, versionCode),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
