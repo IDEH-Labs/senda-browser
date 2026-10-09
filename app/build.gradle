@@ -39,6 +39,11 @@ android {
         }
     }
 
+    // Only the 8 languages Senda is translated into: libraries bring texts in ~80 more that the app never shows
+    androidResources {
+        localeFilters += ['es', 'en', 'de', 'fr', 'pt', 'it', 'ja', 'zh']
+    }
+
     signingConfigs {
         release {
             if (releaseSigningConfigured) {
