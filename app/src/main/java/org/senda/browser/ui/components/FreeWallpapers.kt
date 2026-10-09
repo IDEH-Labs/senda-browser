@@ -6,9 +6,14 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -20,6 +25,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -38,6 +44,12 @@ data class FreeWallpaper(
     val assetPath: String? = null,
     val filePath: String? = null,
     val focusX: Float = 0.5f,
+    /** Same as [focusX] for the height: where to keep the crop on screens wider than the work. */
+    val focusY: Float = 0.5f,
+    /** Its text or logo is wider than a portrait screen: shown only in landscape (see [FreeWallpaperBackground]). */
+    val landscapeOnly: Boolean = false,
+    /** Official portrait version published by the project, used when the screen is taller than wide. */
+    val portraitAssetPath: String? = null,
     val colors: List<Color>
 )
 
@@ -55,6 +67,7 @@ object FreeWallpapers {
         FreeWallpaper(
             id = "debian_ceratopsian", name = "Ceratopsian (Debian 13)", category = "Debian", author = "Elise Couper", license = "GPL-2.0+",
             sourceUrl = "https://wiki.debian.org/DebianArt/Themes/Ceratopsian", assetPath = "wallpapers/debian_ceratopsian.webp", focusX = 0.5f,
+            portraitAssetPath = "wallpapers/debian_ceratopsian_portrait.webp",
             colors = listOf(Color(0xFF264456), Color(0xFF254C63), Color(0xFF275A78), Color(0xFF266386))
         ),
         FreeWallpaper(
@@ -105,26 +118,33 @@ object FreeWallpapers {
         FreeWallpaper(
             id = "gnu_this_is_freedom", name = "This is Freedom", category = "GNU", author = "Vadim Gush", license = "GPL-3.0",
             sourceUrl = "https://www.gnu.org/graphics/this-is-freedom-wallpaper.html", assetPath = "wallpapers/gnu_this_is_freedom.webp", focusX = 0.5f,
+            landscapeOnly = true,
             colors = listOf(Color(0xFF18354D), Color(0xFF2B4A5C), Color(0xFF244B5E), Color(0xFF1C5469))
         ),
         FreeWallpaper(
             id = "gnu_skwid_free_side", name = "Free Side of the Force", category = "GNU", author = "Ben «Skwid» Gailly", license = "CC BY-SA 4.0",
             sourceUrl = "https://www.gnu.org/graphics/skwid-wallpapers.html", assetPath = "wallpapers/gnu_skwid_free_side.webp", focusX = 0.5f,
+            landscapeOnly = true,
             colors = listOf(Color(0xFF0A0A0C), Color(0xFF191A1E), Color(0xFF131314), Color(0xFF020203))
         ),
         FreeWallpaper(
             id = "gnu_skwid_fsfs", name = "Free Software, Free Society", category = "GNU", author = "Ben «Skwid» Gailly", license = "CC BY-SA 4.0",
             sourceUrl = "https://www.gnu.org/graphics/skwid-wallpapers.html", assetPath = "wallpapers/gnu_skwid_fsfs.webp", focusX = 0.5f,
+            landscapeOnly = true,
+            focusY = 0.3f,
             colors = listOf(Color(0xFF2E2E2E), Color(0xFF323232), Color(0xFF2A2A2A), Color(0xFF282828))
         ),
         FreeWallpaper(
             id = "gnu_skwid_gnu_fsf", name = "GNU/Linux + FSF", category = "GNU", author = "Ben «Skwid» Gailly", license = "CC BY-SA 4.0",
             sourceUrl = "https://www.gnu.org/graphics/skwid-wallpapers.html", assetPath = "wallpapers/gnu_skwid_gnu_fsf.webp", focusX = 0.5f,
+            landscapeOnly = true,
+            focusY = 0.3f,
             colors = listOf(Color(0xFF111010), Color(0xFF0F0F0F), Color(0xFF171717), Color(0xFF090909))
         ),
         FreeWallpaper(
             id = "gnu_skwid_hurd", name = "GNU Hurd", category = "GNU", author = "Ben «Skwid» Gailly", license = "CC BY-SA 4.0",
             sourceUrl = "https://www.gnu.org/graphics/skwid-wallpapers.html", assetPath = "wallpapers/gnu_skwid_hurd.webp", focusX = 0.5f,
+            landscapeOnly = true,
             colors = listOf(Color(0xFF7C341F), Color(0xFF6C3E1D), Color(0xFF7C4119), Color(0xFF742C1C))
         ),
         FreeWallpaper(
@@ -135,16 +155,22 @@ object FreeWallpapers {
         FreeWallpaper(
             id = "gentoo_g10_purple", name = "10 Years Compiling (morado)", category = "Gentoo", author = "Ben Stedman y Alex Legler", license = "CC BY-SA 4.0",
             sourceUrl = "https://www.gentoo.org/inside-gentoo/artwork/", assetPath = "wallpapers/gentoo_g10_purple.webp", focusX = 0.7f,
+            landscapeOnly = true,
+            focusY = 0.25f,
             colors = listOf(Color(0xFFCECECD), Color(0xFFD0D0CF), Color(0xFFB4ACC8), Color(0xFF9F93BD))
         ),
         FreeWallpaper(
             id = "gentoo_g10_blue", name = "10 Years Compiling (azul)", category = "Gentoo", author = "Ben Stedman y Alex Legler", license = "CC BY-SA 4.0",
             sourceUrl = "https://www.gentoo.org/inside-gentoo/artwork/", assetPath = "wallpapers/gentoo_g10_blue.webp", focusX = 0.7f,
+            landscapeOnly = true,
+            focusY = 0.25f,
             colors = listOf(Color(0xFFCECECD), Color(0xFFD0D0CF), Color(0xFFA0B3D4), Color(0xFF819DCF))
         ),
         FreeWallpaper(
             id = "gentoo_abducted", name = "Abducted", category = "Gentoo", author = "Matteo «Peach» Pescarin y Ethan Dunham", license = "CC BY-SA 2.5",
             sourceUrl = "https://www.gentoo.org/inside-gentoo/artwork/", assetPath = "wallpapers/gentoo_abducted.webp", focusX = 0.5f,
+            landscapeOnly = true,
+            focusY = 0.55f,
             colors = listOf(Color(0xFF0C031F), Color(0xFF170D2C), Color(0xFF171325), Color(0xFF030703))
         ),
         FreeWallpaper(
@@ -155,11 +181,13 @@ object FreeWallpapers {
         FreeWallpaper(
             id = "gentoo_larry", name = "Red Larry", category = "Gentoo", author = "Dávid Kótai, Matteo Pescarin y Ethan Dunham", license = "CC BY-SA 2.5",
             sourceUrl = "https://www.gentoo.org/inside-gentoo/artwork/", assetPath = "wallpapers/gentoo_larry.webp", focusX = 0.25f,
+            landscapeOnly = true,
+            focusY = 0.62f,
             colors = listOf(Color(0xFFC1C1C1), Color(0xFFA5A5A5), Color(0xFF868382), Color(0xFFA23939))
         ),
         FreeWallpaper(
             id = "kde_flyingkonqui", name = "Flying Konqui", category = "KDE Plasma", author = "Timothée Giet", license = "LGPL-3.0",
-            sourceUrl = "https://invent.kde.org/plasma/plasma-workspace-wallpapers", assetPath = "wallpapers/kde_flyingkonqui.webp", focusX = 0.83f,
+            sourceUrl = "https://invent.kde.org/plasma/plasma-workspace-wallpapers", assetPath = "wallpapers/kde_flyingkonqui.webp", focusX = 0.71f,
             colors = listOf(Color(0xFF096DC1), Color(0xFF1777BC), Color(0xFF3589D5), Color(0xFF559FDF))
         ),
         FreeWallpaper(
@@ -260,6 +288,7 @@ object FreeWallpapers {
         FreeWallpaper(
             id = "arch_archbtw", name = "Arch btw", category = "Arch Linux", author = "xyproto", license = "CC0 1.0",
             sourceUrl = "https://bbs.archlinux.org/viewtopic.php?pid=1931165", assetPath = "wallpapers/arch_archbtw.webp", focusX = 0.5f,
+            landscapeOnly = true,
             colors = listOf(Color(0xFF000000), Color(0xFF1D1917), Color(0xFF242525), Color(0xFF131213))
         ),
         FreeWallpaper(
@@ -284,22 +313,24 @@ object FreeWallpapers {
         ),
         FreeWallpaper(
             id = "arch_geolanes", name = "Geolanes", category = "Arch Linux", author = "xyproto", license = "CC0 1.0",
-            sourceUrl = "https://bbs.archlinux.org/viewtopic.php?pid=1930379", assetPath = "wallpapers/arch_geolanes.webp", focusX = 0.5f,
+            sourceUrl = "https://bbs.archlinux.org/viewtopic.php?pid=1930379", assetPath = "wallpapers/arch_geolanes.webp", focusX = 0.18f,
             colors = listOf(Color(0xFF050505), Color(0xFF0A0A0A), Color(0xFF050505), Color(0xFF060606))
         ),
         FreeWallpaper(
             id = "arch_geowaves", name = "Geowaves", category = "Arch Linux", author = "xyproto", license = "CC0 1.0",
-            sourceUrl = "https://bbs.archlinux.org/viewtopic.php?pid=1930379", assetPath = "wallpapers/arch_geowaves.webp", focusX = 0.5f,
+            sourceUrl = "https://bbs.archlinux.org/viewtopic.php?pid=1930379", assetPath = "wallpapers/arch_geowaves.webp", focusX = 0.18f,
             colors = listOf(Color(0xFF070707), Color(0xFF0B0B0B), Color(0xFF070707), Color(0xFF070707))
         ),
         FreeWallpaper(
             id = "arch_gritty", name = "Gritty", category = "Arch Linux", author = "astize y xyproto", license = "CC0 1.0",
             sourceUrl = "https://bbs.archlinux.org/viewtopic.php?pid=1931174", assetPath = "wallpapers/arch_gritty.webp", focusX = 0.5f,
+            landscapeOnly = true,
             colors = listOf(Color(0xFF121619), Color(0xFF1E2931), Color(0xFF2A3339), Color(0xFF353C40))
         ),
         FreeWallpaper(
             id = "arch_simple", name = "Simple", category = "Arch Linux", author = "xyproto", license = "CC0 1.0",
             sourceUrl = "https://bbs.archlinux.org/viewtopic.php?pid=1931204", assetPath = "wallpapers/arch_simple.webp", focusX = 0.5f,
+            landscapeOnly = true,
             colors = listOf(Color(0xFF202320), Color(0xFF222624), Color(0xFF222725), Color(0xFF202320))
         ),
         FreeWallpaper(
@@ -314,12 +345,12 @@ object FreeWallpapers {
         ),
         FreeWallpaper(
             id = "arch_wirefeather", name = "Wirefeather", category = "Arch Linux", author = "xyproto", license = "CC0 1.0",
-            sourceUrl = "https://bbs.archlinux.org/viewtopic.php?pid=1930379", assetPath = "wallpapers/arch_wirefeather.webp", focusX = 0.5f,
+            sourceUrl = "https://bbs.archlinux.org/viewtopic.php?pid=1930379", assetPath = "wallpapers/arch_wirefeather.webp", focusX = 0.21f,
             colors = listOf(Color(0xFFFCFCFC), Color(0xFFCBCBCB), Color(0xFFC9C9C9), Color(0xFFB9B9B9))
         ),
         FreeWallpaper(
             id = "arch_wireparts", name = "Wireparts", category = "Arch Linux", author = "xyproto", license = "CC0 1.0",
-            sourceUrl = "https://bbs.archlinux.org/viewtopic.php?pid=1930379", assetPath = "wallpapers/arch_wireparts.webp", focusX = 0.5f,
+            sourceUrl = "https://bbs.archlinux.org/viewtopic.php?pid=1930379", assetPath = "wallpapers/arch_wireparts.webp", focusX = 0.235f,
             colors = listOf(Color(0xFFFFFFFF), Color(0xFFFAFAFA), Color(0xFFFCFCFC), Color(0xFFF7F7F7))
         ),
         FreeWallpaper(
@@ -388,9 +419,21 @@ object FreeWallpapers {
         }
     }
 
-    /** Another random wallpaper, different from the current one, for the rotation. */
-    fun nextRandom(currentId: String?): FreeWallpaper =
-        items.filter { it.id != currentId }.random()
+    /** Another random wallpaper, different from the current one, for the rotation: only among those already on the phone. */
+    fun nextRandom(context: android.content.Context, currentId: String?): FreeWallpaper {
+        val portrait = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT
+        return items.filter { it.id != currentId && WallpaperFiles.isAvailable(context, it) && !(portrait && it.landscapeOnly) }
+            .randomOrNull() ?: items.first()
+    }
+
+    /** In portrait, instead of a landscape-only work: another one of the same project already on the phone, or the default. */
+    fun portraitAlternative(context: android.content.Context, wallpaper: FreeWallpaper): FreeWallpaper =
+        items.firstOrNull { it.category == wallpaper.category && !it.landscapeOnly && WallpaperFiles.isAvailable(context, it) }
+            ?: items.first { !it.landscapeOnly && WallpaperFiles.isAvailable(context, it) }
+
+    /** The wallpaper to show: if the chosen one has not been downloaded (e.g. after an update), the default one. */
+    fun shownOrDefault(context: android.content.Context, wallpaper: FreeWallpaper): FreeWallpaper =
+        if (WallpaperFiles.isAvailable(context, wallpaper)) wallpaper else items.first()
 
     fun getById(id: String, customPath: String? = null): FreeWallpaper {
         if (id == "custom_user") {
@@ -409,22 +452,123 @@ object FreeWallpapers {
     }
 }
 
-/** Crops centered on [focusX] (0 = left, 1 = right) without leaving empty borders. */
-private class FocusAlignment(private val focusX: Float) : Alignment {
-    override fun align(size: IntSize, space: IntSize, layoutDirection: LayoutDirection): IntOffset {
-        val x = if (size.width > space.width) {
-            (space.width / 2f - focusX * size.width).coerceIn((space.width - size.width).toFloat(), 0f).toInt()
-        } else (space.width - size.width) / 2
-        return IntOffset(x, (space.height - size.height) / 2)
+/**
+ * Wallpapers that are not inside the APK (to keep it under the stores' size limit): each one is downloaded
+ * once, only when the user chooses it, through the same Tor or proxy as browsing, and kept only if its
+ * size and SHA-256 match the ones built into Senda ([WallpaperDownloads]).
+ */
+object WallpaperFiles {
+    private const val GITHUB = "https://github.com/IDEH-Labs/senda-browser/releases/download/"
+    // Mirror: GitLab generic package with the same files
+    private const val GITLAB = "https://gitlab.com/api/v4/projects/ideh-labs%2Fsenda-browser/packages/generic/wallpapers/"
+    const val SOURCE_LABEL = "github.com/IDEH-Labs/senda-browser"
+
+    /** Changes after each download, so the screens that show wallpapers refresh. */
+    var revision by mutableIntStateOf(0)
+        private set
+
+    private fun dir(context: android.content.Context) = java.io.File(context.applicationContext.filesDir, "wallpapers")
+    private fun fileName(wp: FreeWallpaper) = wp.assetPath?.substringAfterLast('/')
+
+    fun isBundled(wp: FreeWallpaper) = wp.id in WallpaperDownloads.BUNDLED
+    fun isBundledAsset(path: String) = path.substringAfterLast('/').substringBeforeLast('.') in WallpaperDownloads.BUNDLED
+
+    fun localFile(context: android.content.Context, wp: FreeWallpaper): java.io.File? =
+        fileName(wp)?.let { java.io.File(dir(context), it) }?.takeIf { it.isFile }
+
+    fun isAvailable(context: android.content.Context, wp: FreeWallpaper): Boolean =
+        wp.id == "custom_user" || isBundled(wp) || localFile(context, wp) != null
+
+    fun downloadBytes(wp: FreeWallpaper): Long = WallpaperDownloads.files[wp.id]?.bytes ?: 0L
+
+    /** Wallpapers of the catalog downloaded to this phone (never the user's own photo). */
+    fun downloaded(context: android.content.Context): List<FreeWallpaper> =
+        FreeWallpapers.items.filter { !isBundled(it) && localFile(context, it) != null }
+
+    /** Frees the space of the downloaded wallpapers; the ones inside Senda and the user's photo stay. */
+    fun deleteDownloaded(context: android.content.Context) {
+        downloaded(context).forEach { localFile(context, it)?.delete() }
+        revision++
+    }
+
+    /** Downloads one wallpaper. Returns false if no source gave the exact expected file. */
+    suspend fun download(context: android.content.Context, wp: FreeWallpaper): Boolean = withContext(Dispatchers.IO) {
+        if (isAvailable(context, wp)) return@withContext true
+        val spec = WallpaperDownloads.files[wp.id] ?: return@withContext false
+        val name = fileName(wp) ?: return@withContext false
+        val version = WallpaperDownloads.RELEASE.removePrefix("wallpapers-")
+        for (url in listOf("$GITHUB${WallpaperDownloads.RELEASE}/$name", "$GITLAB$version/$name")) {
+            val data = try { fetch(url, spec.bytes) } catch (e: Exception) {
+                android.util.Log.w("SendaWallpaper", "$name: ${e.javaClass.simpleName}")
+                null
+            } ?: continue
+            val sha = java.security.MessageDigest.getInstance("SHA-256").digest(data).joinToString("") { "%02x".format(it) }
+            if (sha != spec.sha256) {
+                android.util.Log.w("SendaWallpaper", "$name: SHA-256 does not match, discarded")
+                continue
+            }
+            val target = java.io.File(dir(context).apply { mkdirs() }, name)
+            val atomic = androidx.core.util.AtomicFile(target)
+            val out = atomic.startWrite()
+            try {
+                out.write(data)
+                atomic.finishWrite(out)
+            } catch (e: Exception) {
+                atomic.failWrite(out)
+                return@withContext false
+            }
+            withContext(Dispatchers.Main) { revision++ }
+            return@withContext true
+        }
+        false
+    }
+
+    private fun fetch(url: String, expected: Long): ByteArray {
+        val conn = org.senda.browser.core.SendaNet.open(url).apply {
+            connectTimeout = 20_000
+            readTimeout = 30_000
+            instanceFollowRedirects = true
+        }
+        try {
+            if (conn.responseCode != 200) throw java.io.IOException("HTTP ${conn.responseCode}")
+            val buf = java.io.ByteArrayOutputStream()
+            conn.inputStream.use { input ->
+                val chunk = ByteArray(64 * 1024)
+                while (true) {
+                    val n = input.read(chunk)
+                    if (n < 0) break
+                    buf.write(chunk, 0, n)
+                    // Never more than the expected size: a wrong or hostile answer cannot fill the phone
+                    if (buf.size() > expected) throw java.io.IOException("too big")
+                }
+            }
+            if (buf.size().toLong() != expected) throw java.io.IOException("size ${buf.size()}")
+            return buf.toByteArray()
+        } finally {
+            conn.disconnect()
+        }
     }
 }
 
 /**
- * The works come in high resolution (up to 5120 px) for PCs, tablets or viewers; they are decoded at the size
- * of the space where they are shown, so a phone screen does not load ~60 MB per wallpaper and each picker
+ * Crops to fill the space, keeping the point ([focusX], [focusY]) as centered as possible without leaving
+ * empty borders: like "art direction" in responsive web design, the important part of each work stays in view.
+ */
+private class FocusAlignment(private val focusX: Float, private val focusY: Float) : Alignment {
+    override fun align(size: IntSize, space: IntSize, layoutDirection: LayoutDirection): IntOffset {
+        fun offset(content: Int, room: Int, focus: Float) =
+            if (content > room) (room / 2f - focus * content).coerceIn((room - content).toFloat(), 0f).toInt()
+            else (room - content) / 2
+        return IntOffset(offset(size.width, space.width, focusX), offset(size.height, space.height, focusY))
+    }
+}
+
+/**
+ * The works come in high resolution (up to 3840 px) for PCs, tablets or TVs; they are decoded at the size
+ * of the space where they are shown, so a phone screen does not load tens of MB per wallpaper and each picker
  * thumbnail takes only what is visible.
  */
-private fun decodeToFit(open: () -> java.io.InputStream, width: Int, height: Int): android.graphics.Bitmap? {
+private fun decodeToFill(open: () -> java.io.InputStream, width: Int, height: Int): android.graphics.Bitmap? {
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     open().use { BitmapFactory.decodeStream(it, null, bounds) }
     val srcW = bounds.outWidth
@@ -444,6 +588,13 @@ private fun decodeToFit(open: () -> java.io.InputStream, width: Int, height: Int
     }
 }
 
+/**
+ * Shows a wallpaper filling any screen: phone in portrait or landscape, tablet, foldable or TV.
+ * - If the project publishes an official portrait version, it is used when the space is taller than wide.
+ * - Otherwise the work is cropped around its important part ([FreeWallpaper.focusX], [FreeWallpaper.focusY]).
+ * - Works whose text or logo is wider than a portrait screen ([FreeWallpaper.landscapeOnly]) are shown only
+ *   in landscape; in portrait another wallpaper of the same project takes their place, so nothing appears cut.
+ */
 @Composable
 fun FreeWallpaperBackground(
     wallpaper: FreeWallpaper,
@@ -454,25 +605,34 @@ fun FreeWallpaperBackground(
     androidx.compose.foundation.layout.BoxWithConstraints(modifier = modifier.fillMaxSize()) {
     val targetW = constraints.maxWidth.takeIf { it != androidx.compose.ui.unit.Constraints.Infinity } ?: 0
     val targetH = constraints.maxHeight.takeIf { it != androidx.compose.ui.unit.Constraints.Infinity } ?: 0
-    var imageBitmap by remember(wallpaper.assetPath, wallpaper.filePath) { mutableStateOf<ImageBitmap?>(null) }
+    // Picker thumbnails show the work itself, whatever the orientation
+    val small = targetH in 1..400
+    val portrait = targetH > targetW
+    val revision = WallpaperFiles.revision
+    val shown = remember(wallpaper, portrait, small, revision) {
+        if (!small && portrait && wallpaper.landscapeOnly) FreeWallpapers.portraitAlternative(context, wallpaper) else wallpaper
+    }
+    var imageBitmap by remember(shown.assetPath, shown.filePath, portrait) { mutableStateOf<ImageBitmap?>(null) }
 
-    LaunchedEffect(wallpaper.assetPath, wallpaper.filePath, targetW, targetH) {
-        val asset = wallpaper.assetPath
-        val file = wallpaper.filePath
+    LaunchedEffect(shown.assetPath, shown.filePath, targetW, targetH, revision) {
+        val asset = shown.assetPath
+        val file = shown.filePath
+        // In small spaces (picker thumbnails) the 320 px copy is used: it is always inside Senda, even for
+        // wallpapers not downloaded yet, and decoding big images while scrolling the row made it stutter
+        val thumb = asset?.let { "wallpapers/thumbs/" + it.substringAfterLast('/') }
+        val officialPortrait = shown.portraitAssetPath?.takeIf { portrait && !small && WallpaperFiles.isBundledAsset(it) }
+        val downloaded = WallpaperFiles.localFile(context, shown)
+        val open: (() -> java.io.InputStream)? = when {
+            small && thumb != null -> { { context.assets.open(thumb) } }
+            officialPortrait != null -> { { context.assets.open(officialPortrait) } }
+            asset != null && WallpaperFiles.isBundled(shown) -> { { context.assets.open(asset) } }
+            downloaded != null -> { { java.io.FileInputStream(downloaded) } }
+            file != null && java.io.File(file).exists() -> { { java.io.FileInputStream(file) } }
+            else -> null
+        }
         imageBitmap = withContext(Dispatchers.IO) {
             try {
-                // In small spaces (picker thumbnails) the 320 px copy is used, not the original of
-                // up to 5120 px: decoding 54 originals while scrolling the row made it stutter
-                val thumb = asset?.let { "wallpapers/thumbs/" + it.substringAfterLast('/') }
-                if (asset != null && thumb != null && targetH in 1..400) {
-                    decodeToFit({ context.assets.open(thumb) }, targetW, targetH)?.asImageBitmap()
-                } else if (asset != null) {
-                    decodeToFit({ context.assets.open(asset) }, targetW, targetH)?.asImageBitmap()
-                } else if (file != null && java.io.File(file).exists()) {
-                    decodeToFit({ java.io.FileInputStream(file) }, targetW, targetH)?.asImageBitmap()
-                } else {
-                    null
-                }
+                open?.let { decodeToFill(it, targetW, targetH)?.asImageBitmap() }
             } catch (e: Exception) {
                 null
             }
@@ -484,9 +644,9 @@ fun FreeWallpaperBackground(
         if (currentBitmap != null) {
             Image(
                 bitmap = currentBitmap,
-                contentDescription = wallpaper.name,
+                contentDescription = shown.name,
                 contentScale = ContentScale.Crop,
-                alignment = FocusAlignment(wallpaper.focusX),
+                alignment = FocusAlignment(shown.focusX, shown.focusY),
                 modifier = Modifier.fillMaxSize()
             )
         } else {
@@ -542,4 +702,150 @@ fun FreeWallpaperBackground(
         }
     }
     }
+}
+
+/**
+ * Asks before downloading a wallpaper that is not inside Senda: what, how much and from where. Choosing it
+ * only happens once the exact file is on the phone.
+ */
+@Composable
+fun WallpaperDownloadDialog(wallpaper: FreeWallpaper, onDismiss: () -> Unit, onReady: (FreeWallpaper) -> Unit) {
+    val context = LocalContext.current
+    val strings = org.senda.browser.core.LocalSendaStrings.current
+    val scope = rememberCoroutineScope()
+    var progress by remember { mutableStateOf<String?>(null) }
+    var failed by remember { mutableStateOf(false) }
+    val missing = remember(WallpaperFiles.revision) { FreeWallpapers.items.filter { !WallpaperFiles.isAvailable(context, it) } }
+    fun size(bytes: Long) = android.text.format.Formatter.formatShortFileSize(context, bytes)
+
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = { if (progress == null) onDismiss() },
+        title = { androidx.compose.material3.Text(strings.wp_download_title) },
+        text = {
+            androidx.compose.foundation.layout.Column {
+                androidx.compose.material3.Text(
+                    strings.wp_download_body.format(wallpaper.name, size(WallpaperFiles.downloadBytes(wallpaper)), WallpaperFiles.SOURCE_LABEL)
+                )
+                progress?.let {
+                    androidx.compose.foundation.layout.Spacer(Modifier.height(12.dp))
+                    androidx.compose.material3.LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    androidx.compose.material3.Text(it)
+                }
+                if (failed) androidx.compose.material3.Text(strings.wp_download_failed, color = androidx.compose.material3.MaterialTheme.colorScheme.error)
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(enabled = progress == null, onClick = {
+                failed = false
+                progress = strings.wp_downloading.format(1, 1)
+                scope.launch {
+                    val ok = WallpaperFiles.download(context, wallpaper)
+                    progress = null
+                    if (ok) onReady(wallpaper) else failed = true
+                }
+            }) { androidx.compose.material3.Text(strings.wp_download_one) }
+        },
+        dismissButton = {
+            androidx.compose.foundation.layout.Row {
+                if (missing.size > 1) androidx.compose.material3.TextButton(enabled = progress == null, onClick = {
+                    failed = false
+                    scope.launch {
+                        var allOk = true
+                        missing.forEachIndexed { i, wp ->
+                            progress = strings.wp_downloading.format(i + 1, missing.size)
+                            if (!WallpaperFiles.download(context, wp)) allOk = false
+                        }
+                        progress = null
+                        if (WallpaperFiles.isAvailable(context, wallpaper)) onReady(wallpaper)
+                        if (!allOk) failed = true
+                    }
+                }) { androidx.compose.material3.Text(strings.wp_download_all.format(size(missing.sumOf { WallpaperFiles.downloadBytes(it) }))) }
+                androidx.compose.material3.TextButton(enabled = progress == null, onClick = onDismiss) {
+                    androidx.compose.material3.Text(strings.general_cancel)
+                }
+            }
+        }
+    )
+}
+
+/**
+ * Download every wallpaper at once, or free the space of the downloaded ones. Always asks first and says how
+ * much and from where, like the single download.
+ */
+@Composable
+fun WallpaperBulkActions(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val strings = org.senda.browser.core.LocalSendaStrings.current
+    val scope = rememberCoroutineScope()
+    val revision = WallpaperFiles.revision
+    val missing = remember(revision) { FreeWallpapers.items.filter { !WallpaperFiles.isAvailable(context, it) } }
+    val downloaded = remember(revision) { WallpaperFiles.downloaded(context) }
+    var askAll by remember { mutableStateOf(false) }
+    var askDelete by remember { mutableStateOf(false) }
+    var progress by remember { mutableStateOf<String?>(null) }
+    var failed by remember { mutableIntStateOf(0) }
+    fun size(bytes: Long) = android.text.format.Formatter.formatShortFileSize(context, bytes)
+
+    androidx.compose.foundation.layout.Row(modifier = modifier) {
+        if (missing.isNotEmpty()) androidx.compose.material3.TextButton(onClick = { failed = 0; askAll = true }) {
+            androidx.compose.material3.Text(strings.wp_download_all_btn.format(missing.size, size(missing.sumOf { WallpaperFiles.downloadBytes(it) })), fontSize = 12.sp)
+        } else androidx.compose.material3.Text(strings.wp_all_downloaded, fontSize = 12.sp,
+            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.align(Alignment.CenterVertically).padding(horizontal = 12.dp))
+        if (downloaded.isNotEmpty()) androidx.compose.material3.TextButton(onClick = { askDelete = true }) {
+            androidx.compose.material3.Text(strings.wp_delete_downloaded_btn.format(size(downloaded.sumOf { WallpaperFiles.downloadBytes(it) })), fontSize = 12.sp)
+        }
+    }
+
+    if (askAll) androidx.compose.material3.AlertDialog(
+        onDismissRequest = { if (progress == null) askAll = false },
+        title = { androidx.compose.material3.Text(strings.wp_download_all_title) },
+        text = {
+            androidx.compose.foundation.layout.Column {
+                androidx.compose.material3.Text(strings.wp_download_all_body.format(missing.size,
+                    size(missing.sumOf { WallpaperFiles.downloadBytes(it) }), WallpaperFiles.SOURCE_LABEL))
+                progress?.let {
+                    androidx.compose.foundation.layout.Spacer(Modifier.height(12.dp))
+                    androidx.compose.material3.LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    androidx.compose.material3.Text(it)
+                }
+                if (failed > 0) androidx.compose.material3.Text(strings.wp_download_failed,
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.error)
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(enabled = progress == null && missing.isNotEmpty(), onClick = {
+                failed = 0
+                scope.launch {
+                    val todo = missing.toList()
+                    todo.forEachIndexed { i, wp ->
+                        progress = strings.wp_downloading.format(i + 1, todo.size)
+                        if (!WallpaperFiles.download(context, wp)) failed++
+                    }
+                    progress = null
+                    if (failed == 0) askAll = false
+                }
+            }) { androidx.compose.material3.Text(strings.wp_download_one) }
+        },
+        dismissButton = {
+            androidx.compose.material3.TextButton(enabled = progress == null, onClick = { askAll = false }) {
+                androidx.compose.material3.Text(strings.general_cancel)
+            }
+        }
+    )
+
+    if (askDelete) androidx.compose.material3.AlertDialog(
+        onDismissRequest = { askDelete = false },
+        title = { androidx.compose.material3.Text(strings.wp_delete_downloaded_title) },
+        text = { androidx.compose.material3.Text(strings.wp_delete_downloaded_body) },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = {
+                WallpaperFiles.deleteDownloaded(context)
+                askDelete = false
+            }) { androidx.compose.material3.Text(strings.general_delete) }
+        },
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = { askDelete = false }) { androidx.compose.material3.Text(strings.general_cancel) }
+        }
+    )
 }

@@ -190,6 +190,15 @@ fun SettingsHomeDialog(
     var showShortcuts by remember { mutableStateOf(prefs.showZenShortcuts) }
     var showNews by remember { mutableStateOf(prefs.showZenNewsFeed) }
     var selectedWp by remember { mutableStateOf(prefs.selectedWallpaperId) }
+    var askDownload by remember { mutableStateOf<org.senda.browser.ui.components.FreeWallpaper?>(null) }
+    askDownload?.let { wp ->
+        org.senda.browser.ui.components.WallpaperDownloadDialog(wp, onDismiss = { askDownload = null }, onReady = { ready ->
+            askDownload = null
+            selectedWp = ready.id
+            FreeWallpapers.choose(prefs, ready.id)
+            onSettingsChanged()
+        })
+    }
     var dimPct by remember { mutableIntStateOf(prefs.wallpaperDimPercent) }
     var customWpPath by remember { mutableStateOf(prefs.customWallpaperPath) }
 
@@ -357,30 +366,41 @@ fun SettingsHomeDialog(
                         }
                     }
 
+                    org.senda.browser.ui.components.WallpaperBulkActions()
                     FreeWallpapers.items.forEach { wp ->
+                        val available = remember(org.senda.browser.ui.components.WallpaperFiles.revision) {
+                            org.senda.browser.ui.components.WallpaperFiles.isAvailable(context, wp)
+                        }
+                        fun pick() {
+                            if (!available) { askDownload = wp; return }
+                            selectedWp = wp.id
+                            FreeWallpapers.choose(prefs, wp.id)
+                            onSettingsChanged()
+                        }
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable {
-                                    selectedWp = wp.id
-                                    FreeWallpapers.choose(prefs, wp.id)
-                                    onSettingsChanged()
-                                }
+                                .clickable { pick() }
                                 .padding(vertical = 5.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             RadioButton(
                                 selected = selectedWp == wp.id,
-                                onClick = {
-                                    selectedWp = wp.id
-                                    FreeWallpapers.choose(prefs, wp.id)
-                                    onSettingsChanged()
-                                }
+                                onClick = { pick() }
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Column {
                                 Text(text = wp.name, style = MaterialTheme.typography.bodyMedium, fontWeight = if (selectedWp == wp.id) FontWeight.Bold else FontWeight.Normal)
                                 Text(text = "${wp.category} · ${wp.author} · ${wp.license}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                if (wp.landscapeOnly) Text(
+                                    text = strings.wp_landscape_only + " · " + strings.wp_landscape_only_hint,
+                                    fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                if (!available) Text(
+                                    text = strings.wp_not_downloaded + " · " + android.text.format.Formatter.formatShortFileSize(context,
+                                        org.senda.browser.ui.components.WallpaperFiles.downloadBytes(wp)),
+                                    fontSize = 11.sp, color = MaterialTheme.colorScheme.primary
+                                )
                                 wp.sourceUrl?.let { Text(text = it, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)) }
                             }
                         }

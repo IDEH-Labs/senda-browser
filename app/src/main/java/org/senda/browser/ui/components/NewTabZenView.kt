@@ -106,8 +106,8 @@ fun NewTabZenView(
     var showAddShortcutDialog by remember { mutableStateOf(false) }
     var editingShortcut by remember { mutableStateOf<ZenShortcut?>(null) }
 
-    val activeWallpaper = remember(selectedWallpaperId, prefs.customWallpaperPath) {
-        FreeWallpapers.getById(selectedWallpaperId, prefs.customWallpaperPath)
+    val activeWallpaper = remember(selectedWallpaperId, prefs.customWallpaperPath, WallpaperFiles.revision) {
+        FreeWallpapers.shownOrDefault(context, FreeWallpapers.getById(selectedWallpaperId, prefs.customWallpaperPath))
     }
 
     val displayWallpaper = when (currentLayout) {
@@ -148,7 +148,7 @@ fun NewTabZenView(
             return@LaunchedEffect
         }
         fun advance(): FreeWallpaper {
-            val next = FreeWallpapers.nextRandom(prefs.wallpaperRotationCurrentId)
+            val next = FreeWallpapers.nextRandom(context, prefs.wallpaperRotationCurrentId)
             prefs.wallpaperRotationCurrentId = next.id
             prefs.wallpaperRotationChangedAt = System.currentTimeMillis()
             return next
@@ -156,13 +156,13 @@ fun NewTabZenView(
         if (rotationMinutes < 0) {
             // Just chosen in the picker: that one is shown; otherwise, a new one for each tab
             val justChosen = System.currentTimeMillis() - prefs.wallpaperRotationChangedAt < 3_000L
-            val current = prefs.wallpaperRotationCurrentId?.let { id -> FreeWallpapers.items.find { it.id == id } }
+            val current = prefs.wallpaperRotationCurrentId?.let { id -> FreeWallpapers.items.find { it.id == id && WallpaperFiles.isAvailable(context, it) } }
             rotatingWallpaper = if (justChosen && current != null) current else advance()
             return@LaunchedEffect
         }
         val intervalMs = rotationMinutes * 60_000L
         while (true) {
-            val current = prefs.wallpaperRotationCurrentId?.let { id -> FreeWallpapers.items.find { it.id == id } }
+            val current = prefs.wallpaperRotationCurrentId?.let { id -> FreeWallpapers.items.find { it.id == id && WallpaperFiles.isAvailable(context, it) } }
             val elapsed = System.currentTimeMillis() - prefs.wallpaperRotationChangedAt
             rotatingWallpaper = if (current == null || elapsed !in 0 until intervalMs) advance() else current
             val waitMs = intervalMs - (System.currentTimeMillis() - prefs.wallpaperRotationChangedAt)
@@ -379,6 +379,16 @@ fun HomeLayoutSelectorSheet(
     var showNews by remember { mutableStateOf(prefs.showZenNewsFeed) }
     var selectedWallpaperId by remember { mutableStateOf(prefs.selectedWallpaperId) }
     var dimPercent by remember { mutableIntStateOf(prefs.wallpaperDimPercent) }
+    // Wallpaper not inside Senda: it is only chosen after the user agrees to download it
+    var askDownload by remember { mutableStateOf<FreeWallpaper?>(null) }
+    askDownload?.let { wp ->
+        WallpaperDownloadDialog(wp, onDismiss = { askDownload = null }, onReady = { ready ->
+            askDownload = null
+            selectedWallpaperId = ready.id
+            FreeWallpapers.choose(prefs, ready.id)
+            onLayoutChanged()
+        })
+    }
 
     val customWallpaperLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -571,15 +581,20 @@ fun HomeLayoutSelectorSheet(
 
                     items(FreeWallpapers.items, key = { it.id }) { wallpaper ->
                         val isSelected = wallpaper.id == selectedWallpaperId
+                        val available = remember(WallpaperFiles.revision) { WallpaperFiles.isAvailable(context, wallpaper) }
                         Surface(
                             modifier = Modifier
                                 .width(76.dp)
                                 .height(96.dp)
                                 .clip(RoundedCornerShape(10.dp))
                                 .clickable {
-                                    selectedWallpaperId = wallpaper.id
-                                    FreeWallpapers.choose(prefs, wallpaper.id)
-                                    onLayoutChanged()
+                                    if (!available) {
+                                        askDownload = wallpaper
+                                    } else {
+                                        selectedWallpaperId = wallpaper.id
+                                        FreeWallpapers.choose(prefs, wallpaper.id)
+                                        onLayoutChanged()
+                                    }
                                 }
                                 .border(
                                     width = if (isSelected) 2.5.dp else 0.8.dp,
@@ -600,6 +615,18 @@ fun HomeLayoutSelectorSheet(
                                             )
                                         )
                                 )
+                                if (!available) Icon(
+                                    imageVector = Icons.Default.CloudDownload,
+                                    contentDescription = strings.wp_not_downloaded,
+                                    tint = Color.White,
+                                    modifier = Modifier.align(Alignment.TopEnd).padding(5.dp).size(16.dp)
+                                )
+                                if (wallpaper.landscapeOnly) Icon(
+                                    imageVector = Icons.Default.StayCurrentLandscape,
+                                    contentDescription = strings.wp_landscape_only,
+                                    tint = Color.White,
+                                    modifier = Modifier.align(Alignment.TopStart).padding(5.dp).size(16.dp)
+                                )
                                 Text(
                                     text = wallpaper.name,
                                     fontSize = 9.sp,
@@ -616,6 +643,7 @@ fun HomeLayoutSelectorSheet(
                     }
                 }
 
+                WallpaperBulkActions()
                 Spacer(modifier = Modifier.height(12.dp))
                 var sheetRotation by remember { mutableIntStateOf(prefs.wallpaperRotationMinutes) }
                 Text(text = strings.wp_rotation_title, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)

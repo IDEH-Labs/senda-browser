@@ -15,7 +15,7 @@ Senda is distributed under the **GNU GPL v3** (see `LICENSE`). It includes or us
 
 ## Wallpapers
 
-The 64 wallpapers in `app/src/main/assets/wallpapers/` come from Debian, GNU, Gentoo, KDE, GNOME, Fedora, Arch Linux and Xfce. Each one keeps its original license: CC BY-SA 2.5 / 3.0 / 4.0, CC0 1.0, GPL-2.0, GPL-2.0+, GPL-3.0, LGPL-3.0 or GFDL-1.3. The author, license and source of every image are listed in the catalog `app/src/main/java/org/senda/browser/ui/components/FreeWallpapers.kt` and shown in the app next to each wallpaper.
+The 64 wallpapers in `wallpapers/original/` come from Debian, GNU, Gentoo, KDE, GNOME, Fedora, Arch Linux and Xfce. Each one keeps its original license: CC BY-SA 2.5 / 3.0 / 4.0, CC0 1.0, GPL-2.0, GPL-2.0+, GPL-3.0, LGPL-3.0 or GFDL-1.3. The author, license and source of every image are listed in the catalog `app/src/main/java/org/senda/browser/ui/components/FreeWallpapers.kt` and shown in the app next to each wallpaper. To keep the APK small, only five optimized copies ship inside it (`app/src/main/assets/wallpapers/`, plus 320 px thumbnails of all 64), together with the official portrait version of Debian's Ceratopsian (`1080x2160.svg` from `ceratopsian-theme` in Debian's desktop-base, by Elise Couper, GPL-2+, rendered at 1920x3840). The others are optimized copies (at most 3840 px) built by `scripts/build_wallpapers.py`, published as assets of the `wallpapers-1` release of this repository, and downloaded by Senda only when the user chooses one; Senda checks each file's size and SHA-256 against `WallpaperDownloads.kt` before using it.
 
 ## Inspiration (no code included)
 
