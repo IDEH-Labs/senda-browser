@@ -74,6 +74,10 @@ object SendaVaultManager {
      * tests. It is the original key (v1): on the chip, but without requiring authentication.
      */
     const val APP_KEY_ALIAS = "senda_vault_master_key_v1"
+    /** Key for the saved assistant conversation: same protection as the vault key, but its own, so resetting one does not lose the other. */
+    const val ASSISTANT_CHAT_KEY_ALIAS = "senda_assistant_chat_key_v1"
+    /** Keys that only work in secure hardware and after a recent fingerprint or PIN. */
+    private val AUTH_KEY_ALIASES = setOf(VAULT_KEY_ALIAS, ASSISTANT_CHAT_KEY_ALIAS)
     /** Seconds the key stays available after authenticating with fingerprint or PIN. */
     const val AUTH_VALIDITY_SECONDS = 30
     private const val GCM_TAG_LENGTH_BITS = 128
@@ -136,12 +140,12 @@ object SendaVaultManager {
         if (keyStore.containsAlias(alias)) {
             val entry = keyStore.getEntry(alias, null) as? KeyStore.SecretKeyEntry
             if (entry != null) {
-                return if (alias == VAULT_KEY_ALIAS) requireSecureHardware(entry.secretKey, alias, justGenerated = false)
+                return if (alias in AUTH_KEY_ALIASES) requireSecureHardware(entry.secretKey, alias, justGenerated = false)
                 else entry.secretKey
             }
         }
         val generated = generateKey(alias)
-        return if (alias == VAULT_KEY_ALIAS) requireSecureHardware(generated, alias, justGenerated = true) else generated
+        return if (alias in AUTH_KEY_ALIASES) requireSecureHardware(generated, alias, justGenerated = true) else generated
     }
 
     private fun generateKey(alias: String): SecretKey {
@@ -157,7 +161,7 @@ object SendaVaultManager {
                 .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
                 .setKeySize(256)
                 .setRandomizedEncryptionRequired(true)
-            if (alias == VAULT_KEY_ALIAS) {
+            if (alias in AUTH_KEY_ALIASES) {
                 // The chip only uses the key if the user authenticated (fingerprint or PIN) less than 30 s ago
                 builder.setUserAuthenticationRequired(true)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -198,7 +202,7 @@ object SendaVaultManager {
             keyGenerator.generateKey()
         } catch (e: Exception) {
             // Without a PIN, pattern or password on the phone, a key that requires authentication cannot be created
-            if (alias == VAULT_KEY_ALIAS) throw VaultUnavailableException(VaultUnavailableException.Reason.NO_SCREEN_LOCK, e)
+            if (alias in AUTH_KEY_ALIASES) throw VaultUnavailableException(VaultUnavailableException.Reason.NO_SCREEN_LOCK, e)
             throw e
         }
     }
@@ -243,6 +247,12 @@ object SendaVaultManager {
         KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }.deleteEntry(VAULT_KEY_ALIAS)
         verifiedHardwareAliases.remove(VAULT_KEY_ALIAS)
         saveAll(context, emptyList())
+    }
+
+    /** Deletes a keystore key (e.g. an invalidated one) so the next use creates and verifies a new one. */
+    fun deleteKey(alias: String) {
+        KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }.deleteEntry(alias)
+        verifiedHardwareAliases.remove(alias)
     }
 
     /** Does the vault key require user authentication? (reported by the keystore itself) */
@@ -336,6 +346,18 @@ object SendaVaultManager {
 
         return resultChars
     }
+
+    /** Encrypts bytes with AES-256-GCM using a keystore key; returns (ciphertext, IV). Does not wipe the input. */
+    @Synchronized
+    fun encryptBytes(plain: ByteArray, alias: String): Pair<ByteArray, ByteArray> {
+        val cipher = cipherFor(Cipher.ENCRYPT_MODE, alias)
+        return Pair(cipher.doFinal(plain), cipher.iv)
+    }
+
+    /** Decrypts what [encryptBytes] produced with the same keystore key. */
+    @Synchronized
+    fun decryptBytes(encrypted: ByteArray, iv: ByteArray, alias: String): ByteArray =
+        cipherFor(Cipher.DECRYPT_MODE, alias, iv).doFinal(encrypted)
 
     /**
      * Memory hygiene: actively wipes confidential characters.
