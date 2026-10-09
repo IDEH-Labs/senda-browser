@@ -20,7 +20,9 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
@@ -37,12 +39,15 @@ import kotlinx.coroutines.launch
 import org.senda.browser.core.LocalSendaStrings
 import org.senda.browser.core.PreferencesManager
 import org.senda.browser.core.SendaStringPack
+import org.senda.browser.core.assistant.AssistantChatStore
 import org.senda.browser.core.assistant.Attachment
 import org.senda.browser.core.assistant.ChatGptPlanClient
 import org.senda.browser.core.assistant.ChatTurn
 import org.senda.browser.core.assistant.Source
 import org.senda.browser.core.assistant.RemoteAiException
 import org.senda.browser.core.assistant.SendaAssistant
+import org.senda.browser.core.security.SendaVaultAuth
+import org.senda.browser.core.security.VaultUnavailableException
 import org.senda.browser.ui.model.BrowserTab
 
 /** User-facing text for a provider failure (without technical details that do not help). */
@@ -159,6 +164,94 @@ private data class AssistantMessage(
     val sources: List<Source> = emptyList()
 )
 
+private fun encodeConversation(messages: List<AssistantMessage>): String {
+    val array = org.json.JSONArray()
+    messages.forEach { m ->
+        array.put(org.json.JSONObject().apply {
+            put("role", m.role.name)
+            put("shown", m.shown)
+            put("sent", m.sent)
+            put("attachments", org.json.JSONArray().apply {
+                m.attachments.forEach { a -> put(org.json.JSONObject().put("name", a.name).put("mime", a.mime).put("base64", a.base64)) }
+            })
+            put("sources", org.json.JSONArray().apply {
+                m.sources.forEach { src -> put(org.json.JSONObject().put("url", src.url).put("title", src.title)) }
+            })
+        })
+    }
+    return org.json.JSONObject().put("messages", array).toString()
+}
+
+private fun decodeConversation(json: String): List<AssistantMessage> {
+    val array = org.json.JSONObject(json).optJSONArray("messages") ?: return emptyList()
+    return (0 until array.length()).map { i ->
+        val o = array.getJSONObject(i)
+        val atts = o.optJSONArray("attachments") ?: org.json.JSONArray()
+        val srcs = o.optJSONArray("sources") ?: org.json.JSONArray()
+        AssistantMessage(
+            role = ChatTurn.Role.valueOf(o.getString("role")),
+            shown = o.getString("shown"),
+            sent = o.getString("sent"),
+            attachments = (0 until atts.length()).map { j ->
+                atts.getJSONObject(j).let { Attachment(it.getString("name"), it.getString("mime"), it.getString("base64")) }
+            },
+            sources = (0 until srcs.length()).map { j -> srcs.getJSONObject(j).let { Source(it.getString("url"), it.getString("title")) } }
+        )
+    }
+}
+
+/**
+ * The conversation outlives the sheet: closing the chat does not lose it, and a reply that is still arriving
+ * is kept. It is saved encrypted ([AssistantChatStore]) and only shown after fingerprint or PIN; when the chat
+ * is closed or Senda goes to the background it is locked again. It is only deleted when the user asks.
+ */
+private object AssistantSession {
+    val messages = mutableStateListOf<AssistantMessage>()
+    var partial by mutableStateOf("")
+    var busy by mutableStateOf<Job?>(null)
+    var unlocked by mutableStateOf(false)
+    /** False when the phone cannot protect it (no screen lock or no secure hardware): then it is not saved. */
+    var persistent by mutableStateOf(false)
+    var sheetOpen = false
+    /** The file picker or the fingerprint screen can stop the activity: that must not lock the chat. */
+    var awayOnPurpose = false
+
+    // Saves and locks one after another, in order, off the main thread
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val storeDispatcher = kotlinx.coroutines.Dispatchers.IO.limitedParallelism(1)
+
+    fun open(json: String?, persistent: Boolean) {
+        messages.clear()
+        if (json != null) messages.addAll(decodeConversation(json))
+        this.persistent = persistent
+        unlocked = true
+    }
+
+    fun save(context: Context) {
+        if (!persistent || !unlocked) return
+        val json = encodeConversation(messages.toList())
+        val app = context.applicationContext
+        SendaAssistant.scope.launch(storeDispatcher) {
+            runCatching { AssistantChatStore.save(app, json) }
+                .onFailure { android.util.Log.w("SendaAssistant", "Conversation not saved: ${it.javaClass.simpleName}") }
+        }
+    }
+
+    fun delete(context: Context) {
+        messages.clear()
+        val app = context.applicationContext
+        SendaAssistant.scope.launch(storeDispatcher) { runCatching { AssistantChatStore.delete(app) } }
+    }
+
+    fun lock() {
+        messages.clear()
+        partial = ""
+        unlocked = false
+        persistent = false
+        SendaAssistant.scope.launch(storeDispatcher) { AssistantChatStore.lock() }
+    }
+}
+
 /** Photos and PDF: what ChatGPT accepts with the plan (measured on 2026-10-06). */
 private const val ATTACH_MAX_MB = 20
 private const val IMAGE_MAX_SIDE = 1600
@@ -215,10 +308,11 @@ fun SendaAssistantSheet(prefs: PreferencesManager, activeTab: BrowserTab?, onDis
     val scope = rememberCoroutineScope()
     var configured by remember { mutableStateOf(SendaAssistant.isConfigured(prefs)) }
     var showSettings by remember { mutableStateOf(false) }
-    val messages = remember { mutableStateListOf<AssistantMessage>() }
+    val session = AssistantSession
+    val messages = session.messages
     var input by remember { mutableStateOf("") }
-    var partial by remember { mutableStateOf("") }
-    var busy by remember { mutableStateOf<Job?>(null) }
+    var partial by session::partial
+    var busy by session::busy
     var includePage by remember { mutableStateOf(false) }
     var deep by remember { mutableStateOf(false) }
     val pending = remember { mutableStateListOf<Attachment>() }
@@ -238,6 +332,7 @@ fun SendaAssistantSheet(prefs: PreferencesManager, activeTab: BrowserTab?, onDis
     val picker = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.OpenMultipleDocuments()
     ) { uris ->
+        session.awayOnPurpose = false
         scope.launch {
             uris.forEach { uri ->
                 val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { readAttachment(context, uri) }
@@ -260,7 +355,7 @@ fun SendaAssistantSheet(prefs: PreferencesManager, activeTab: BrowserTab?, onDis
         } else {
             openInBrowser(context, url)
         }
-        busy?.cancel(); onDismiss()
+        onDismiss()
     }
 
     fun send(text: String, withPage: Boolean) {
@@ -270,7 +365,9 @@ fun SendaAssistantSheet(prefs: PreferencesManager, activeTab: BrowserTab?, onDis
         input = ""
         partial = ""
         pending.clear()
-        busy = scope.launch {
+        // In the assistant's scope, not the sheet's: closing the chat does not lose the reply
+        val appContext = context.applicationContext
+        busy = SendaAssistant.scope.launch {
             val pageText = if (withPage && hasPage) activeTab?.extractPageText() else null
             val sent = if (pageText != null)
                 SendaAssistant.pageBlock(activeTab?.title.orEmpty(), activeTab?.url.orEmpty(), pageText) + "\n\n" + question
@@ -283,6 +380,7 @@ fun SendaAssistantSheet(prefs: PreferencesManager, activeTab: BrowserTab?, onDis
                 val model = SendaAssistant.ensureModel(prefs)
                 val reply = SendaAssistant.client(prefs).chat(model, SendaAssistant.systemPrompt(language), turns, deep && backend?.canThinkDeep == true) { partial = it }
                 messages += AssistantMessage(ChatTurn.Role.ASSISTANT, reply.text, reply.text, sources = reply.sources)
+                session.save(appContext)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -295,16 +393,94 @@ fun SendaAssistantSheet(prefs: PreferencesManager, activeTab: BrowserTab?, onDis
                 if (modelGone) {
                     // Forgotten: the next message will pick another model that works (ensureModel)
                     prefs.assistantProvider?.let { prefs.setAssistantModelFor(it, "") }
-                    Toast.makeText(context, strings.as_model_gone, Toast.LENGTH_LONG).show()
+                    Toast.makeText(appContext, strings.as_model_gone, Toast.LENGTH_LONG).show()
                 } else if (e is RemoteAiException && e.kind == RemoteAiException.Kind.USAGE_LIMIT) showLimit = true
-                else Toast.makeText(context, assistantErrorText(e, strings, destination), Toast.LENGTH_LONG).show()
+                else Toast.makeText(appContext, assistantErrorText(e, strings, destination), Toast.LENGTH_LONG).show()
                 input = question
                 pending.addAll(files)
             } finally {
                 partial = ""
                 busy = null
+                // The chat was closed while the reply arrived: once saved, it is locked
+                if (!session.sheetOpen) session.lock()
             }
         }
+    }
+
+    // Unlocking: fingerprint or PIN, then the saved conversation is decrypted
+    var unlocking by remember { mutableStateOf(false) }
+    var invalidated by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
+    fun unlock() {
+        if (unlocking || session.unlocked) return
+        unlocking = true
+        session.awayOnPurpose = true
+        SendaVaultAuth.request(context, strings.as_unlock_prompt) { ok ->
+            session.awayOnPurpose = false
+            if (!ok) { unlocking = false; return@request }
+            scope.launch {
+                val result = kotlinx.coroutines.withContext(session.storeDispatcher) { runCatching { AssistantChatStore.unlock(context) } }
+                unlocking = false
+                result.onSuccess { session.open(it, persistent = true) }.onFailure { e ->
+                    when {
+                        (e is VaultUnavailableException && e.reason == VaultUnavailableException.Reason.KEY_INVALIDATED) ||
+                            e is javax.crypto.AEADBadTagException -> invalidated = true
+                        // The phone cannot protect it: the chat works, but nothing is saved
+                        e is VaultUnavailableException -> session.open(null, persistent = false)
+                        else -> Toast.makeText(context, strings.as_unlock_failed, Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        }
+    }
+    LaunchedEffect(configured) { if (configured) unlock() }
+
+    DisposableEffect(Unit) {
+        session.sheetOpen = true
+        onDispose {
+            session.sheetOpen = false
+            if (session.busy == null) session.lock()
+        }
+    }
+    // Leaving Senda with the chat open closes it, so coming back asks for the fingerprint again
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP && !session.awayOnPurpose) onDismiss()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    if (invalidated) {
+        AlertDialog(
+            onDismissRequest = { invalidated = false; onDismiss() },
+            title = { Text(strings.as_locked_title) },
+            text = { Text(strings.as_chat_key_invalidated) },
+            confirmButton = {
+                TextButton(onClick = {
+                    AssistantChatStore.resetInvalidated(context)
+                    invalidated = false
+                    unlock()
+                }) { Text(strings.general_delete) }
+            },
+            dismissButton = { TextButton(onClick = { invalidated = false; onDismiss() }) { Text(strings.general_cancel) } }
+        )
+    }
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text(strings.as_delete_chat_title) },
+            text = { Text(strings.as_delete_chat_body) },
+            confirmButton = {
+                TextButton(onClick = {
+                    session.delete(context)
+                    pending.clear()
+                    confirmDelete = false
+                }) { Text(strings.general_delete) }
+            },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(strings.general_cancel) } }
+        )
     }
 
     LaunchedEffect(messages.size, partial.length / 120) {
@@ -319,11 +495,11 @@ fun SendaAssistantSheet(prefs: PreferencesManager, activeTab: BrowserTab?, onDis
                 configured = SendaAssistant.isConfigured(prefs)
             },
             // OpenAI's page is left in view: the dialog and the assistant sheet are closed
-            onLeaveForSignIn = { showSettings = false; busy?.cancel(); onDismiss() }
+            onLeaveForSignIn = { showSettings = false; onDismiss() }
         )
     }
 
-    ModalBottomSheet(onDismissRequest = { busy?.cancel(); onDismiss() }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+    ModalBottomSheet(onDismissRequest = { onDismiss() }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(modifier = Modifier.fillMaxWidth().fillMaxHeight(0.92f).navigationBarsPadding().imePadding().padding(horizontal = 16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
@@ -335,8 +511,8 @@ fun SendaAssistantSheet(prefs: PreferencesManager, activeTab: BrowserTab?, onDis
                             fontSize = 11.sp, color = MaterialTheme.colorScheme.primary, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                     }
                 }
-                if (messages.isNotEmpty() && busy == null) {
-                    TextButton(onClick = { messages.clear(); pending.clear() }) { Text(strings.as_new_chat, fontSize = 12.sp) }
+                if (session.unlocked && messages.isNotEmpty() && busy == null) {
+                    TextButton(onClick = { confirmDelete = true }) { Text(strings.as_new_chat, fontSize = 12.sp) }
                 }
                 IconButton(onClick = { showSettings = true }) { Icon(Icons.Default.Settings, contentDescription = strings.as_settings_title) }
             }
@@ -351,6 +527,24 @@ fun SendaAssistantSheet(prefs: PreferencesManager, activeTab: BrowserTab?, onDis
                 }
                 return@Column
             }
+            if (!session.unlocked) {
+                // Locked: nothing of the conversation is shown until the fingerprint or PIN
+                Spacer(Modifier.height(24.dp))
+                Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(32.dp), tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.height(8.dp))
+                Text(strings.as_locked_title, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Spacer(Modifier.height(4.dp))
+                Text(strings.as_locked_body, fontSize = 14.sp)
+                Spacer(Modifier.height(16.dp))
+                Button(enabled = !unlocking, onClick = { unlock() }) {
+                    Icon(Icons.Default.Fingerprint, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(strings.as_unlock)
+                }
+                return@Column
+            }
+            Text(if (session.persistent) strings.as_chat_saved_note else strings.as_chat_not_saved_note,
+                fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(strings.as_drafts_note, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             LazyColumn(state = listState, modifier = Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
                 items(messages) { m -> AssistantBubble(m, strings, context) { url -> openInTab(url) } }
@@ -405,7 +599,10 @@ fun SendaAssistantSheet(prefs: PreferencesManager, activeTab: BrowserTab?, onDis
                 Text(strings.as_chatgpt_using_plan, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 8.dp)) {
-                if (backend?.canAttach == true) IconButton(enabled = busy == null, onClick = { picker.launch(arrayOf("image/*", "application/pdf")) }) {
+                if (backend?.canAttach == true) IconButton(enabled = busy == null, onClick = {
+                    session.awayOnPurpose = true
+                    picker.launch(arrayOf("image/*", "application/pdf"))
+                }) {
                     Icon(Icons.Default.AttachFile, contentDescription = strings.as_attach)
                 }
                 OutlinedTextField(
