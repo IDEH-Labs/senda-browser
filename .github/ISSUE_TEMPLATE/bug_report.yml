@@ -1,0 +1,52 @@
+name: Bug report
+description: Something in Senda does not work as it should
+labels: ["bug", "beta"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for testing Senda. **Never include passwords, private addresses or personal data** in a report,
+        and blur them in screenshots.
+  - type: input
+    id: version
+    attributes:
+      label: Senda version
+      description: Settings → About, or the release you installed.
+      placeholder: 0.2.0-beta.1
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Phone and Android version
+      placeholder: Motorola moto g34 5G, Android 15
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: What did you do?
+      description: Step by step, so we can repeat it.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: How often does it happen?
+      options:
+        - Every time
+        - Sometimes
+        - Only once
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else (optional)
+      description: Tor or proxy on? TV casting? Home page layout? A log is welcome only if you reviewed it first.

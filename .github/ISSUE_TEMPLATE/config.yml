@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Privacy policy
+    url: https://github.com/IDEH-Labs/senda-browser/blob/main/PRIVACY.md
+    about: What Senda stores and which connections it makes.
