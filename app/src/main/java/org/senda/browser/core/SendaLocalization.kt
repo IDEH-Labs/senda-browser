@@ -3312,7 +3312,7 @@ object SendaStringsEs : SendaStringPack {
     override val bk_bad_file = "El archivo no es una copia de Senda válida o está dañado."
     override val bk_too_heavy = "Esta copia se creó con una protección que necesita más memoria de la que tiene este teléfono."
     override val bk_newer = "La copia la creó una versión más nueva de Senda. Actualiza Senda para restaurarla."
-    override val bk_preview = "Copia del %s. Elige qué restaurar:"
+    override val bk_preview = "Copia del %s · Elige qué restaurar:"
     override val bk_count_bookmarks = "%1\$d marcadores y %2\$d accesos directos"
     override val bk_count_settings = "%d ajustes"
     override val bk_count_history = "%d entradas del historial"
