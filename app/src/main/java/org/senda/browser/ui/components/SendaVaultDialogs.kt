@@ -135,6 +135,208 @@ fun SendaVaultDialog(
         )
     }
 
+    // ---- Import and export (CSV) ----
+    class ImportPreview(val uri: android.net.Uri, val fileName: String, val result: org.senda.browser.core.security.VaultCsv.ImportResult, val existing: Int)
+    var importPreview by remember { mutableStateOf<ImportPreview?>(null) }
+    var replaceExisting by remember { mutableStateOf(false) }
+    var importing by remember { mutableStateOf(false) }
+    var deleteCsvOffer by remember { mutableStateOf<Pair<android.net.Uri, String>?>(null) }
+    var showExportWarning by remember { mutableStateOf(false) }
+
+    fun displayName(uri: android.net.Uri): String =
+        runCatching {
+            context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
+                if (it.moveToFirst()) it.getString(0) else null
+            }
+        }.getOrNull() ?: uri.lastPathSegment.orEmpty()
+
+    // Heavy work with the vault key off the main thread; if the key is locked (more than 30 s since the
+    // fingerprint or PIN) it is asked for and the work is retried once. Nothing is written until it all succeeds
+    fun <T> secureInBackground(work: () -> T, onDone: (T) -> Unit, onFail: () -> Unit = {}) {
+        fun run(retry: Boolean) {
+            coroutineScope.launch {
+                val result = withContext(Dispatchers.Default) { runCatching(work) }
+                result.onSuccess(onDone).onFailure { e ->
+                    when (e) {
+                        is org.senda.browser.core.security.VaultLockedException ->
+                            if (retry) onRequireBiometricAuth { ok -> if (ok) run(false) else onFail() } else onFail()
+                        is org.senda.browser.core.security.VaultUnavailableException -> {
+                            when (e.reason) {
+                                org.senda.browser.core.security.VaultUnavailableException.Reason.NO_SCREEN_LOCK ->
+                                    Toast.makeText(context, strings.vault_err_no_lock, Toast.LENGTH_LONG).show()
+                                org.senda.browser.core.security.VaultUnavailableException.Reason.KEY_INVALIDATED -> showVaultReset = true
+                                org.senda.browser.core.security.VaultUnavailableException.Reason.NO_SECURE_HARDWARE ->
+                                    Toast.makeText(context, strings.vault_err_no_secure_hw, Toast.LENGTH_LONG).show()
+                            }
+                            onFail()
+                        }
+                        else -> {
+                            Toast.makeText(context, strings.vault_err_generic.format(e.message ?: ""), Toast.LENGTH_LONG).show()
+                            onFail()
+                        }
+                    }
+                }
+            }
+        }
+        run(true)
+    }
+
+    // The system picker: Senda only sees the file the user chooses
+    val importPicker = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        coroutineScope.launch {
+            val name = displayName(uri)
+            val parsed = withContext(Dispatchers.IO) {
+                runCatching {
+                    val bytes = context.contentResolver.openInputStream(uri)?.use { input ->
+                        val buf = java.io.ByteArrayOutputStream()
+                        val chunk = ByteArray(64 * 1024)
+                        while (true) {
+                            val n = input.read(chunk)
+                            if (n < 0) break
+                            buf.write(chunk, 0, n)
+                            if (buf.size() > org.senda.browser.core.security.VaultCsv.MAX_IMPORT_BYTES) throw java.io.IOException("too_big")
+                        }
+                        buf.toByteArray()
+                    } ?: throw java.io.IOException("unreadable")
+                    val result = org.senda.browser.core.security.VaultCsv.parseLogins(String(bytes, Charsets.UTF_8))
+                    java.util.Arrays.fill(bytes, 0)
+                    // Accounts already saved (same site and user): counted without decrypting anything
+                    val saved = SendaVaultManager.getCredentials(context).map { it.domain.lowercase() to it.username }.toSet()
+                    val existing = result.logins.count { SendaVaultManager.extractCanonicalDomain(it.url, context).lowercase() to it.username in saved }
+                    ImportPreview(uri, name, result, existing)
+                }
+            }
+            parsed.onSuccess { preview ->
+                if (preview.result.logins.isEmpty()) Toast.makeText(context, strings.vault_import_none, Toast.LENGTH_LONG).show()
+                else { replaceExisting = false; importPreview = preview }
+            }.onFailure { e ->
+                val msg = when {
+                    e is org.senda.browser.core.security.VaultCsv.UnsupportedFormatException -> strings.vault_import_unsupported
+                    e.message == "too_big" -> strings.vault_import_too_big.format(org.senda.browser.core.security.VaultCsv.MAX_IMPORT_BYTES / (1024 * 1024))
+                    else -> strings.vault_err_generic.format(e.message ?: "")
+                }
+                Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    importPreview?.let { preview ->
+        AlertDialog(
+            onDismissRequest = { if (!importing) importPreview = null },
+            icon = { Icon(Icons.Default.FileDownload, contentDescription = null) },
+            title = { Text(strings.vault_import_btn) },
+            text = {
+                Column {
+                    Text(strings.vault_import_found.format(preview.result.logins.size), fontWeight = FontWeight.SemiBold)
+                    if (preview.result.skipped > 0) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(strings.vault_import_skipped.format(preview.result.skipped), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    if (preview.existing > 0) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(strings.vault_import_existing.format(preview.existing), fontSize = 12.sp)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(checked = replaceExisting, onCheckedChange = { replaceExisting = it }, enabled = !importing)
+                            Text(strings.vault_import_replace, fontSize = 12.sp)
+                        }
+                    }
+                    if (importing) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    }
+                }
+            },
+            confirmButton = {
+                Button(enabled = !importing, onClick = {
+                    importing = true
+                    secureInBackground(
+                        work = { SendaVaultManager.importLogins(context, preview.result.logins, replaceExisting) },
+                        onDone = { summary ->
+                            importing = false
+                            importPreview = null
+                            credentials = SendaVaultManager.getCredentials(context)
+                            Toast.makeText(context, strings.vault_import_done.format(summary.added, summary.replaced, summary.kept), Toast.LENGTH_LONG).show()
+                            // The file still holds every password unencrypted: offer to delete it
+                            deleteCsvOffer = preview.uri to preview.fileName
+                        },
+                        onFail = { importing = false }
+                    )
+                }) { Text(strings.vault_import_confirm) }
+            },
+            dismissButton = { TextButton(enabled = !importing, onClick = { importPreview = null }) { Text(strings.general_cancel) } }
+        )
+    }
+
+    deleteCsvOffer?.let { (uri, name) ->
+        AlertDialog(
+            onDismissRequest = { deleteCsvOffer = null },
+            icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text(strings.vault_import_delete_title) },
+            text = { Text(strings.vault_import_delete_body.format(name)) },
+            confirmButton = {
+                Button(onClick = {
+                    val deleted = runCatching { android.provider.DocumentsContract.deleteDocument(context.contentResolver, uri) }.getOrDefault(false)
+                    Toast.makeText(context, if (deleted) strings.vault_import_deleted else strings.vault_import_delete_failed.format(name), Toast.LENGTH_LONG).show()
+                    deleteCsvOffer = null
+                }) { Text(strings.vault_import_delete_confirm) }
+            },
+            dismissButton = { TextButton(onClick = { deleteCsvOffer = null }) { Text(strings.vault_import_keep) } }
+        )
+    }
+
+    // Export: the user chooses where; a fingerprint or PIN is always asked right before decrypting
+    val exportPicker = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val name = displayName(uri)
+        fun discard() { runCatching { android.provider.DocumentsContract.deleteDocument(context.contentResolver, uri) } }
+        onRequireBiometricAuth { ok ->
+            if (!ok) {
+                discard()
+                Toast.makeText(context, strings.vault_export_failed, Toast.LENGTH_SHORT).show()
+                return@onRequireBiometricAuth
+            }
+            secureInBackground(
+                work = {
+                    val logins = SendaVaultManager.exportLogins(context)
+                    val bytes = org.senda.browser.core.security.VaultCsv.write(logins).toByteArray(Charsets.UTF_8)
+                    try {
+                        context.contentResolver.openOutputStream(uri, "wt")?.use { it.write(bytes) } ?: throw java.io.IOException("unwritable")
+                    } finally {
+                        java.util.Arrays.fill(bytes, 0)
+                    }
+                    logins.size
+                },
+                onDone = { count -> Toast.makeText(context, strings.vault_export_done.format(count, name), Toast.LENGTH_LONG).show() },
+                onFail = {
+                    discard()
+                    Toast.makeText(context, strings.vault_export_failed, Toast.LENGTH_SHORT).show()
+                }
+            )
+        }
+    }
+
+    if (showExportWarning) {
+        AlertDialog(
+            onDismissRequest = { showExportWarning = false },
+            icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text(strings.vault_export_warn_title) },
+            text = { Text(strings.vault_export_warn_body) },
+            confirmButton = {
+                Button(onClick = {
+                    showExportWarning = false
+                    val date = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ROOT).format(java.util.Date())
+                    exportPicker.launch("senda-passwords-$date.csv")
+                }) { Text(strings.vault_export_confirm) }
+            },
+            dismissButton = { TextButton(onClick = { showExportWarning = false }) { Text(strings.general_cancel) } }
+        )
+    }
+
     // Password generator
     var genLength by rememberSaveable { mutableFloatStateOf(18f) }
     var genUpper by rememberSaveable { mutableStateOf(true) }
@@ -282,6 +484,33 @@ fun SendaVaultDialog(
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(strings.vault_open.format(credentials.size), fontSize = 12.sp)
                             }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // Buttons: import from other browsers and managers / export to move elsewhere
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(
+                                    onClick = { importPicker.launch(arrayOf("text/*", "application/csv", "application/vnd.ms-excel", "application/octet-stream")) },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(strings.vault_import_btn, fontSize = 12.sp)
+                                }
+                                OutlinedButton(
+                                    onClick = { showExportWarning = true },
+                                    enabled = credentials.isNotEmpty(),
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Icon(Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(strings.vault_export_btn, fontSize = 12.sp)
+                                }
+                            }
+                            Text(strings.vault_import_help, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 4.dp))
 
                             Spacer(modifier = Modifier.height(8.dp))
 
