@@ -15,8 +15,16 @@ import java.net.URL
  */
 object SendaNet {
 
-    /** Generic Firefox for Android User-Agent: one specific to Senda would identify its users. */
-    const val USER_AGENT = "Mozilla/5.0 (Android 15; Mobile; rv:157.0) Gecko/157.0 Firefox/157.0"
+    /**
+     * The same User-Agent GeckoView sends when loading pages (generic Firefox for Android): one specific to Senda
+     * would identify its users, and a fixed one would fall behind with every GeckoView update.
+     */
+    val USER_AGENT: String by lazy {
+        runCatching { org.mozilla.geckoview.GeckoSession.getDefaultUserAgent() }.getOrNull()?.takeIf { it.isNotBlank() }
+            ?: org.mozilla.geckoview.BuildConfig.MOZILLA_VERSION.substringBefore('.').let { v ->
+                "Mozilla/5.0 (Android ${android.os.Build.VERSION.RELEASE}; Mobile; rv:$v.0) Gecko/$v.0 Firefox/$v.0"
+            }
+    }
 
     fun open(url: String): HttpURLConnection {
         val target = URL(url)
