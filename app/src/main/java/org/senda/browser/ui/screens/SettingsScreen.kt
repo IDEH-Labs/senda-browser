@@ -42,7 +42,7 @@ import org.senda.browser.core.*
 import org.senda.browser.ui.components.CastHelper
 import org.senda.browser.ui.components.ExtensionsManagerDialog
 import org.senda.browser.ui.components.FreeWallpapers
-import org.senda.browser.ui.components.SovereignSyncDialog
+import org.senda.browser.ui.components.BackupDialog
 import org.senda.browser.ui.components.ToolbarCustomizationDialog
 import org.senda.browser.ui.components.SendaVaultDialog
 import org.senda.browser.ui.components.UBlockOriginDialog
@@ -228,30 +228,30 @@ fun SettingsScreen(
                                     modifier = Modifier
                                         .size(48.dp)
                                         .clip(CircleShape)
-                                        .background(if (prefs.lastWebdavSync > 0) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer),
+                                        .background(if (prefs.lastBackupTime > 0) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
-                                        imageVector = if (prefs.lastWebdavSync > 0) Icons.Default.CloudDone else Icons.Default.CloudUpload,
+                                        imageVector = Icons.Default.EnhancedEncryption,
                                         contentDescription = null,
-                                        tint = if (prefs.lastWebdavSync > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSecondaryContainer,
+                                        tint = if (prefs.lastBackupTime > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSecondaryContainer,
                                         modifier = Modifier.size(28.dp)
                                     )
                                 }
                                 Spacer(modifier = Modifier.width(16.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = strings.sync_card_title,
+                                        text = strings.bk_title,
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Text(
-                                        text = if (prefs.lastWebdavSync > 0) {
-                                            "${strings.sync_card_connected} ${java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date(prefs.lastWebdavSync))}"
+                                        text = if (prefs.lastBackupTime > 0) {
+                                            strings.bk_card_last.format(java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM, java.text.DateFormat.SHORT).format(java.util.Date(prefs.lastBackupTime)))
                                         } else {
-                                            strings.sync_card_disconnected
+                                            strings.bk_card_never
                                         },
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -582,9 +582,9 @@ fun SettingsScreen(
         )
     }
 
-    // DIALOG: SYNC AND BACKUP (WEBDAV & NETSCAPE HTML)
+    // DIALOG: ENCRYPTED BACKUP (age) AND BOOKMARKS AS HTML
     if (activeDialog == "sync_ethical") {
-        SovereignSyncDialog(
+        BackupDialog(
             prefs = prefs,
             onDismiss = { activeDialog = null }
         )

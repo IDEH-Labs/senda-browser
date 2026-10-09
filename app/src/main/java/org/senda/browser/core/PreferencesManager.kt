@@ -62,6 +62,12 @@ class PreferencesManager(context: Context) {
     }
 
     private fun cleanUpLegacyData() {
+        // Retired WebDAV upload (bookmarks only, unencrypted, with no restore): its stored server password goes too
+        if (prefs.all.keys.any { it.startsWith("webdav_") || it == "last_webdav_sync" }) {
+            prefs.edit().apply {
+                prefs.all.keys.filter { it.startsWith("webdav_") || it == "last_webdav_sync" }.forEach { remove(it) }
+            }.apply()
+        }
         // Settings of the retired AI: no data should remain from a feature that no longer exists
         if (prefs.all.keys.any { it.startsWith("ai_") || it == "selected_local_ai_model" }) {
             prefs.edit().apply {
@@ -788,54 +794,98 @@ class PreferencesManager(context: Context) {
         }
     }
 
-    // --- SYNC AND BACKUP (WEBDAV / OWN CLOUD) ---
-    var webdavUrl: String
-        get() = prefs.getString("webdav_url", "") ?: ""
-        set(value) = prefs.edit().putString("webdav_url", value).apply()
+    // --- ENCRYPTED BACKUP (see core/backup and docs/backup-format.md) ---
+    /** When the last encrypted backup was saved (0 = never). */
+    var lastBackupTime: Long
+        get() = prefs.getLong("last_backup_time", 0L)
+        set(value) = prefs.edit().putLong("last_backup_time", value).apply()
 
-    var webdavUser: String
-        get() = prefs.getString("webdav_user", "") ?: ""
-        set(value) = prefs.edit().putString("webdav_user", value).apply()
+    /**
+     * Settings that travel in a backup: portable, not secret and not tied to this phone. Left out on purpose:
+     * AI sessions and keys, proxy server and custom DNS (a backup must not be able to divert traffic), custom
+     * CSS and scripts (nor inject code into pages), remote debugging, open tabs, TV mode and wallpaper state.
+     */
+    private val portableSettingKeys = setOf(
+        "accent_color_hex", "always_private_mode", "app_language", "ask_download_location",
+        "block_fingerprinting", "block_social_trackers", "block_web_popups", "close_tabs_policy", "cookie_policy",
+        "dns_over_https_mode", "doh_provider", "enable_anti_snooping", "font_hinting", "font_scale_percent",
+        "force_enable_zoom", "https_only_mode", "offer_translations", "open_links_in_apps", "open_links_in_background",
+        "reader_font_family", "reader_font_size_percent", "reader_theme", "require_biometrics", "safe_browsing_enabled",
+        "search_engine_name", "search_engine_url", "search_suggestions_enabled", "selected_wallpaper_id",
+        "show_back_button", "show_bookmarks_bar", "show_bookmarks_button", "show_cast_button", "show_devtools_button",
+        "show_forward_button", "show_home_button", "show_menu_button", "show_new_tab_button", "show_reader_button",
+        "show_reload_button", "show_security_indicator", "show_share_button", "show_tabs_button",
+        "show_zen_news_feed", "show_zen_shortcuts", "show_zen_wallpaper", "site_perm_camera", "site_perm_location",
+        "site_perm_mic", "site_perm_notifications", "startup_mode", "sync_web_font_scale", "tabs_view_mode",
+        "theme_mode", "toolbar_full_width", "toolbar_position", "toolbar_widget_size", "tracking_protection_level",
+        "true_oled_black", "ui_font_family", "ui_font_scale_percent", "use_system_color", "wallpaper_dim_percent",
+        "wallpaper_rotation_minutes", "zen_home_layout"
+    )
 
-    var webdavPassword: String
-        get() {
-            val enc = prefs.getString("webdav_password_enc", "") ?: ""
-            val iv = prefs.getString("webdav_password_iv", "") ?: ""
-            if (enc.isNotBlank() && iv.isNotBlank()) {
-                return try {
-                    val chars = org.senda.browser.core.security.SendaVaultManager.decryptPassword(enc, iv, org.senda.browser.core.security.SendaVaultManager.APP_KEY_ALIAS)
-                    val s = String(chars)
-                    org.senda.browser.core.security.SendaVaultManager.wipe(chars)
-                    s
-                } catch (e: Exception) {
-                    prefs.getString("webdav_password", "") ?: ""
-                }
-            }
-            return prefs.getString("webdav_password", "") ?: ""
-        }
-        set(value) {
-            if (value.isBlank()) {
-                prefs.edit().remove("webdav_password").remove("webdav_password_enc").remove("webdav_password_iv").apply()
-            } else {
-                try {
-                    val chars = value.toCharArray()
-                    val (enc, iv) = org.senda.browser.core.security.SendaVaultManager.encryptPassword(chars, org.senda.browser.core.security.SendaVaultManager.APP_KEY_ALIAS)
-                    org.senda.browser.core.security.SendaVaultManager.wipe(chars)
-                    prefs.edit()
-                        .putString("webdav_password_enc", enc)
-                        .putString("webdav_password_iv", iv)
-                        .remove("webdav_password")
-                        .apply()
-                } catch (e: Exception) {
-                    // Never stored in plain text: if the chip cannot encrypt, it is not stored
-                    android.util.Log.e("SendaPrefs", "No se pudo cifrar la contraseña de WebDAV: ${e.message}")
-                }
+    fun exportPortableSettings(): org.json.JSONObject {
+        val out = org.json.JSONObject()
+        prefs.all.forEach { (key, value) ->
+            if (key !in portableSettingKeys || value == null) return@forEach
+            // The user's own photo lives only on this phone
+            if (key == "selected_wallpaper_id" && value == "custom_user") return@forEach
+            when (value) {
+                is Boolean, is Int, is Long, is Float, is String -> out.put(key, value)
             }
         }
+        return out
+    }
 
-    var lastWebdavSync: Long
-        get() = prefs.getLong("last_webdav_sync", 0L)
-        set(value) = prefs.edit().putLong("last_webdav_sync", value).apply()
+    /** Applies the portable settings of a backup; only known keys and only with the type they already have. */
+    fun importPortableSettings(settings: org.json.JSONObject): Int {
+        val editor = prefs.edit()
+        var applied = 0
+        settings.keys().forEach { key ->
+            if (key !in portableSettingKeys) return@forEach
+            val value = settings.opt(key)
+            val current = prefs.all[key]
+            val ok = when {
+                value is Boolean && (current == null || current is Boolean) -> { editor.putBoolean(key, value); true }
+                value is Number && current is Long -> { editor.putLong(key, value.toLong()); true }
+                value is Number && current is Float -> { editor.putFloat(key, value.toFloat()); true }
+                value is Number && (current == null || current is Int) -> { editor.putInt(key, value.toInt()); true }
+                value is String && (current == null || current is String) && value.length <= 2048 &&
+                    !(key == "search_engine_url" && !value.startsWith("https://")) -> { editor.putString(key, value); true }
+                else -> false
+            }
+            if (ok) applied++
+        }
+        editor.apply()
+        return applied
+    }
+
+    /** Adds bookmarks that are not saved yet (same address); nothing is removed or replaced. */
+    fun mergeBookmarks(items: List<BookmarkItem>): Int {
+        val current = getBookmarks().toMutableList()
+        val known = current.map { it.url.trimEnd('/') }.toMutableSet()
+        var added = 0
+        items.forEach { if (known.add(it.url.trimEnd('/'))) { current.add(it); added++ } }
+        if (added > 0) saveBookmarks(current)
+        return added
+    }
+
+    /** Adds home shortcuts that are not there yet (same address). */
+    fun mergeZenShortcuts(items: List<ZenShortcut>): Int {
+        val current = getZenShortcuts().toMutableList()
+        val known = current.map { it.url.trimEnd('/') }.toMutableSet()
+        var added = 0
+        items.forEach { if (known.add(it.url.trimEnd('/'))) { current.add(it); added++ } }
+        if (added > 0) saveZenShortcuts(current)
+        return added
+    }
+
+    /** Adds visits of a backup to the history (same address and time are not repeated), newest first. */
+    fun mergeHistory(items: List<HistoryItem>): Int = synchronized(historyLock) {
+        val current = getHistory()
+        val known = current.map { it.url to it.timestamp }.toHashSet()
+        val fresh = items.filter { known.add(it.url to it.timestamp) }
+        if (fresh.isNotEmpty()) saveHistory((current + fresh).sortedByDescending { it.timestamp })
+        fresh.size
+    }
 
     // --- ADVANCED DOWNLOAD MANAGER ---
     fun getDownloads(): List<DownloadItem> {
@@ -912,11 +962,11 @@ class PreferencesManager(context: Context) {
         sb.append("<!DOCTYPE NETSCAPE-Bookmark-file-1>\n")
         sb.append("<!-- This is an automatically generated file by Senda Browser. -->\n")
         sb.append("<META HTTP-EQUIV=\"Content-Type\" CONTENT=\"text/html; charset=UTF-8\">\n")
-        sb.append("<TITLE>Marcadores Senda Browser</TITLE>\n")
-        sb.append("<H1>Marcadores y Favoritos</H1>\n")
+        sb.append("<TITLE>Bookmarks</TITLE>\n")
+        sb.append("<H1>Bookmarks</H1>\n")
         sb.append("<DL><p>\n")
         bookmarks.forEach { bm ->
-            val cleanTitle = bm.title.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            val cleanTitle = bm.title.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
             val cleanUrl = bm.url.replace("&", "&amp;").replace("\"", "&quot;")
             sb.append("    <DT><A HREF=\"$cleanUrl\" ADD_DATE=\"${bm.timestamp / 1000}\">$cleanTitle</A>\n")
         }
@@ -925,25 +975,13 @@ class PreferencesManager(context: Context) {
     }
 
     fun importBookmarksFromNetscapeHtml(html: String): Int {
-        val regex = Regex("""<A\s+[^>]*HREF=["']([^"']+)["'][^>]*>(.*?)</A>""", RegexOption.IGNORE_CASE)
-        val matches = regex.findAll(html)
         val current = getBookmarks().toMutableList()
+        val known = current.map { it.url.trimEnd('/') }.toMutableSet()
         var addedCount = 0
-        for (m in matches) {
-            val url = m.groupValues[1].trim()
-            val rawTitle = m.groupValues[2].trim()
-            val title = rawTitle
-                .replace("&amp;", "&")
-                .replace("&lt;", "<")
-                .replace("&gt;", ">")
-                .replace("&quot;", "\"")
-                .ifBlank { url }
-
-            if (url.startsWith("http://") || url.startsWith("https://")) {
-                if (current.none { it.url.trimEnd('/') == url.trimEnd('/') }) {
-                    current.add(0, BookmarkItem(title = title, url = url))
-                    addedCount++
-                }
+        for (b in org.senda.browser.core.backup.BookmarkHtml.parse(html)) {
+            if (known.add(b.url.trimEnd('/'))) {
+                current.add(0, BookmarkItem(title = b.title, url = b.url, timestamp = b.added ?: System.currentTimeMillis()))
+                addedCount++
             }
         }
         if (addedCount > 0) {
