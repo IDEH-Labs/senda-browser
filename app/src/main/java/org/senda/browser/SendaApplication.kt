@@ -68,19 +68,6 @@ class SendaApplication : Application() {
         }
     }
 
-    override fun onTrimMemory(level: Int) {
-        super.onTrimMemory(level)
-        when (level) {
-            android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL,
-            android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW,
-            android.content.ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN,
-            android.content.ComponentCallbacks2.TRIM_MEMORY_COMPLETE -> {
-                android.util.Log.w("SendaMemory", "Presión crítica de memoria en Android (level=$level). Liberando memoria de trabajo de IA para proteger pestañas de navegación.")
-                System.gc()
-            }
-        }
-    }
-
     companion object {
         lateinit var instance: SendaApplication
             private set

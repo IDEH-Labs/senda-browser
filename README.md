@@ -7,7 +7,7 @@ The interface is available in 8 languages: Spanish, English, German, French, Por
 > **Status: advanced alpha (0.1.4-alpha).** Its author uses it every day, but it is **not yet recommended for sensitive data**:
 > - Tested on a single phone model (Motorola moto g34 5G, Android 15).
 > - Signed release builds have been tested on that phone: startup, browsing, reader mode, Tor, uBlock Origin and Settings (0.1.1); the password vault filling in and saving accounts, the ChatGPT assistant and TV mode (a pre-release build of 0.1.2); browsing and the password vault (0.1.3, 0.1.4).
-> - Not yet tried by hand on the phone (only by automated tests): the encrypted assistant conversation, password import/export, the encrypted backup and wallpaper downloads.
+> - Tried by hand on that phone (October 9): the assistant conversation and the saved passwords open only after fingerprint or PIN, and wallpaper downloads work. Not yet tried by hand (only by automated tests): password import/export and the encrypted backup.
 > - It has not had an external security audit.
 >
 > Bug reports are welcome.

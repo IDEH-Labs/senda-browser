@@ -55,8 +55,7 @@ object SendaLocaleManager {
     }
 
     fun getSystemLocale(context: Context? = null): Locale {
-        getSystemPropertyLocale()?.let { return it }
-
+        // Android 14+: the official API for the system language (unaffected by Senda's own language)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE && context != null) {
             try {
                 val lm = context.getSystemService(android.app.LocaleManager::class.java)
@@ -67,6 +66,9 @@ object SendaLocaleManager {
                 }
             } catch (_: Exception) {}
         }
+
+        // Older versions: the system property, as before
+        getSystemPropertyLocale()?.let { return it }
 
         try {
             val locales = Resources.getSystem().configuration.locales

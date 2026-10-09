@@ -402,6 +402,8 @@ class SendaTvModeService : Service() {
  */
 class SendaTvModeRestoreReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        // Only the two system broadcasts declared in the manifest
+        if (intent.action != Intent.ACTION_BOOT_COMPLETED && intent.action != Intent.ACTION_MY_PACKAGE_REPLACED) return
         SendaTvMode.init(context)
     }
 }

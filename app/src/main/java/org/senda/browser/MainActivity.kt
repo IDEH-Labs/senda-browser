@@ -455,18 +455,6 @@ class MainActivity : FragmentActivity() {
         } catch (_: Exception) {}
     }
 
-    override fun onTrimMemory(level: Int) {
-        super.onTrimMemory(level)
-        if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) {
-            System.gc()
-        }
-    }
-
-    override fun onLowMemory() {
-        super.onLowMemory()
-        System.gc()
-    }
-
     // While mirroring to the TV, ask for 60 Hz instead of 120 Hz: the TV shows no more than 60
     // and composing/encoding twice as many frames is what delays the picture on the TV
     private val displayListener = object : DisplayManager.DisplayListener {
