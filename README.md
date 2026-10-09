@@ -7,6 +7,7 @@ The interface is available in 8 languages: Spanish, English, German, French, Por
 > **Status: advanced alpha (0.1.4-alpha).** Its author uses it every day, but it is **not yet recommended for sensitive data**:
 > - Tested on a single phone model (Motorola moto g34 5G, Android 15).
 > - Signed release builds have been tested on that phone: startup, browsing, reader mode, Tor, uBlock Origin and Settings (0.1.1); the password vault filling in and saving accounts, the ChatGPT assistant and TV mode (a pre-release build of 0.1.2); browsing and the password vault (0.1.3, 0.1.4).
+> - Not yet tried by hand on the phone (only by automated tests): the encrypted assistant conversation, password import/export, the encrypted backup and wallpaper downloads.
 > - It has not had an external security audit.
 >
 > Bug reports are welcome.
@@ -21,7 +22,7 @@ The interface is available in 8 languages: Spanish, English, German, French, Por
 - Bookmarks, history and downloads; find in page; desktop site; print or save as PDF; shortcut on the Android home screen.
 - Reader mode in 8 languages, with "key sentences" and search within the text. It works offline and only shows literal sentences from the article.
 - On-device page translation using Gecko's local translator; the text never leaves the phone.
-- Home page with shortcuts and four layouts (Focused, Inspirational, Informational and Custom); 64 freely licensed wallpapers.
+- Home page with shortcuts and four layouts (Focused, Inspirational, Informational and Custom); 64 freely licensed wallpapers that fill any screen without cutting the important part (a few wide designs are shown only in landscape). Five come with the app; the others are downloaded only when you choose them.
 
 **Privacy and security**
 - Strict tracking protection, isolated third-party cookies, tracking-parameter stripping in URLs, and Global Privacy Control.
@@ -29,11 +30,13 @@ The interface is available in 8 languages: Spanish, English, German, French, Por
 - HTTPS-only mode and DNS over HTTPS, both on by default.
 - Built-in Tor network (optional), or your own SOCKS5/HTTP proxy.
 - Password vault encrypted with AES-256-GCM. The key is generated and used only inside the phone's secure hardware (StrongBox or TEE); on phones without secure hardware the vault stays disabled. It requires a fingerprint or PIN, and it fills in and saves accounts on web pages. It is designed to offer an account only on the site where it was saved (domains are resolved with Mozilla's Public Suffix List); this has not yet been tested across different sites.
+- Import passwords from the CSV exported by Chrome, Brave, Edge, Firefox, Bitwarden or KeePassXC, and export them (after fingerprint or PIN).
+- Encrypted backup of bookmarks, settings, history and passwords, with a passphrase only you know, in the open [age](https://age-encryption.org) format: save it wherever you want (Syncthing, Nextcloud, a USB drive) and open it with `age -d` on any system. Format: [docs/backup-format.md](docs/backup-format.md).
 - Optional app lock with fingerprint, and optional screenshot protection.
 
 **Other**
 - Casting to a TV through Android screen mirroring (Miracast), with an optional TV mode when you rotate the phone.
-- Optional assistant: with your ChatGPT plan, or with your own API key (Claude, Gemini, Grok or Mistral). It only sends something when you use it, and only to the service you choose.
+- Optional assistant: with your ChatGPT plan, or with your own API key (Claude, Gemini, Grok or Mistral). It only sends something when you use it, and only to the service you choose. The conversation is kept encrypted on the phone, opens only with your fingerprint or PIN, and is deleted only when you decide.
 - Extensions from `.xpi` files, custom CSS and scripts (Senda Labs), and a developer console on the phone itself.
 
 ## Connections Senda makes on its own
@@ -44,6 +47,7 @@ So you know exactly what leaves your phone without you asking:
 - **uBlock Origin**: periodically updates its filter lists from each list's servers.
 - **Home page news**, in the Inspirational and Informational layouts, and in Custom if you turn news on: reads the RSS feeds of MuyLinux, EFF and FSF. The Focused layout neither shows nor downloads news.
 - **Translation**: the first time you translate a language, it downloads that language's model from Mozilla. Translation then runs on the phone.
+- **Wallpapers**: only when you choose a wallpaper that is not included (and after asking), it is downloaded from this repository's `wallpapers-1` release on GitHub (GitLab as fallback), through the same Tor or proxy as browsing; its SHA-256 is checked.
 
 Senda includes no telemetry or usage reports. Firefox's captive portal detection is turned off.
 
@@ -62,7 +66,7 @@ cd senda-browser
 
 ## Tests
 
-Unit tests for the Public Suffix List (`PublicSuffixListTest`) run on the host JVM:
+Unit tests run on the host JVM: the Public Suffix List, password CSV import/export, the encrypted assistant conversation, the backup format, and the age implementation against the official [C2SP CCTV](https://github.com/C2SP/CCTV) test vectors:
 
 ```bash
 ./gradlew testDebugUnitTest
