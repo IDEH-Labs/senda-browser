@@ -159,6 +159,9 @@ dependencies {
     implementation 'info.guardianproject:jtorctl:0.4.5.7'
     implementation 'androidx.localbroadcastmanager:localbroadcastmanager:1.1.0'
 
+    // Encrypted backups in the open age format: scrypt, ChaCha20-Poly1305, HKDF (vetted primitives, Maven Central)
+    implementation 'org.bouncycastle:bcprov-jdk18on:1.86'
+
     debugImplementation 'androidx.compose.ui:ui-tooling'
     testImplementation 'junit:junit:4.13.2'
     // Real org.json for JVM tests (android.jar only has stubs)

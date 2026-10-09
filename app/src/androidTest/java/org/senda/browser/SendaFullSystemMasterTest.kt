@@ -48,7 +48,7 @@ class SendaFullSystemMasterTest {
             assertNotNull("El paquete de strings para $code no debe ser nulo", pack)
             assertTrue("st_passwords_title en $code no debe estar vacío", pack.st_passwords_title.isNotBlank())
             assertTrue("st_extensions_title en $code no debe estar vacío", pack.st_extensions_title.isNotBlank())
-            assertTrue("sync_webdav_title en $code no debe estar vacío", pack.sync_webdav_title.isNotBlank())
+            assertTrue("bk_title en $code no debe estar vacío", pack.bk_title.isNotBlank())
             assertTrue("ublock_dlg_title en $code no debe estar vacío", pack.ublock_dlg_title.isNotBlank())
             assertTrue("dlg_passwords_info en $code no debe estar vacío", pack.dlg_passwords_info.isNotBlank())
             assertTrue("rm_visual_theme en $code no debe estar vacío", pack.rm_visual_theme.isNotBlank())
@@ -105,37 +105,27 @@ class SendaFullSystemMasterTest {
     }
 
     // =========================================================================
-    // 3. HARDWARE ENCRYPTION OF WEBDAV (KEYSTORE AES-256-GCM)
+    // 3. ENCRYPTED BACKUP ON THE DEVICE (age, scrypt work factor 16)
     // =========================================================================
     @Test
-    fun test03_WebdavHardwareEncryptionInStorage() {
-        DestructiveTestGuard.requireExplicitPermission("deja vacía la contraseña de WebDAV")
-        val rawPrefs = context.getSharedPreferences("senda_preferences", Context.MODE_PRIVATE)
-        val testPassword = "HardwareVaultWebDavKey_2026!#"
-
-        // Write credential
-        prefs.webdavPassword = testPassword
-
-        // Check there is no plain text in flash storage
-        val plainInDisk = rawPrefs.getString("webdav_password", null)
-        assertNull("La contraseña WebDAV NO debe estar en texto plano", plainInDisk)
-
-        // Check that encrypted fields with a nonce are present
-        val enc = rawPrefs.getString("webdav_password_enc", null)
-        val iv = rawPrefs.getString("webdav_password_iv", null)
-        assertNotNull("Payload cifrado ausente", enc)
-        assertNotNull("IV único ausente", iv)
-
-        // Decryption through the keystore
-        val decrypted = prefs.webdavPassword
-        assertEquals("El descifrado de Keystore debe coincidir", testPassword, decrypted)
-
-        // Cleanup and sanitization
-        prefs.webdavPassword = ""
-        assertNull(rawPrefs.getString("webdav_password_enc", null))
-        assertNull(rawPrefs.getString("webdav_password_iv", null))
-
-        println("[PASS 3/8] Cifrado WebDAV: 100% verificado en chip Keystore sin fugas de texto plano.")
+    fun test03_EncryptedBackupOnDevice() {
+        val contents = org.senda.browser.core.backup.SendaBackup.Contents(
+            created = System.currentTimeMillis(),
+            bookmarks = List(500) { org.senda.browser.core.backup.SendaBackup.Bookmark("Marcador $it", "https://example.org/$it", it.toLong()) },
+            history = List(1000) { org.senda.browser.core.backup.SendaBackup.Visit("Visita $it", "https://example.net/$it", it.toLong() + 1) },
+            sections = setOf(org.senda.browser.core.backup.SendaBackup.Section.BOOKMARKS, org.senda.browser.core.backup.SendaBackup.Section.HISTORY)
+        )
+        val phrase = "frase de prueba larga ñ".toCharArray()
+        val t0 = System.currentTimeMillis()
+        val file = org.senda.browser.core.backup.BackupService.encrypt(contents, phrase, "test")
+        val t1 = System.currentTimeMillis()
+        val back = org.senda.browser.core.backup.BackupService.decrypt(file, phrase)
+        val t2 = System.currentTimeMillis()
+        assertEquals(contents.bookmarks, back.bookmarks)
+        assertEquals(contents.history, back.history)
+        assertTrue("Cifrar no debe tardar más de 10 s (${t1 - t0} ms)", t1 - t0 < 10_000)
+        assertTrue("Descifrar no debe tardar más de 10 s (${t2 - t1} ms)", t2 - t1 < 10_000)
+        println("[PASS 3/8] Copia cifrada en el dispositivo: cifrar ${t1 - t0} ms, descifrar ${t2 - t1} ms, ${file.size} bytes.")
     }
 
     // =========================================================================

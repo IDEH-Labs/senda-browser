@@ -14,40 +14,32 @@ import org.senda.browser.core.security.SendaVaultManager
 @RunWith(AndroidJUnit4::class)
 class VaultVerificationEndToEndTest {
 
+    /** A backup never carries settings that could divert traffic or inject code, and a backup cannot set them. */
     @Test
-    fun testWebdavPasswordHardwareEncryption() {
-        DestructiveTestGuard.requireExplicitPermission("deja vacía la contraseña de WebDAV")
+    fun testBackupSettingsLeaveOutDangerousKeys() {
+        DestructiveTestGuard.requireExplicitPermission("escribe y borra ajustes de prueba (proxy, script, modelo de IA)")
         val context = ApplicationProvider.getApplicationContext<Context>()
         val prefs = PreferencesManager(context)
         val rawPrefs = context.getSharedPreferences("senda_preferences", Context.MODE_PRIVATE)
-
-        val testSecret = "SuperWebDavSecretPass_2026_@#"
-
-        // 1. Save the password
-        prefs.webdavPassword = testSecret
-
-        // 2. Check that it is NOT in plain text in SharedPreferences
-        val plaintextInDisk = rawPrefs.getString("webdav_password", null)
-        assertNull("La contraseña WebDAV NO debe existir en texto plano en el disco", plaintextInDisk)
-
-        // 3. Check that the encrypted fields exist
-        val encryptedBase64 = rawPrefs.getString("webdav_password_enc", null)
-        val ivBase64 = rawPrefs.getString("webdav_password_iv", null)
-        assertNotNull("Debe existir el payload cifrado en disco", encryptedBase64)
-        assertNotNull("Debe existir el vector IV único en disco", ivBase64)
-        assertTrue("El payload cifrado no debe estar vacío", encryptedBase64!!.isNotBlank())
-        assertTrue("El IV no debe estar vacío", ivBase64!!.isNotBlank())
-
-        // 4. Check that it decrypts correctly
-        val retrieved = prefs.webdavPassword
-        assertEquals("La contraseña descifrada con hardware debe ser idéntica", testSecret, retrieved)
-
-        // 5. Cleanup
-        prefs.webdavPassword = ""
-        assertNull(rawPrefs.getString("webdav_password_enc", null))
-        assertNull(rawPrefs.getString("webdav_password_iv", null))
-        assertEquals("", prefs.webdavPassword)
-        println("[VERIFICADO] Cifrado de WebDAV en Keystore: 100% probado en dispositivo.")
+        val keys = listOf("proxy_host", "user_custom_script", "user_custom_css", "assistant_model", "remote_debugging_enabled")
+        val saved = keys.associateWith { rawPrefs.all[it] }
+        try {
+            rawPrefs.edit().putString("proxy_host", "10.0.0.1").putString("user_custom_script", "alert(1)")
+                .putString("user_custom_css", "*{}").putString("assistant_model", "x").putBoolean("remote_debugging_enabled", false).commit()
+            val exported = prefs.exportPortableSettings()
+            keys.forEach { assertFalse("$it no debe viajar en la copia", exported.has(it)) }
+            val hostile = org.json.JSONObject().put("proxy_host", "evil.example").put("user_custom_script", "steal()")
+                .put("remote_debugging_enabled", true).put("search_engine_url", "http://evil.example/?q=")
+            assertEquals(0, prefs.importPortableSettings(hostile))
+            assertEquals("10.0.0.1", rawPrefs.getString("proxy_host", null))
+            assertEquals(false, rawPrefs.getBoolean("remote_debugging_enabled", false))
+        } finally {
+            rawPrefs.edit().apply {
+                saved.forEach { (k, v) ->
+                    when (v) { null -> remove(k); is String -> putString(k, v); is Boolean -> putBoolean(k, v) }
+                }
+            }.commit()
+        }
     }
 
     @Test
