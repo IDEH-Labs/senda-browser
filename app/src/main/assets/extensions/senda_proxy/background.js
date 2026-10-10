@@ -43,11 +43,36 @@ function proxyFor(config) {
     return { type: 'direct' };
 }
 
-function handleProxyRequest(requestInfo) {
-    if (currentConfig) {
-        return proxyFor(currentConfig);
-    }
-    return configReady.then(() => proxyFor(currentConfig));
+// With Tor, requests wait while it connects: going through its port before then only gave a connection error, and
+// going direct would reveal the real IP. "failed" stops waiting: through Tor's port, so it fails instead of leaking
+let torWaiters = [];
+const TOR_MAX_WAIT_MS = 120000;
+
+function torStarting(config) {
+    return config && config.mode === 'TOR_ORBOT' && config.torState === 'starting';
+}
+
+function releaseTorWaiters() {
+    const waiting = torWaiters;
+    torWaiters = [];
+    waiting.forEach((release) => release());
+}
+
+function waitForTor() {
+    return new Promise((resolve) => {
+        const release = () => { clearTimeout(timer); resolve(); };
+        const timer = setTimeout(() => {
+            torWaiters = torWaiters.filter((r) => r !== release);
+            resolve();
+        }, TOR_MAX_WAIT_MS);
+        torWaiters.push(release);
+    });
+}
+
+async function handleProxyRequest(requestInfo) {
+    if (!currentConfig) await configReady;
+    if (torStarting(currentConfig)) await waitForTor();
+    return proxyFor(currentConfig);
 }
 
 // 1. Register the active proxy listener for all URLs
@@ -80,6 +105,7 @@ function applyProxy(config) {
     if (!config) return;
     currentConfig = config;
     markReady();
+    if (!torStarting(config)) releaseTorWaiters();
     applyWebRtcPolicy(config);
 
     // 2. Global configuration through browser.proxy.settings
@@ -127,7 +153,8 @@ function applyProxy(config) {
 function rememberAndApply(msg) {
     if (msg && msg.type === 'SET_PROXY') {
         applyProxy(msg);
-        browser.storage.local.set({ currentProxy: msg });
+        // Tor's readiness belongs to this session: the saved copy is only the mode
+        browser.storage.local.set({ currentProxy: Object.assign({}, msg, { torState: 'starting' }) });
     }
 }
 

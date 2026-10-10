@@ -11,7 +11,6 @@ The interface is available in 8 languages: Spanish, English, German, French, Por
 > - Passkeys tried by hand on that phone (October 9, 0.2.0-beta.2): creating one and signing in with it on webauthn.io, stored in Bitwarden.
 > - TV mode measured on that phone (October 10, 0.2.0-beta.5) with an LG TV over Miracast: rotating the phone fills the TV in 16:9, and a 1080p 60 fps VP9 video played without dropped frames, decoded by the phone's hardware.
 > - It has not had an external security audit.
-> - Known issue: with Tor on, the first page opened right after Senda starts can show a connection error until Tor finishes connecting; tapping Retry loads it.
 > - Known report not yet reproduced: on October 5, 2026 Senda once would not close and kept reopening while casting to a TV, watching video and using the AI assistant that Senda had then, all at the same time. If it happens to you, please report it.
 > - Privacy policy: [PRIVACY.md](PRIVACY.md).
 > - Security problems: please report them privately, as described in [SECURITY.md](SECURITY.md).
@@ -34,7 +33,8 @@ The interface is available in 8 languages: Spanish, English, German, French, Por
 - Strict tracking protection, isolated third-party cookies, tracking-parameter stripping in URLs, and Global Privacy Control.
 - Built-in uBlock Origin.
 - HTTPS-only mode and DNS over HTTPS, both on by default.
-- Built-in Tor network (optional), or your own SOCKS5/HTTP proxy.
+- Built-in Tor network (optional), or your own SOCKS5/HTTP proxy. It applies from the very first connection: pages wait
+  while Tor connects, and a connection that fails through Tor or the proxy fails instead of going out directly.
 - Password vault encrypted with AES-256-GCM. The key is generated and used only inside the phone's secure hardware (StrongBox or TEE); on phones without secure hardware the vault stays disabled. It requires a fingerprint or PIN, and it fills in and saves accounts on web pages. It is designed to offer an account only on the site where it was saved (domains are resolved with Mozilla's Public Suffix List); this has not yet been tested across different sites.
 - Import passwords from the CSV exported by Chrome, Brave, Edge, Firefox, Bitwarden or KeePassXC, and export them (after fingerprint or PIN).
 - Encrypted backup of bookmarks, settings, history and passwords, with a passphrase only you know, in the open [age](https://age-encryption.org) format: save it wherever you want (Syncthing, Nextcloud, a USB drive) and open it with `age -d` on any system. Format: [docs/backup-format.md](docs/backup-format.md).

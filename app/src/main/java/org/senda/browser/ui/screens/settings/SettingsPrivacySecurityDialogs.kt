@@ -254,20 +254,12 @@ fun SettingsTorDialog(
                 onClick = {
                     val parsedPort = portInput.toIntOrNull() ?: 9050
                     prefs.proxyMode = selectedMode
-                    if (selectedMode == "TOR_ORBOT") {
-                        prefs.proxyHost = "127.0.0.1"
-                        prefs.proxyPort = 9050
-                        prefs.proxyDnsRemote = true
-                        SendaTorManager.start(context) {
-                            SendaGeckoEngine.applyProxy(prefs)
-                        }
-                    } else {
+                    if (selectedMode != "TOR_ORBOT") {
                         prefs.proxyHost = hostInput
                         prefs.proxyPort = parsedPort
                         prefs.proxyDnsRemote = dnsRemote
-                        SendaTorManager.stop(context)
-                        SendaGeckoEngine.applyProxy(prefs)
                     }
+                    SendaTorManager.applyMode(context, prefs)
                     onSettingsChanged()
                     onDismiss()
                 }
