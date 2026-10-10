@@ -296,7 +296,8 @@ object SendaGeckoEngine {
                         android.util.Log.i("Senda", "uBlock Origin instalado con éxito: ${ext.id}")
                     }
                 } else {
-                    list?.forEach { ext ->
+                    // Except Senda Labs: the user's own CSS and script must never run in private tabs
+                    list?.filter { it.id != "labs@senda.org" }?.forEach { ext ->
                         controller.setAllowedInPrivateBrowsing(ext, true)
                     }
                 }
@@ -425,6 +426,11 @@ object SendaGeckoEngine {
         ext.setMessageDelegate(object : WebExtension.MessageDelegate {
             override fun onConnect(port: WebExtension.Port) {
                 labsPort = port
+                // Sent as soon as the extension connects (like the proxy): its own request at startup can arrive
+                // before this delegate exists and get no answer
+                try { port.postMessage(labsMessage(cachedPrefs)) } catch (e: Exception) {
+                    android.util.Log.e("Senda", "Error al enviar Senda Labs: ${e.message}")
+                }
             }
             override fun onMessage(nativeMessage: String, message: Any, sender: WebExtension.MessageSender): org.mozilla.geckoview.GeckoResult<Any>? =
                 org.mozilla.geckoview.GeckoResult.fromValue(labsMessage(cachedPrefs))

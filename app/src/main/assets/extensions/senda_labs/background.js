@@ -1,6 +1,7 @@
 // The custom CSS and script from Senda Labs (Settings) are registered as content scripts: they run in the
 // extension's isolated world, so a page cannot intercept or read them, and the page's CSP does not block them.
-// This extension is not allowed in private browsing, so nothing runs in private tabs.
+// The manifest says "incognito": "not_allowed": Gecko grants private browsing to built-in extensions unless
+// they declare that, so this is what keeps the user's code out of private tabs.
 
 const EXCLUDE = [
     '*://youtube.com/*', '*://*.youtube.com/*',
