@@ -1,0 +1,1 @@
+Passkeys work: create them and sign in with the password manager you use, such as Bitwarden (Android 14 and later). Google Password Manager does not accept Senda yet, because Google only serves browsers it has approved. No more proprietary code: GeckoView's Google Play Services client library is replaced with microG's free one.

@@ -4,10 +4,11 @@
 
 The interface is available in 8 languages: Spanish, English, German, French, Portuguese, Italian, Japanese and Chinese.
 
-> **Status: beta (0.2.0-beta.1).** Its author uses it every day and it is ready for wider testing, but it is **not yet recommended for sensitive data**:
+> **Status: beta (0.2.0-beta.2).** Its author uses it every day and it is ready for wider testing, but it is **not yet recommended for sensitive data**:
 > - Tested on a single phone model (Motorola moto g34 5G, Android 15).
 > - Signed release builds have been tested on that phone: startup, browsing, reader mode, Tor, uBlock Origin and Settings (0.1.1); the password vault filling in and saving accounts, the ChatGPT assistant and TV mode (a pre-release build of 0.1.2); browsing and the password vault (0.1.3, 0.1.4).
 > - Tried by hand on that phone (October 9): the assistant conversation and the saved passwords open only after fingerprint or PIN, and wallpaper downloads work. Not yet tried by hand (only by automated tests): password import/export and the encrypted backup.
+> - Passkeys tried by hand on that phone (October 9, 0.2.0-beta.2): creating one and signing in with it on webauthn.io, stored in Bitwarden.
 > - It has not had an external security audit.
 > - Known report not yet reproduced: on October 5, 2026 Senda once would not close and kept reopening while casting to a TV, watching video and using the assistant at the same time. If it happens to you, please report it.
 > - Privacy policy: [PRIVACY.md](PRIVACY.md).
@@ -34,6 +35,11 @@ The interface is available in 8 languages: Spanish, English, German, French, Por
 - Password vault encrypted with AES-256-GCM. The key is generated and used only inside the phone's secure hardware (StrongBox or TEE); on phones without secure hardware the vault stays disabled. It requires a fingerprint or PIN, and it fills in and saves accounts on web pages. It is designed to offer an account only on the site where it was saved (domains are resolved with Mozilla's Public Suffix List); this has not yet been tested across different sites.
 - Import passwords from the CSV exported by Chrome, Brave, Edge, Firefox, Bitwarden or KeePassXC, and export them (after fingerprint or PIN).
 - Encrypted backup of bookmarks, settings, history and passwords, with a passphrase only you know, in the open [age](https://age-encryption.org) format: save it wherever you want (Syncthing, Nextcloud, a USB drive) and open it with `age -d` on any system. Format: [docs/backup-format.md](docs/backup-format.md).
+- Passkeys and security keys (WebAuthn) through Android's Credential Manager (Android 14 and later), with the password
+  manager you use, such as Bitwarden. Google Password Manager does not accept Senda yet: Google only serves browsers it
+  has approved.
+- No proprietary code: the Google Play Services client library that GeckoView depends on is replaced with microG's free
+  one.
 - Optional app lock with fingerprint, and optional screenshot protection.
 
 **Other**

@@ -29,6 +29,13 @@
     <!-- Only granted through ADB (pm grant); without it the TV keeps the phone's aspect ratio -->
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"
         tools:ignore="ProtectedPermissions" />
+    <!-- Passkeys (WebAuthn): lets GeckoView ask Android's Credential Manager for credentials on behalf of the
+         site being visited (Android 14+). Without it GeckoView falls back to Google's FIDO API, which only
+         serves browsers Google has approved -->
+    <uses-permission android:name="android.permission.CREDENTIAL_MANAGER_SET_ORIGIN" />
+    <!-- Passkey sign-in: GeckoView checks whether a provider has a matching credential before showing Android's
+         sheet; without this permission that check throws a SecurityException that closes the app -->
+    <uses-permission android:name="android.permission.CREDENTIAL_MANAGER_QUERY_CANDIDATE_CREDENTIALS" />
 
     <!-- Only browsers (apps that open https links): to offer another browser when signing in with
          ChatGPT. Since Android 11 other apps are not visible unless declared -->
