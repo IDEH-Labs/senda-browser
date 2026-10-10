@@ -19,7 +19,7 @@ import kotlinx.coroutines.withContext
 object SendaGeckoEngine {
 
     private var runtime: GeckoRuntime? = null
-    val EMBEDDED_EXTENSION_IDS = setOf("uBlock0@raymondhill.net", "proxy@senda.org", "media@senda.org")
+    val EMBEDDED_EXTENSION_IDS = setOf("uBlock0@raymondhill.net", "proxy@senda.org", "media@senda.org", "labs@senda.org")
     val installedExtensions = mutableStateListOf<WebExtension>()
     var cachedUBlockOptionsUrl: String? = null
         private set
@@ -46,6 +46,7 @@ object SendaGeckoEngine {
     }
 
     private var proxyPort: WebExtension.Port? = null
+    private var labsPort: WebExtension.Port? = null
     private var cachedPrefs: PreferencesManager? = null
     var appContext: Context? = null
         private set
@@ -317,6 +318,11 @@ object SendaGeckoEngine {
                     ext.setMessageDelegate(org.senda.browser.core.cast.SendaMediaCatalog.messageDelegate, "senda_media")
                 }
 
+                // 4. Senda Labs: the user's custom CSS and script, isolated from pages and never in private tabs
+                installBuiltInFolder("resource://android/assets/extensions/senda_labs/", "labs@senda.org", allowPrivate = false) { ext ->
+                    setupLabsMessageDelegate(ext)
+                }
+
                 // Remove the Chromecast video detector from a test version: it must not inject anything into pages
                 list?.firstOrNull { it.id == "cast@senda.org" }?.let { controller.uninstall(it) }
             },
@@ -326,7 +332,7 @@ object SendaGeckoEngine {
         )
     }
 
-    private fun installBuiltInFolder(resourceUri: String, id: String, onInstalled: (WebExtension) -> Unit) {
+    private fun installBuiltInFolder(resourceUri: String, id: String, allowPrivate: Boolean = true, onInstalled: (WebExtension) -> Unit) {
         try {
             val rt = runtime ?: return
             val controller = rt.webExtensionController
@@ -336,7 +342,7 @@ object SendaGeckoEngine {
                     if (ext != null) {
                         installedExtensions.removeAll { it.id == ext.id }
                         installedExtensions.add(ext)
-                        controller.setAllowedInPrivateBrowsing(ext, true)
+                        controller.setAllowedInPrivateBrowsing(ext, allowPrivate)
                         onInstalled(ext)
                     }
                 },
@@ -407,6 +413,32 @@ object SendaGeckoEngine {
                 return org.mozilla.geckoview.GeckoResult.fromValue(resp)
             }
         }, "senda_proxy")
+    }
+
+    private fun labsMessage(prefs: PreferencesManager?) = org.json.JSONObject().apply {
+        put("type", "SET_LABS")
+        put("css", prefs?.userCustomCss.orEmpty().trim())
+        put("js", prefs?.userCustomScript.orEmpty().trim())
+    }
+
+    private fun setupLabsMessageDelegate(ext: WebExtension) {
+        ext.setMessageDelegate(object : WebExtension.MessageDelegate {
+            override fun onConnect(port: WebExtension.Port) {
+                labsPort = port
+            }
+            override fun onMessage(nativeMessage: String, message: Any, sender: WebExtension.MessageSender): org.mozilla.geckoview.GeckoResult<Any>? =
+                org.mozilla.geckoview.GeckoResult.fromValue(labsMessage(cachedPrefs))
+        }, "senda_labs")
+    }
+
+    /** Sends the saved Senda Labs CSS and script to the Labs extension, which registers them again. */
+    fun applyLabs(prefs: PreferencesManager) {
+        cachedPrefs = prefs
+        try {
+            labsPort?.postMessage(labsMessage(prefs))
+        } catch (e: Exception) {
+            android.util.Log.e("Senda", "Error al enviar Senda Labs: ${e.message}")
+        }
     }
 
     fun applyProxy(prefs: PreferencesManager) {

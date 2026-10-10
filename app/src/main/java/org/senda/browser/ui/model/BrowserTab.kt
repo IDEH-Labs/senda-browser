@@ -540,29 +540,7 @@ class BrowserTab(
                     prefs.addHistoryItem(title.ifBlank { url }, url)
                 }
 
-                if (success && prefs != null && url != "about:blank" && !isYouTubeUrl(url)) {
-                    // Senda Labs: live custom CSS injection (never on YouTube, which is left as is)
-                    if (prefs.userCustomCss.isNotBlank()) {
-                        val escapedCss = prefs.userCustomCss
-                            .replace("\\", "\\\\")
-                            .replace("\"", "\\\"")
-                            .replace("\n", " ")
-                            .replace("\r", "")
-                        val cssJs = "javascript:(function(){try{var s=document.getElementById('senda-custom-css')||document.createElement('style');s.id='senda-custom-css';s.textContent=\"$escapedCss\";if(!s.parentNode){document.head.appendChild(s);}}catch(e){}})()"
-                        session.loadUri(cssJs)
-                    }
-
-                    // Senda Labs: custom UserScript injection
-                    if (prefs.userCustomScript.isNotBlank()) {
-                        val jsCode = prefs.userCustomScript
-                            .replace("\\", "\\\\")
-                            .replace("\"", "\\\"")
-                            .replace("\n", " ")
-                            .replace("\r", "")
-                        val scriptJs = "javascript:(function(){try{eval(\"$jsCode\");}catch(e){console.error('Senda Script Error:', e);}})()"
-                        session.loadUri(scriptJs)
-                    }
-                }
+                // Senda Labs CSS and script are applied by the labs@senda.org extension (see SendaGeckoEngine.applyLabs)
             }
 
             override fun onProgressChange(session: GeckoSession, newProgress: Int) {
@@ -1061,11 +1039,6 @@ class BrowserTab(
         }
         mediaPositionAt = android.os.SystemClock.elapsedRealtime()
         mediaPlaying = playing
-    }
-
-    private fun isYouTubeUrl(pageUrl: String): Boolean {
-        val host = try { URI(pageUrl).host ?: "" } catch (_: Exception) { "" }
-        return host == "youtu.be" || host.endsWith("youtube.com") || host.endsWith("youtube-nocookie.com")
     }
 
     fun loadUri(uri: String, overrideSearchEngine: String? = null) {
