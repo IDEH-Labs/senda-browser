@@ -10,6 +10,8 @@ Senda is distributed under the **GNU GPL v3** (see `LICENSE`). It includes or us
 | [Jetpack Compose and AndroidX](https://developer.android.com/jetpack/androidx) (including `androidx.biometric`) | Google / AOSP | Apache 2.0 | User interface and fingerprint/PIN |
 | [Kotlin and kotlinx.coroutines](https://kotlinlang.org) | JetBrains | Apache 2.0 | Language and concurrency |
 | [HiddenApiBypass](https://github.com/LSPosed/AndroidHiddenApiBypass) | LSPosed | Apache 2.0 | GeckoView compatibility on some Android versions |
+| [microG client libraries](https://github.com/microg/GmsCore) (`play-services-fido`, `-base`, `-basement`, `-tasks`) | microG Team | Apache 2.0 | Free replacement for Google's Play Services client library that GeckoView depends on for passkeys (WebAuthn); from Maven Central |
+| [Bouncy Castle](https://www.bouncycastle.org/) (`bcprov-jdk18on`) | Legion of the Bouncy Castle | MIT | scrypt, ChaCha20-Poly1305 and HKDF for encrypted backups in the age format; from Maven Central |
 | [Cantarell](https://gitlab.gnome.org/GNOME/cantarell-fonts) | The Cantarell Project Authors | SIL OFL 1.1 (notice included in the font metadata) | Optional interface typeface |
 | [Mozilla Public Suffix List](https://publicsuffix.org/) | Mozilla | MPL 2.0 | Domain canonicalization and anti-phishing in the password vault. The official text list is in `third_party/publicsuffix/` and is turned into a per-TLD archive during the build |
 
