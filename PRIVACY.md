@@ -65,3 +65,4 @@ about this before creating them.
 
 Questions or reports: <https://github.com/IDEH-Labs/senda-browser/issues> or
 <https://gitlab.com/ideh-labs/senda-browser/-/issues>. Please never include passwords or personal data in a report.
+Security vulnerabilities: please report them privately, as described in [SECURITY.md](SECURITY.md).

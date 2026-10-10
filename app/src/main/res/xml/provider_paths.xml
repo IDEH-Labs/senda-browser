@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Only the folders where Senda saves downloads on Android 8-9 (on 10 and later they go through MediaStore).
+     Nothing else in the app's private storage (vault, settings, profile) can be shared through this provider -->
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <external-path name="external_files" path="." />
-    <files-path name="files" path="." />
-    <cache-path name="cache" path="." />
+    <external-files-path name="downloads" path="Download/" />
+    <files-path name="downloads_internal" path="downloads/" />
 </paths>

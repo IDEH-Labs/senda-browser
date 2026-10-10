@@ -12,6 +12,7 @@ The interface is available in 8 languages: Spanish, English, German, French, Por
 > - It has not had an external security audit.
 > - Known report not yet reproduced: on October 5, 2026 Senda once would not close and kept reopening while casting to a TV, watching video and using the assistant at the same time. If it happens to you, please report it.
 > - Privacy policy: [PRIVACY.md](PRIVACY.md).
+> - Security problems: please report them privately, as described in [SECURITY.md](SECURITY.md).
 >
 > Bug reports are welcome.
 
