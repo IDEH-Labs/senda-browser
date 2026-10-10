@@ -65,7 +65,14 @@ Builds:
     gradle:
       - yes
 
+  - versionName: 0.2.0-beta.6
+    versionCode: 11
+    commit: v0.2.0-beta.6
+    subdir: app
+    gradle:
+      - yes
+
 AutoUpdateMode: Version
 UpdateCheckMode: Tags ^v[\d.]+-(alpha|beta(\.\d+)?)$
-CurrentVersion: 0.2.0-beta.5
-CurrentVersionCode: 10
+CurrentVersion: 0.2.0-beta.6
+CurrentVersionCode: 11

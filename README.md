@@ -4,11 +4,12 @@
 
 The interface is available in 8 languages: Spanish, English, German, French, Portuguese, Italian, Japanese and Chinese.
 
-> **Status: beta (0.2.0-beta.5).** Its author uses it every day and it is ready for wider testing, but it is **not yet recommended for sensitive data**:
+> **Status: beta (0.2.0-beta.6).** Its author uses it every day and it is ready for wider testing, but it is **not yet recommended for sensitive data**:
 > - Tested on a single phone model (Motorola moto g34 5G, Android 15).
 > - Signed release builds have been tested on that phone: startup, browsing, reader mode, Tor, uBlock Origin and Settings (0.1.1); the password vault filling in and saving accounts, and TV mode (a pre-release build of 0.1.2); browsing and the password vault (0.1.3, 0.1.4).
 > - Tried by hand on that phone (October 9): the saved passwords open only after fingerprint or PIN, and wallpaper downloads work. Not yet tried by hand (only by automated tests): password import/export and the encrypted backup.
 > - Passkeys tried by hand on that phone (October 9, 0.2.0-beta.2): creating one and signing in with it on webauthn.io, stored in Bitwarden.
+> - Tor measured on that phone (October 10, a build identical to 0.2.0-beta.6 except for the version): 4 of 4 cold starts went through Tor (check.torproject.org), and a page on the local network was not reached directly. Earlier versions loaded the first page with the real IP.
 > - TV mode measured on that phone (October 10, 0.2.0-beta.5) with an LG TV over Miracast: rotating the phone fills the TV in 16:9, and a 1080p 60 fps VP9 video played without dropped frames, decoded by the phone's hardware.
 > - It has not had an external security audit.
 > - Known report not yet reproduced: on October 5, 2026 Senda once would not close and kept reopening while casting to a TV, watching video and using the AI assistant that Senda had then, all at the same time. If it happens to you, please report it.
