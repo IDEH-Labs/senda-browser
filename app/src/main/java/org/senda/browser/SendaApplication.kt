@@ -58,6 +58,8 @@ class SendaApplication : Application() {
             java.io.File(filesDir, "models_ai").deleteRecursively()
             // Copies of files uploaded to pages in the previous session
             org.senda.browser.core.SendaWebUploads.cleanup(this)
+            // Nor the AI assistant (2026-10-10): its keys, session and conversation are deleted
+            org.senda.browser.core.RetiredAssistant.cleanUp(this)
         }.start()
         // Initialize the built-in Tor manager
         org.senda.browser.core.SendaTorManager.init(this)

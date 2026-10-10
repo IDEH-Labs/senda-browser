@@ -6,13 +6,13 @@ The interface is available in 8 languages: Spanish, English, German, French, Por
 
 > **Status: beta (0.2.0-beta.5).** Its author uses it every day and it is ready for wider testing, but it is **not yet recommended for sensitive data**:
 > - Tested on a single phone model (Motorola moto g34 5G, Android 15).
-> - Signed release builds have been tested on that phone: startup, browsing, reader mode, Tor, uBlock Origin and Settings (0.1.1); the password vault filling in and saving accounts, the ChatGPT assistant and TV mode (a pre-release build of 0.1.2); browsing and the password vault (0.1.3, 0.1.4).
-> - Tried by hand on that phone (October 9): the assistant conversation and the saved passwords open only after fingerprint or PIN, and wallpaper downloads work. Not yet tried by hand (only by automated tests): password import/export and the encrypted backup.
+> - Signed release builds have been tested on that phone: startup, browsing, reader mode, Tor, uBlock Origin and Settings (0.1.1); the password vault filling in and saving accounts, and TV mode (a pre-release build of 0.1.2); browsing and the password vault (0.1.3, 0.1.4).
+> - Tried by hand on that phone (October 9): the saved passwords open only after fingerprint or PIN, and wallpaper downloads work. Not yet tried by hand (only by automated tests): password import/export and the encrypted backup.
 > - Passkeys tried by hand on that phone (October 9, 0.2.0-beta.2): creating one and signing in with it on webauthn.io, stored in Bitwarden.
 > - TV mode measured on that phone (October 10, 0.2.0-beta.5) with an LG TV over Miracast: rotating the phone fills the TV in 16:9, and a 1080p 60 fps VP9 video played without dropped frames, decoded by the phone's hardware.
 > - It has not had an external security audit.
 > - Known issue: with Tor on, the first page opened right after Senda starts can show a connection error until Tor finishes connecting; tapping Retry loads it.
-> - Known report not yet reproduced: on October 5, 2026 Senda once would not close and kept reopening while casting to a TV, watching video and using the assistant at the same time. If it happens to you, please report it.
+> - Known report not yet reproduced: on October 5, 2026 Senda once would not close and kept reopening while casting to a TV, watching video and using the AI assistant that Senda had then, all at the same time. If it happens to you, please report it.
 > - Privacy policy: [PRIVACY.md](PRIVACY.md).
 > - Security problems: please report them privately, as described in [SECURITY.md](SECURITY.md).
 >
@@ -49,7 +49,6 @@ The interface is available in 8 languages: Spanish, English, German, French, Por
 - Casting to a TV through Android screen mirroring (Miracast), with an optional TV mode that fills the TV in 16:9 when you
   rotate the phone (it needs a permission that can only be granted once with ADB). Videos pause when you leave Senda for
   another app, unless they are playing on the TV.
-- Optional assistant: with your ChatGPT plan, or with your own API key (Claude, Gemini, Grok or Mistral). It only sends something when you use it, and only to the service you choose. The conversation is kept encrypted on the phone, opens only with your fingerprint or PIN, and is deleted only when you decide.
 - Extensions from `.xpi` files, custom CSS and scripts (Senda Labs: they run isolated from pages, like an extension,
   and never in private tabs), and a developer console on the phone itself.
 
@@ -61,6 +60,7 @@ So you know exactly what leaves your phone without you asking:
 - **uBlock Origin**: periodically updates its filter lists from each list's servers.
 - **Home page news**, in the Inspirational and Informational layouts, and in Custom if you turn news on: reads the RSS feeds of MuyLinux, EFF and FSF. The Focused layout neither shows nor downloads news.
 - **Translation**: the first time you translate a language, it downloads that language's model from Mozilla. Translation then runs on the phone.
+- **Removed assistant**: once only, when updating from a version that had the AI assistant, a ChatGPT session you had signed in with is revoked at OpenAI; the assistant's data is deleted from the phone.
 - **Wallpapers**: only when you choose a wallpaper that is not included (and after asking), it is downloaded from this repository's `wallpapers-1` release on GitHub (GitLab as fallback), through the same Tor or proxy as browsing; its SHA-256 is checked.
 
 Senda includes no telemetry or usage reports. Firefox's captive portal detection is turned off.
@@ -92,7 +92,7 @@ cd senda-browser
 
 ## Tests
 
-Unit tests run on the host JVM: the Public Suffix List, password CSV import/export, the encrypted assistant conversation, the backup format, and the age implementation against the official [C2SP CCTV](https://github.com/C2SP/CCTV) test vectors:
+Unit tests run on the host JVM: the Public Suffix List, password CSV import/export, the backup format, and the age implementation against the official [C2SP CCTV](https://github.com/C2SP/CCTV) test vectors:
 
 ```bash
 ./gradlew testDebugUnitTest
@@ -107,7 +107,7 @@ adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 adb shell am instrument -w org.senda.browser.test/androidx.test.runner.AndroidJUnitRunner
 ```
 
-> **Warning:** `./gradlew connectedAndroidTest` uninstalls the app and **deletes its data** (passwords, history…). Tests that delete data only run if you pass `-e allowDestructive 1`. The ChatGPT and Gemini tests use real accounts and consume quota.
+> **Warning:** `./gradlew connectedAndroidTest` uninstalls the app and **deletes its data** (passwords, history…). Tests that delete data only run if you pass `-e allowDestructive 1`.
 
 ## License
 
