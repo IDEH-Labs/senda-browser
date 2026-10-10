@@ -338,14 +338,13 @@ fun SettingsScreen(
         )
     }
 
-    // DIALOG: HOME PAGE (ZEN)
+    // HOME PAGE: the same sheet as the "Home page design" button on the home page itself, so both places
+    // always offer the same options
     if (activeDialog == "home") {
-        org.senda.browser.ui.screens.settings.SettingsHomeDialog(
-            context = context,
+        org.senda.browser.ui.components.HomeLayoutSelectorSheet(
             prefs = prefs,
-            strings = strings,
-            onSettingsChanged = onSettingsChanged,
-            onDismiss = { activeDialog = null }
+            onDismiss = { activeDialog = null },
+            onLayoutChanged = onSettingsChanged
         )
     }
 

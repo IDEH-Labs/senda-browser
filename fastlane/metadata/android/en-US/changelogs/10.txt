@@ -1,0 +1,1 @@
+Wallpapers now change every minute by default (only while the home page is shown, and only among the wallpapers already on the phone). Settings → Home page opens the same design sheet as the home page itself, instead of a second, outdated copy of it.
