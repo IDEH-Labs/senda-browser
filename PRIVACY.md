@@ -35,6 +35,9 @@ If you use Tor or a proxy, these connections go through it too.
 - **AI assistant** (optional): when you write to it, your message (and the page, only if you include it) is sent to
   the service you connected: ChatGPT (OpenAI), Claude (Anthropic), Gemini (Google), Grok (xAI) or Mistral. Their
   own privacy policies apply to what you send them. Nothing is sent until you use it.
+- **Passkeys**: when a site asks to create or use a passkey, Android's Credential Manager passes the request, with the
+  site's address, to the password manager you choose on the phone (for example Bitwarden). Senda does not keep
+  passkeys itself.
 - **Search engine**: what you type in the address bar goes to the search engine you selected. Suggestions while
   typing come only from your bookmarks and history on the phone.
 
@@ -53,6 +56,8 @@ about this before creating them.
   first, and Senda asks again for each site.
 - **Notifications, display over other apps, foreground service, start at boot**: only for TV mode while your screen is
   mirrored to a TV, and to put the screen back to normal if the phone restarts while mirroring.
+- **Credential Manager (set origin, query candidate credentials)**: to use passkeys from your password manager on
+  the site you are visiting. Android does not ask for these; they only work when a site requests a passkey.
 - **Write secure settings**: cannot be granted from the app. It can only be granted manually with ADB, to adapt the
   screen's aspect ratio for TV mode.
 
