@@ -133,8 +133,9 @@ class PreferencesManager(context: Context) {
         set(value) = prefs.edit().putString("selected_wallpaper_id", value).apply()
 
     /** Wallpaper change: 0 = fixed, -1 = a different one in each new tab, >0 = every that many minutes. */
+    /** Minutes between wallpapers on the home page (0 = fixed, -1 = a new one per tab). By default they rotate every minute. */
     var wallpaperRotationMinutes: Int
-        get() = prefs.getInt("wallpaper_rotation_minutes", 0)
+        get() = prefs.getInt("wallpaper_rotation_minutes", 1)
         set(value) = prefs.edit().putInt("wallpaper_rotation_minutes", value).apply()
 
     /** Wallpaper currently shown in the rotation and when it started (to keep the turn across tabs). */
