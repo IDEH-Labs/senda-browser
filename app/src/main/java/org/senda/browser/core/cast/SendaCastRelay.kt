@@ -21,7 +21,9 @@ import java.util.concurrent.Executors
  * video the way the page did (through the same proxy or Tor) and passes it on without re-encoding.
  *
  * It only serves the given address (127.0.0.1) and paths with a random secret, and it closes when done.
- * HLS playlists are rewritten so their chunks also go through here.
+ * HLS playlists are rewritten so their chunks also go through here. It does not fetch addresses on the user's
+ * network (router, NAS…) unless the page or the video itself is there: otherwise a page's playlist could make
+ * Senda send requests to them.
  */
 class SendaCastRelay private constructor(
     private val server: ServerSocket,
@@ -32,6 +34,13 @@ class SendaCastRelay private constructor(
     private val secret = ByteArray(16).also { SecureRandom().nextBytes(it) }.joinToString("") { "%02x".format(it) }
     private val pool = Executors.newCachedThreadPool { r -> Thread(r, "senda-cast-relay").apply { isDaemon = true } }
     @Volatile private var closed = false
+    private val resolveLocally = proxy == Proxy.NO_PROXY
+    /** The page's and the video's own hosts are always allowed (a home media server under its own name). */
+    private val trustedHosts: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet<String>().apply {
+        referer?.let { hostOf(it) }?.let(::add)
+    }
+    /** True when the user is casting from their own network: then other local addresses are fine too. */
+    @Volatile private var allowLocal = referer?.let { isLocalUrl(it) } ?: false
 
     private val baseUrl: String
         get() {
@@ -39,8 +48,25 @@ class SendaCastRelay private constructor(
             return "http://${if (server.inetAddress is java.net.Inet6Address) "[$host]" else host}:${server.localPort}/$secret/"
         }
 
-    /** Local address given to the TV for [original]. */
+    /** Local address given to the TV for [original], the video the page is playing. */
     fun urlFor(original: String): String {
+        hostOf(original)?.let(trustedHosts::add)
+        if (isLocalUrl(original)) allowLocal = true
+        return relayUrl(original)
+    }
+
+    private fun hostOf(url: String): String? = runCatching { URL(url).host.lowercase() }.getOrNull()?.ifBlank { null }
+
+    /** Without any DNS lookup: this runs on the UI thread. */
+    private fun isLocalUrl(url: String): Boolean =
+        hostOf(url)?.let { LocalNetwork.isLocalHost(it, resolve = false) } ?: false
+
+    /** Whether the relay may fetch [url]: http(s) only, and the user's network only when casting from it. */
+    private fun mayFetch(url: URL): Boolean =
+        (url.protocol == "http" || url.protocol == "https") &&
+            (allowLocal || url.host.lowercase() in trustedHosts || !LocalNetwork.isLocalHost(url.host, resolveLocally))
+
+    private fun relayUrl(original: String): String {
         val encoded = Base64.encodeToString(original.toByteArray(Charsets.UTF_8), Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
         // Some TVs choose the player by the extension: the original file name is kept
         val name = original.substringBefore('?').substringAfterLast('/').ifBlank { "video" }
@@ -115,13 +141,32 @@ class SendaCastRelay private constructor(
     }
 
     private fun relay(original: String, method: String, range: String?, out: OutputStream) {
-        val conn = URL(original).openConnection(proxy) as HttpURLConnection
-        conn.connectTimeout = 10_000
-        conn.readTimeout = 30_000
-        conn.instanceFollowRedirects = true
-        conn.setRequestProperty("User-Agent", org.senda.browser.core.SendaNet.USER_AGENT)
-        referer?.let { conn.setRequestProperty("Referer", it) }
-        if (range != null) conn.setRequestProperty("Range", range)
+        // Redirects are followed here, one by one, so that each destination is checked as well
+        var target = URL(original)
+        var conn: HttpURLConnection
+        var hops = 0
+        while (true) {
+            if (!mayFetch(target)) {
+                Log.w(TAG, "Relé: dirección local rechazada")
+                writeStatus(out, 403, "Forbidden", emptyMap())
+                return
+            }
+            conn = target.openConnection(proxy) as HttpURLConnection
+            conn.connectTimeout = 10_000
+            conn.readTimeout = 30_000
+            conn.instanceFollowRedirects = false
+            conn.setRequestProperty("User-Agent", org.senda.browser.core.SendaNet.USER_AGENT)
+            referer?.let { conn.setRequestProperty("Referer", it) }
+            if (range != null) conn.setRequestProperty("Range", range)
+            val location = if (conn.responseCode in 300..399) conn.getHeaderField("Location") else null
+            if (location == null) break
+            conn.disconnect()
+            if (++hops > 5) {
+                writeStatus(out, 502, "Too Many Redirects", emptyMap())
+                return
+            }
+            target = URL(target, location)
+        }
         try {
             val code = conn.responseCode
             val type = conn.contentType?.substringBefore(';')?.trim() ?: ""
@@ -134,7 +179,7 @@ class SendaCastRelay private constructor(
             if (isPlaylist) {
                 val text = conn.inputStream.bufferedReader().use { it.readText() }
                 // The final URL (after redirects) is the base for the playlist's relative paths
-                val body = rewritePlaylist(text, conn.url.toString()).toByteArray(Charsets.UTF_8)
+                val body = rewritePlaylist(text, target.toString()).toByteArray(Charsets.UTF_8)
                 writeStatus(out, 200, "OK", mapOf(
                     "Content-Type" to "application/vnd.apple.mpegurl",
                     "Content-Length" to body.size.toString(),
@@ -162,7 +207,7 @@ class SendaCastRelay private constructor(
     private fun rewritePlaylist(text: String, base: String): String {
         val baseUrl = URL(base)
         fun relayed(uri: String): String = try {
-            urlFor(URL(baseUrl, uri.trim()).toString())
+            relayUrl(URL(baseUrl, uri.trim()).toString())
         } catch (_: Exception) {
             uri
         }

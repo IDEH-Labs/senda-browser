@@ -210,7 +210,8 @@ object SendaDownloadManager {
             return uri to finalName
         }
         // Android 8-9: the app's own downloads folder (needs no storage permission)
-        val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: context.filesDir
+        val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+            ?: File(context.filesDir, "downloads").apply { mkdirs() }
         var file = File(dir, fileName)
         var n = 1
         while (file.exists()) {
