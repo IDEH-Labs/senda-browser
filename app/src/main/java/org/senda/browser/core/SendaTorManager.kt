@@ -38,7 +38,11 @@ object SendaTorManager {
     var socksPort by mutableIntStateOf(TOR_SOCKS_PORT)
         private set
 
+    /** Called on the main thread whenever [state] changes: the proxy extension needs to know when Tor is ready. */
+    var onStateChanged: (() -> Unit)? = null
+
     private var receiverRegistered = false
+    private var timeoutJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     private val statusReceiver = object : BroadcastReceiver() {
@@ -51,11 +55,13 @@ object SendaTorManager {
                     statusMessage = "Construyendo circuito Tor..."
                 }
                 TorService.STATUS_ON -> {
+                    if (state == TorState.CONNECTED) return
                     state = TorState.CONNECTED
                     // tor-android 0.4.9 no longer exposes the port as a static field: it is the one set in ensureTorrc()
                     socksPort = TOR_SOCKS_PORT
                     statusMessage = "Conectado a la Red Tor (127.0.0.1:$socksPort)"
                     Log.i(TAG, "Tor conectado exitosamente en puerto $socksPort")
+                    onStateChanged?.invoke()
                 }
                 TorService.STATUS_STOPPING -> {
                     state = TorState.STOPPING
@@ -92,12 +98,25 @@ object SendaTorManager {
         }
     }
 
-    fun start(context: Context, onConnected: (() -> Unit)? = null) {
-        init(context)
-        if (state == TorState.CONNECTED) {
-            onConnected?.invoke()
-            return
+    /**
+     * Applies the proxy mode saved in [prefs]. With Tor the proxy is applied at once, before Tor is ready: pages
+     * wait for it instead of going out directly with the real IP while it connects.
+     */
+    fun applyMode(context: Context, prefs: PreferencesManager) {
+        if (prefs.proxyMode == "TOR_ORBOT") {
+            prefs.proxyHost = "127.0.0.1"
+            prefs.proxyPort = 9050
+            prefs.proxyDnsRemote = true
+            start(context)
+        } else {
+            stop(context)
         }
+        SendaGeckoEngine.applyProxy(prefs)
+    }
+
+    fun start(context: Context) {
+        init(context)
+        if (state == TorState.CONNECTED || state == TorState.STARTING) return
 
         state = TorState.STARTING
         statusMessage = "Iniciando demonio Tor embebido..."
@@ -109,25 +128,28 @@ object SendaTorManager {
             }
             context.startService(intent)
 
-            scope.launch {
-                var waitMs = 0
-                // The receiver switches to CONNECTED with STATUS_ON
-                while (state != TorState.CONNECTED && waitMs < 35000) {
-                    delay(500)
-                    waitMs += 500
-                }
-                if (state == TorState.CONNECTED) {
-                    onConnected?.invoke()
+            timeoutJob?.cancel()
+            timeoutJob = scope.launch {
+                // The receiver switches to CONNECTED with STATUS_ON. Without it in time, pages stop waiting and show
+                // the connection error (never a direct connection); if Tor connects later, it is used from then on
+                delay(60_000)
+                if (state == TorState.STARTING) {
+                    state = TorState.ERROR
+                    statusMessage = "Tor no pudo conectarse"
+                    Log.w(TAG, "Tor no conectó en 60 s")
+                    onStateChanged?.invoke()
                 }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error al iniciar TorService: ${e.message}", e)
             state = TorState.ERROR
             statusMessage = "Error al iniciar Tor: ${e.localizedMessage}"
+            onStateChanged?.invoke()
         }
     }
 
     fun stop(context: Context) {
+        timeoutJob?.cancel()
         state = TorState.STOPPING
         statusMessage = "Deteniendo Tor para conservar batería..."
         try {

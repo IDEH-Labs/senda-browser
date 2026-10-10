@@ -71,7 +71,7 @@ object SendaGeckoEngine {
                     .build()
             )
             // No Firefox captive portal detection: Android already does it, and this way Senda does not contact Mozilla at startup
-            .configFilePath(writeGeckoConfig(context))
+            .configFilePath(writeGeckoConfig(context, prefs))
             // 2. Enable about:config so the user has technical control
             .aboutConfigEnabled(true)
             // 3. Turn off unnecessary console logs and protect privacy
@@ -95,7 +95,31 @@ object SendaGeckoEngine {
         initializeBuiltInExtensions(context)
     }
 
-    private fun writeGeckoConfig(context: Context): String {
+    /**
+     * Tor or the user's proxy, set in Gecko itself before the first request. The proxy extension loads a moment
+     * after the engine: until then the tab restored at startup went out directly, with the real IP (measured on
+     * 2026-10-10: 3 of 3 cold starts with Tor on gave IsTor:false). Nothing here for "OFF".
+     */
+    private fun startupProxyPrefs(prefs: PreferencesManager?): String {
+        val mode = prefs?.proxyMode ?: return ""
+        // Only characters of a host name or address: the value goes into YAML
+        val host = prefs.proxyHost.filter { it.isLetterOrDigit() || it in ".:-[]" }.ifBlank { "127.0.0.1" }
+        val port = prefs.proxyPort.coerceIn(1, 65535)
+        return when (mode) {
+            "TOR_ORBOT" -> socksPrefs("127.0.0.1", 9050, remoteDns = true)
+            "CUSTOM_SOCKS5" -> socksPrefs(host, port, prefs.proxyDnsRemote)
+            "CUSTOM_HTTP" -> "  network.proxy.type: 1\n" +
+                "  network.proxy.http: \"$host\"\n  network.proxy.http_port: $port\n" +
+                "  network.proxy.ssl: \"$host\"\n  network.proxy.ssl_port: $port\n"
+            else -> ""
+        }
+    }
+
+    private fun socksPrefs(host: String, port: Int, remoteDns: Boolean) =
+        "  network.proxy.type: 1\n  network.proxy.socks: \"$host\"\n  network.proxy.socks_port: $port\n" +
+            "  network.proxy.socks_version: 5\n  network.proxy.socks_remote_dns: $remoteDns\n"
+
+    private fun writeGeckoConfig(context: Context, prefs: PreferencesManager?): String {
         val file = java.io.File(context.filesDir, "geckoview-config.yaml")
         file.writeText(
             "prefs:\n" +
@@ -107,7 +131,12 @@ object SendaGeckoEngine {
                 "  signon.includeOtherSubdomainsInLookup: false\n" +
                 // Media control (MediaSession): without it Senda does not know when a video is playing and cannot pause it
                 // when sending it to the TV (it could be heard on the phone and the TV at the same time)
-                "  media.hardwaremediakeys.enabled: true\n"
+                "  media.hardwaremediakeys.enabled: true\n" +
+                // With Tor or a proxy, a connection that fails through it must fail, never go out directly with the
+                // real IP; nor may anything bypass the proxy (the same as Tor Browser)
+                "  network.proxy.failover_direct: false\n" +
+                "  network.proxy.allow_bypass: false\n" +
+                startupProxyPrefs(prefs)
         )
         return file.absolutePath
     }
@@ -398,20 +427,7 @@ object SendaGeckoEngine {
             }
             override fun onMessage(nativeMessage: String, message: Any, sender: WebExtension.MessageSender): org.mozilla.geckoview.GeckoResult<Any>? {
                 android.util.Log.i("Senda", "Senda Proxy onMessage recibido: $message")
-                val prefs = cachedPrefs
-                val mode = prefs?.proxyMode ?: "OFF"
-                val host = prefs?.proxyHost ?: "127.0.0.1"
-                val port = prefs?.proxyPort ?: 9050
-                val dns = prefs?.proxyDnsRemote ?: true
-
-                val resp = org.json.JSONObject().apply {
-                    put("type", "SET_PROXY")
-                    put("mode", mode)
-                    put("host", host)
-                    put("port", port)
-                    put("proxyDNS", dns)
-                }
-                return org.mozilla.geckoview.GeckoResult.fromValue(resp)
+                return org.mozilla.geckoview.GeckoResult.fromValue(proxyMessage(cachedPrefs))
             }
         }, "senda_proxy")
     }
@@ -447,27 +463,29 @@ object SendaGeckoEngine {
         }
     }
 
-    fun applyProxy(prefs: PreferencesManager) {
-        cachedPrefs = prefs
-        applyProxy(
-            mode = prefs.proxyMode,
-            host = prefs.proxyHost,
-            port = prefs.proxyPort,
-            proxyDns = prefs.proxyDnsRemote
-        )
+    /**
+     * Proxy configuration for the extension. With Tor, "torState" tells whether pages must wait ("starting") or can
+     * go out ("ready"; "failed" also goes through Tor's port, so it fails with an error instead of going direct).
+     */
+    private fun proxyMessage(prefs: PreferencesManager?) = org.json.JSONObject().apply {
+        put("type", "SET_PROXY")
+        put("mode", prefs?.proxyMode ?: "OFF")
+        put("host", prefs?.proxyHost ?: "127.0.0.1")
+        put("port", prefs?.proxyPort ?: 9050)
+        put("proxyDNS", prefs?.proxyDnsRemote ?: true)
+        put("torState", when (SendaTorManager.state) {
+            TorState.CONNECTED -> "ready"
+            TorState.ERROR -> "failed"
+            else -> "starting"
+        })
     }
 
-    fun applyProxy(mode: String, host: String = "127.0.0.1", port: Int = 9050, proxyDns: Boolean = true) {
+    fun applyProxy(prefs: PreferencesManager) {
+        cachedPrefs = prefs
         try {
-            val msg = org.json.JSONObject().apply {
-                put("type", "SET_PROXY")
-                put("mode", mode)
-                put("host", host)
-                put("port", port)
-                put("proxyDNS", proxyDns)
-            }
+            val msg = proxyMessage(prefs)
             proxyPort?.postMessage(msg)
-            android.util.Log.i("Senda", "Enrutamiento Proxy aplicado: mode=$mode, host=$host, port=$port, dns=$proxyDns")
+            android.util.Log.i("Senda", "Enrutamiento Proxy aplicado: mode=${msg.optString("mode")}, tor=${msg.optString("torState")}")
         } catch (e: Exception) {
             android.util.Log.e("Senda", "Error al postear configuración a Senda Proxy: ${e.message}")
         }

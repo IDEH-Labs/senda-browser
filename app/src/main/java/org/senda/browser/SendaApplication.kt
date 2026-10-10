@@ -63,11 +63,8 @@ class SendaApplication : Application() {
         }.start()
         // Initialize the built-in Tor manager
         org.senda.browser.core.SendaTorManager.init(this)
-        if (prefs.proxyMode == "TOR_ORBOT") {
-            org.senda.browser.core.SendaTorManager.start(this) {
-                SendaGeckoEngine.applyProxy(prefs)
-            }
-        }
+        org.senda.browser.core.SendaTorManager.onStateChanged = { SendaGeckoEngine.applyProxy(prefs) }
+        if (prefs.proxyMode == "TOR_ORBOT") org.senda.browser.core.SendaTorManager.start(this)
     }
 
     companion object {

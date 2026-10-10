@@ -1744,17 +1744,7 @@ fun SendaToolbar(
                             p.proxyHost = hostInput.trim()
                             p.proxyPort = parsedPort
                             p.proxyDnsRemote = dnsRemote
-                            if (selectedMode == "TOR_ORBOT") {
-                                p.proxyHost = "127.0.0.1"
-                                p.proxyPort = 9050
-                                p.proxyDnsRemote = true
-                                org.senda.browser.core.SendaTorManager.start(context) {
-                                    SendaGeckoEngine.applyProxy(p)
-                                }
-                            } else {
-                                org.senda.browser.core.SendaTorManager.stop(context)
-                                SendaGeckoEngine.applyProxy(p)
-                            }
+                            org.senda.browser.core.SendaTorManager.applyMode(context, p)
                         }
                         showProxyDialog = false
                     }
