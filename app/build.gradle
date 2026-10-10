@@ -132,6 +132,14 @@ configurations.all {
         force 'androidx.lifecycle:lifecycle-viewmodel:2.8.7'
         force 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7'
         force 'androidx.lifecycle:lifecycle-viewmodel-savedstate:2.8.7'
+
+        // GeckoView's WebAuthn code pulls in Google's proprietary Play Services client libraries. microG's
+        // client libraries (Apache 2.0) provide the same API, so the APK carries no proprietary code
+        dependencySubstitution {
+            ['play-services-fido', 'play-services-base', 'play-services-basement', 'play-services-tasks'].each { name ->
+                substitute module("com.google.android.gms:${name}") using module("org.microg.gms:${name}:0.3.14.250932")
+            }
+        }
     }
 }
 
