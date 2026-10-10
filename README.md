@@ -4,7 +4,7 @@
 
 The interface is available in 8 languages: Spanish, English, German, French, Portuguese, Italian, Japanese and Chinese.
 
-> **Status: beta (0.2.0-beta.3).** Its author uses it every day and it is ready for wider testing, but it is **not yet recommended for sensitive data**:
+> **Status: beta (0.2.0-beta.4).** Its author uses it every day and it is ready for wider testing, but it is **not yet recommended for sensitive data**:
 > - Tested on a single phone model (Motorola moto g34 5G, Android 15).
 > - Signed release builds have been tested on that phone: startup, browsing, reader mode, Tor, uBlock Origin and Settings (0.1.1); the password vault filling in and saving accounts, the ChatGPT assistant and TV mode (a pre-release build of 0.1.2); browsing and the password vault (0.1.3, 0.1.4).
 > - Tried by hand on that phone (October 9): the assistant conversation and the saved passwords open only after fingerprint or PIN, and wallpaper downloads work. Not yet tried by hand (only by automated tests): password import/export and the encrypted backup.
@@ -46,7 +46,8 @@ The interface is available in 8 languages: Spanish, English, German, French, Por
 **Other**
 - Casting to a TV through Android screen mirroring (Miracast), with an optional TV mode when you rotate the phone.
 - Optional assistant: with your ChatGPT plan, or with your own API key (Claude, Gemini, Grok or Mistral). It only sends something when you use it, and only to the service you choose. The conversation is kept encrypted on the phone, opens only with your fingerprint or PIN, and is deleted only when you decide.
-- Extensions from `.xpi` files, custom CSS and scripts (Senda Labs), and a developer console on the phone itself.
+- Extensions from `.xpi` files, custom CSS and scripts (Senda Labs: they run isolated from pages, like an extension,
+  and never in private tabs), and a developer console on the phone itself.
 
 ## Connections Senda makes on its own
 

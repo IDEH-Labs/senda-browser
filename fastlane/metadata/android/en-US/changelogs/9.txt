@@ -1,0 +1,1 @@
+Senda Labs custom CSS and scripts now run isolated from pages, like an extension, and never in private tabs. Before, a page could intercept your script, private tabs ran it too, many sites silently blocked it, and a // comment cut off the rest of the script. Use window.wrappedJSObject to reach a page's own variables.
