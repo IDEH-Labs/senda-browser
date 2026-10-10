@@ -1,0 +1,1 @@
+Security hardening. The video relay used for TV mode no longer requests addresses on your home network (router, other devices) unless the video itself comes from there, and it checks every redirect. Only the downloads folder can be shared with other apps. New security policy explaining how to report vulnerabilities privately.
