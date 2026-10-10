@@ -50,7 +50,6 @@ files made by Senda open with `age -d`, and files made with `age -p` open in Sen
 Only portable, non-secret settings are written (the list is `portableSettingKeys` in
 `PreferencesManager.kt`). Left out on purpose:
 
-- AI sessions, keys and model choices.
 - Proxy server and custom DNS-over-HTTPS address: a backup must not be able to divert traffic.
 - Custom CSS and scripts: a backup must not be able to inject code into pages.
 - Remote debugging, open tabs, TV mode, wallpaper rotation state and the user's own wallpaper photo.

@@ -67,7 +67,6 @@ fun BrowserScreen(
 
     var showTabsSheet by remember { mutableStateOf(false) }
     var showDevToolsSheet by remember { mutableStateOf(false) }
-    var showAssistant by remember { mutableStateOf(false) }
     var showCastDialog by remember { mutableStateOf(false) }
     var showBookmarksDialog by remember { mutableStateOf(false) }
     var showHistoryDialog by remember { mutableStateOf(false) }
@@ -226,7 +225,6 @@ fun BrowserScreen(
                         onRefresh = { activeTab?.reload() },
                         onOpenTabsOverview = openTabsOverview,
                         onOpenDevTools = { showDevToolsSheet = true },
-                        onOpenAssistant = { showAssistant = true },
                         onOpenSettings = onOpenSettings,
                         onOpenCast = openCast,
                         onOpenBookmarks = { showBookmarksDialog = true },
@@ -273,7 +271,6 @@ fun BrowserScreen(
                         onRefresh = { activeTab?.reload() },
                         onOpenTabsOverview = openTabsOverview,
                         onOpenDevTools = { showDevToolsSheet = true },
-                        onOpenAssistant = { showAssistant = true },
                         onOpenSettings = onOpenSettings,
                         onOpenCast = openCast,
                         onOpenBookmarks = { showBookmarksDialog = true },
@@ -419,11 +416,6 @@ fun BrowserScreen(
                 activeTab = activeTab,
                 onDismiss = { showDevToolsSheet = false }
             )
-        }
-
-        // Assistant with the external AI the user sets up
-        if (showAssistant) {
-            org.senda.browser.ui.components.SendaAssistantSheet(prefs = prefs, activeTab = activeTab, onDismiss = { showAssistant = false })
         }
 
         // Mirroring to a TV: the playing video moves to the TV as a secondary display (the phone does not change)

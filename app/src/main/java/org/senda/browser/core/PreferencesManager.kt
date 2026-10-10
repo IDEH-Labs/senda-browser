@@ -74,27 +74,6 @@ class PreferencesManager(context: Context) {
                 prefs.all.keys.filter { it.startsWith("ai_") || it == "selected_local_ai_model" }.forEach { remove(it) }
             }.apply()
         }
-        // The assistant uses ChatGPT or, for advanced users, Claude, Gemini, Grok or Mistral with a key (2026-10-06): the
-        // OpenAI API key and the self-hosted server, which no longer exist, are deleted
-        val oldKeys = listOf("openai", "own").flatMap { listOf("assistant_key_enc_$it", "assistant_key_iv_$it") } + "assistant_server_url"
-        val stillValid = setOf("chatgpt_plan", "anthropic", "gemini", "xai", "mistral")
-        val provider = prefs.getString("assistant_provider", null)
-        if (oldKeys.any { prefs.contains(it) } || (provider != null && provider !in stillValid)) {
-            prefs.edit().apply {
-                oldKeys.forEach { remove(it) }
-                if (provider != null && provider !in stillValid) {
-                    remove("assistant_provider"); remove("assistant_model"); remove("assistant_privacy_accepted")
-                }
-            }.apply()
-        }
-        // Model and consent of the AI in use, now stored per AI
-        val activeAi = prefs.getString("assistant_provider", null)
-        if (activeAi != null && prefs.contains("assistant_model") && !prefs.contains("assistant_model_$activeAi")) {
-            prefs.edit()
-                .putString("assistant_model_$activeAi", prefs.getString("assistant_model", "") ?: "")
-                .putBoolean("assistant_consent_$activeAi", prefs.getBoolean("assistant_privacy_accepted", false))
-                .apply()
-        }
         // Earlier versions faked Firefox Sync: delete the "connected account" that never existed.
         if (prefs.contains("fxa_is_connected") || prefs.contains("sync_type")) {
             prefs.edit()
@@ -569,65 +548,6 @@ class PreferencesManager(context: Context) {
         get() = prefs.getString("user_custom_script", "") ?: ""
         set(value) = prefs.edit().putString("user_custom_script", value).apply()
 
-    // --- REMOTE AI ASSISTANT ---
-    // "assistant_" prefix: the "ai_*" keys of the retired on-device AI are deleted at startup
-    /** "chatgpt_plan" (SendaAssistant.PROVIDER_ID), the id of an AI with a key (ApiProvider) or null. */
-    var assistantProvider: String?
-        get() = prefs.getString("assistant_provider", null)
-        set(value) = prefs.edit().putString("assistant_provider", value).apply()
-
-    /** "Sign in with ChatGPT": stable identifier of this installation (ext_agent_host_id) and issued client. */
-    var assistantChatGptHostId: String
-        get() = prefs.getString("assistant_chatgpt_host_id", "") ?: ""
-        set(value) = prefs.edit().putString("assistant_chatgpt_host_id", value).apply()
-
-    var assistantChatGptClientId: String
-        get() = prefs.getString("assistant_chatgpt_client_id", "") ?: ""
-        set(value) = prefs.edit().putString("assistant_chatgpt_client_id", value).apply()
-
-    /** Has already seen OpenAI's mandatory welcome notice ("Eligible usage in this app uses your ChatGPT plan"). */
-    var assistantChatGptWelcomeSeen: Boolean
-        get() = prefs.getBoolean("assistant_chatgpt_welcome_seen", false)
-        set(value) = prefs.edit().putBoolean("assistant_chatgpt_welcome_seen", value).apply()
-
-    // "My AIs": each connected AI keeps its own model and consent, to switch between them without losing any
-    // settings. assistant_provider is the one in use; assistant_model and assistant_privacy_accepted, from earlier
-    // versions, were moved to the AI that was in use (see init)
-    fun assistantModelFor(id: String): String = prefs.getString("assistant_model_$id", "") ?: ""
-    fun setAssistantModelFor(id: String, model: String) = prefs.edit().putString("assistant_model_$id", model).apply()
-    fun assistantConsentFor(id: String): Boolean = prefs.getBoolean("assistant_consent_$id", false)
-    fun setAssistantConsentFor(id: String, accepted: Boolean) = prefs.edit().putBoolean("assistant_consent_$id", accepted).apply()
-
-    /** Assistant credentials (ChatGPT session or API key), encrypted with the phone's keystore. */
-    fun getAssistantKey(providerId: String): String {
-        val enc = prefs.getString("assistant_key_enc_$providerId", null) ?: return ""
-        val iv = prefs.getString("assistant_key_iv_$providerId", null) ?: return ""
-        return try {
-            val chars = org.senda.browser.core.security.SendaVaultManager.decryptPassword(enc, iv, org.senda.browser.core.security.SendaVaultManager.APP_KEY_ALIAS)
-            String(chars).also { org.senda.browser.core.security.SendaVaultManager.wipe(chars) }
-        } catch (e: Exception) {
-            ""
-        }
-    }
-
-    /** Saves the encrypted key; if the chip cannot encrypt, it is not saved (returns false). */
-    fun setAssistantKey(providerId: String, key: String): Boolean {
-        if (key.isBlank()) {
-            prefs.edit().remove("assistant_key_enc_$providerId").remove("assistant_key_iv_$providerId").apply()
-            return true
-        }
-        return try {
-            val chars = key.trim().toCharArray()
-            val (enc, iv) = org.senda.browser.core.security.SendaVaultManager.encryptPassword(chars, org.senda.browser.core.security.SendaVaultManager.APP_KEY_ALIAS)
-            org.senda.browser.core.security.SendaVaultManager.wipe(chars)
-            prefs.edit().putString("assistant_key_enc_$providerId", enc).putString("assistant_key_iv_$providerId", iv).apply()
-            true
-        } catch (e: Exception) {
-            android.util.Log.e("SendaPrefs", "No se pudo cifrar la clave del asistente: ${e.javaClass.simpleName}")
-            false
-        }
-    }
-
     // --- BOOKMARKS ---
     var showBookmarksBar: Boolean
         get() = prefs.getBoolean("show_bookmarks_bar", false)
@@ -803,7 +723,7 @@ class PreferencesManager(context: Context) {
 
     /**
      * Settings that travel in a backup: portable, not secret and not tied to this phone. Left out on purpose:
-     * AI sessions and keys, proxy server and custom DNS (a backup must not be able to divert traffic), custom
+     * proxy server and custom DNS (a backup must not be able to divert traffic), custom
      * CSS and scripts (nor inject code into pages), remote debugging, open tabs, TV mode and wallpaper state.
      */
     private val portableSettingKeys = setOf(

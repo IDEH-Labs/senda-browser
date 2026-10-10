@@ -476,14 +476,6 @@ class BrowserTab(
                 session: GeckoSession,
                 request: GeckoSession.NavigationDelegate.LoadRequest
             ): GeckoResult<org.mozilla.geckoview.AllowOrDeny>? {
-                // Redirect from the ChatGPT sign-in: delivered inside Senda without loading it. Over the network,
-                // HTTPS-only mode blocks http://127.0.0.1 and the page showed "connection not secure"
-                if (org.senda.browser.core.assistant.ChatGptPlanAuth.deliverCallback(request.uri)) {
-                    // Blank page: going back reloaded OpenAI's page for the same authorization right
-                    // before the exchange and the code was invalidated (invalid_grant, 2026-10-05)
-                    android.os.Handler(android.os.Looper.getMainLooper()).post { session.loadUri("about:blank") }
-                    return GeckoResult.fromValue(org.mozilla.geckoview.AllowOrDeny.DENY)
-                }
                 val scheme = request.uri.substringBefore(':', "").lowercase()
                 if (scheme in GECKO_SCHEMES) return null
                 // Only after a user tap: a website cannot launch apps on its own

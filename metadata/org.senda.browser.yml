@@ -1,8 +1,7 @@
 AntiFeatures:
   NonFreeNet:
     en-US: |-
-      Google Safe Browsing is on by default (it can be turned off in Settings). The optional assistant
-      connects to the service the user chooses: ChatGPT, Claude, Gemini, Grok or Mistral. Wallpapers that are
+      Google Safe Browsing is on by default (it can be turned off in Settings). Wallpapers that are
       not included are downloaded, only when the user picks one, from the project's release on GitHub (GitLab as
       a fallback).
 Categories:

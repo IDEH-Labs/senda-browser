@@ -440,10 +440,6 @@ fun SettingsScreen(
         )
     }
 
-    // DIALOG: MY AIs (ChatGPT and, for advanced users, other AIs with a key)
-    if (activeDialog == "assistant") {
-        org.senda.browser.ui.components.AssistantHubDialog(prefs = prefs, onDismiss = { activeDialog = null })
-    }
 
     // DIALOG: TOR & SOCKS5 PROXY ROUTING
     if (activeDialog == "tor_proxy") {

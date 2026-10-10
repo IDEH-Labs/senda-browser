@@ -70,14 +70,12 @@ object SendaVaultManager {
     /** Key for the vault passwords: requires a recent fingerprint or PIN and the phone unlocked. */
     const val VAULT_KEY_ALIAS = "senda_vault_master_key_v2"
     /**
-     * Key for secrets Senda uses without asking (WebDAV password) and for the audit
+     * Key for secrets Senda uses without asking and for the audit
      * tests. It is the original key (v1): on the chip, but without requiring authentication.
      */
     const val APP_KEY_ALIAS = "senda_vault_master_key_v1"
-    /** Key for the saved assistant conversation: same protection as the vault key, but its own, so resetting one does not lose the other. */
-    const val ASSISTANT_CHAT_KEY_ALIAS = "senda_assistant_chat_key_v1"
     /** Keys that only work in secure hardware and after a recent fingerprint or PIN. */
-    private val AUTH_KEY_ALIASES = setOf(VAULT_KEY_ALIAS, ASSISTANT_CHAT_KEY_ALIAS)
+    private val AUTH_KEY_ALIASES = setOf(VAULT_KEY_ALIAS)
     /** Seconds the key stays available after authenticating with fingerprint or PIN. */
     const val AUTH_VALIDITY_SECONDS = 30
     private const val GCM_TAG_LENGTH_BITS = 128

@@ -17,15 +17,15 @@ class VaultVerificationEndToEndTest {
     /** A backup never carries settings that could divert traffic or inject code, and a backup cannot set them. */
     @Test
     fun testBackupSettingsLeaveOutDangerousKeys() {
-        DestructiveTestGuard.requireExplicitPermission("escribe y borra ajustes de prueba (proxy, script, modelo de IA)")
+        DestructiveTestGuard.requireExplicitPermission("escribe y borra ajustes de prueba (proxy, script, DNS)")
         val context = ApplicationProvider.getApplicationContext<Context>()
         val prefs = PreferencesManager(context)
         val rawPrefs = context.getSharedPreferences("senda_preferences", Context.MODE_PRIVATE)
-        val keys = listOf("proxy_host", "user_custom_script", "user_custom_css", "assistant_model", "remote_debugging_enabled")
+        val keys = listOf("proxy_host", "user_custom_script", "user_custom_css", "custom_doh_url", "remote_debugging_enabled")
         val saved = keys.associateWith { rawPrefs.all[it] }
         try {
             rawPrefs.edit().putString("proxy_host", "10.0.0.1").putString("user_custom_script", "alert(1)")
-                .putString("user_custom_css", "*{}").putString("assistant_model", "x").putBoolean("remote_debugging_enabled", false).commit()
+                .putString("user_custom_css", "*{}").putString("custom_doh_url", "https://example.invalid/dns-query").putBoolean("remote_debugging_enabled", false).commit()
             val exported = prefs.exportPortableSettings()
             keys.forEach { assertFalse("$it no debe viajar en la copia", exported.has(it)) }
             val hostile = org.json.JSONObject().put("proxy_host", "evil.example").put("user_custom_script", "steal()")
