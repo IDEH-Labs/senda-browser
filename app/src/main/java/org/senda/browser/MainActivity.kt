@@ -267,6 +267,12 @@ class MainActivity : FragmentActivity() {
                     if (event == Lifecycle.Event.ON_STOP) {
                         activeTab?.exitFullScreen()
                         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                        // Leaving Senda for another app pauses its videos, unless they are being watched on the
+                        // TV; with the screen off (locked or put aside) they keep playing
+                        val power = getSystemService(android.os.PowerManager::class.java)
+                        if (power?.isInteractive != false && !org.senda.browser.core.cast.SendaTvMode.tvConnected) {
+                            tabs.forEach { it.pauseMedia() }
+                        }
                     }
                 }
                 lifecycle.addObserver(observer)
