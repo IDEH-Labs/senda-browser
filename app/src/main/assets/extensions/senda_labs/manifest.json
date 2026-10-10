@@ -1,0 +1,19 @@
+{
+  "manifest_version": 2,
+  "name": "Senda Labs",
+  "version": "1.0",
+  "description": "Applies the custom CSS and script the user writes in Senda Labs, isolated from the pages",
+  "permissions": [
+    "geckoViewAddons",
+    "nativeMessaging",
+    "<all_urls>"
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "labs@senda.org"
+    }
+  },
+  "background": {
+    "scripts": ["background.js"]
+  }
+}

@@ -269,10 +269,7 @@ fun SettingsSendaLabsDialog(
                 Spacer(modifier = Modifier.height(4.dp))
                 OutlinedTextField(
                     value = userCss,
-                    onValueChange = {
-                        userCss = it
-                        prefs.userCustomCss = it
-                    },
+                    onValueChange = { userCss = it },
                     placeholder = { Text(strings.dlg_senda_labs_css_hint, style = MaterialTheme.typography.bodySmall.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)) },
                     // Code: monospaced font, as in any editor
                     textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace),
@@ -286,10 +283,7 @@ fun SettingsSendaLabsDialog(
                 Spacer(modifier = Modifier.height(4.dp))
                 OutlinedTextField(
                     value = userJs,
-                    onValueChange = {
-                        userJs = it
-                        prefs.userCustomScript = it
-                    },
+                    onValueChange = { userJs = it },
                     placeholder = { Text(strings.dlg_senda_labs_js_hint, style = MaterialTheme.typography.bodySmall.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)) },
                     // Code: monospaced font, as in any editor
                     textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace),
@@ -304,6 +298,8 @@ fun SettingsSendaLabsDialog(
                 onClick = {
                     prefs.userCustomCss = userCss
                     prefs.userCustomScript = userJs
+                    // Saved only here: the Labs extension registers the new CSS and script for the next pages
+                    org.senda.browser.core.SendaGeckoEngine.applyLabs(prefs)
                     onSettingsChanged()
                     onDismiss()
                 }
