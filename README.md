@@ -9,7 +9,9 @@ The interface is available in 8 languages: Spanish, English, German, French, Por
 > - Signed release builds have been tested on that phone: startup, browsing, reader mode, Tor, uBlock Origin and Settings (0.1.1); the password vault filling in and saving accounts, the ChatGPT assistant and TV mode (a pre-release build of 0.1.2); browsing and the password vault (0.1.3, 0.1.4).
 > - Tried by hand on that phone (October 9): the assistant conversation and the saved passwords open only after fingerprint or PIN, and wallpaper downloads work. Not yet tried by hand (only by automated tests): password import/export and the encrypted backup.
 > - Passkeys tried by hand on that phone (October 9, 0.2.0-beta.2): creating one and signing in with it on webauthn.io, stored in Bitwarden.
+> - TV mode measured on that phone (October 10, 0.2.0-beta.5) with an LG TV over Miracast: rotating the phone fills the TV in 16:9, and a 1080p 60 fps VP9 video played without dropped frames, decoded by the phone's hardware.
 > - It has not had an external security audit.
+> - Known issue: with Tor on, the first page opened right after Senda starts can show a connection error until Tor finishes connecting; tapping Retry loads it.
 > - Known report not yet reproduced: on October 5, 2026 Senda once would not close and kept reopening while casting to a TV, watching video and using the assistant at the same time. If it happens to you, please report it.
 > - Privacy policy: [PRIVACY.md](PRIVACY.md).
 > - Security problems: please report them privately, as described in [SECURITY.md](SECURITY.md).
@@ -44,7 +46,9 @@ The interface is available in 8 languages: Spanish, English, German, French, Por
 - Optional app lock with fingerprint, and optional screenshot protection.
 
 **Other**
-- Casting to a TV through Android screen mirroring (Miracast), with an optional TV mode when you rotate the phone.
+- Casting to a TV through Android screen mirroring (Miracast), with an optional TV mode that fills the TV in 16:9 when you
+  rotate the phone (it needs a permission that can only be granted once with ADB). Videos pause when you leave Senda for
+  another app, unless they are playing on the TV.
 - Optional assistant: with your ChatGPT plan, or with your own API key (Claude, Gemini, Grok or Mistral). It only sends something when you use it, and only to the service you choose. The conversation is kept encrypted on the phone, opens only with your fingerprint or PIN, and is deleted only when you decide.
 - Extensions from `.xpi` files, custom CSS and scripts (Senda Labs: they run isolated from pages, like an extension,
   and never in private tabs), and a developer console on the phone itself.

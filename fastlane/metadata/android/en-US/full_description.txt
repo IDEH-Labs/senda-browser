@@ -23,7 +23,7 @@ Senda is a free web browser for Android built on Mozilla's GeckoView engine, ind
 
 <b>Other</b>
 <ul>
-<li>Casting to a TV through Android screen mirroring (Miracast).</li>
+<li>Casting to a TV through Android screen mirroring (Miracast). Videos pause when you leave Senda, unless they are playing on the TV.</li>
 <li>Optional assistant using your ChatGPT plan or your own API key (Claude, Gemini, Grok or Mistral). These are non-free network services: nothing is sent unless you use the assistant, and only to the service you choose. The conversation is kept encrypted on the phone behind fingerprint or PIN.</li>
 </ul>
 
