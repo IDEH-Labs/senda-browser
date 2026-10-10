@@ -431,7 +431,7 @@ fun SettingsScreen(
     }
 
     // DIALOG: READER MODE AND SUMMARIES
-    if (activeDialog == "reader_mode" || activeDialog == "summaries") {
+    if (activeDialog == "reader_mode") {
         SettingsReaderModeDialog(
             prefs = prefs,
             strings = strings,
@@ -527,13 +527,6 @@ fun SettingsScreen(
         )
     }
 
-    // DIALOG: DATA COLLECTION & PRIVACY
-    if (activeDialog == "data_collection") {
-        SettingsDataCollectionDialog(
-            strings = strings,
-            onDismiss = { activeDialog = null }
-        )
-    }
 
     // DIALOG: ADD-ONS AND EXTENSIONS
     if (activeDialog == "extensions") {
@@ -573,9 +566,8 @@ fun SettingsScreen(
     }
 
     // DIALOG: ABOUT SENDA & MANIFESTO
-    if (activeDialog == "about_senda" || activeDialog == "ethical_manifesto" || activeDialog == "third_party_licenses") {
+    if (activeDialog == "about_senda") {
         SettingsAboutDialog(
-            activeDialog = activeDialog ?: "about_senda",
             strings = strings,
             onDismiss = { activeDialog = null }
         )

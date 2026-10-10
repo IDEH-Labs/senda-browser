@@ -118,30 +118,6 @@ fun SettingsSitePermissionsDialog(
 }
 
 @Composable
-fun SettingsDataCollectionDialog(
-    strings: SendaStringPack,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(strings.dlg_zero_telemetry_title) },
-        text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                Text(
-                    text = strings.dlg_zero_telemetry_content,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(strings.general_done)
-            }
-        }
-    )
-}
-
-@Composable
 fun SettingsOpenInAppsDialog(
     prefs: PreferencesManager,
     strings: SendaStringPack,
@@ -312,7 +288,6 @@ fun SettingsSendaLabsDialog(
 
 @Composable
 fun SettingsAboutDialog(
-    activeDialog: String,
     strings: SendaStringPack,
     onDismiss: () -> Unit
 ) {
@@ -326,57 +301,39 @@ fun SettingsAboutDialog(
     }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = {
-            Text(
-                when (activeDialog) {
-                    "about_senda" -> strings.st_about_title
-                    "ethical_manifesto" -> strings.st_privacy_commitment_title
-                    else -> strings.st_licenses_title
-                }
-            )
-        },
+        title = { Text(strings.st_about_title) },
         text = {
+            // Version, principles and licenses in one place
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                when (activeDialog) {
-                    "about_senda" -> {
-                        Text(
-                            text = strings.dlg_about_senda_build.format(versionName, versionCode),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = strings.dlg_about_content,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = strings.dlg_about_license_details,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(10.dp)
-                            )
-                        }
-                    }
-                    "ethical_manifesto" -> {
-                        Text(
-                            text = strings.dlg_privacy_principles,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                    else -> {
-                        Text(
-                            text = strings.dlg_about_third_party,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
+                Text(
+                    text = strings.dlg_about_senda_build.format(versionName, versionCode),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(text = strings.dlg_about_content, style = MaterialTheme.typography.bodyMedium)
+                Spacer(modifier = Modifier.height(12.dp))
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = strings.dlg_about_license_details,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(10.dp)
+                    )
                 }
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(text = strings.st_privacy_commitment_title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(text = strings.dlg_privacy_principles, style = MaterialTheme.typography.bodyMedium)
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(text = strings.st_licenses_title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(text = strings.dlg_about_third_party, style = MaterialTheme.typography.bodyMedium)
             }
         },
         confirmButton = {

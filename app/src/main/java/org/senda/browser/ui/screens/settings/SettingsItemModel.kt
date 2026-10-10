@@ -291,14 +291,6 @@ fun buildSettingsList(
             icon = Icons.Default.SettingsApplications,
             onClick = { onOpenDialog("site_permissions") }
         ),
-        SettingItemData(
-            id = "data_collection",
-            title = strings.st_zero_telemetry_title,
-            subtitle = strings.st_zero_telemetry_sub,
-            category = strings.cat_privacy,
-            icon = Icons.Default.Security,
-            onClick = { onOpenDialog("data_collection") }
-        ),
 
         // ADVANCED
         SettingItemData(
@@ -367,22 +359,6 @@ fun buildSettingsList(
             category = strings.cat_about,
             icon = Icons.Default.Info,
             onClick = { onOpenDialog("about_senda") }
-        ),
-        SettingItemData(
-            id = "ethical_manifesto",
-            title = strings.st_privacy_commitment_title,
-            subtitle = strings.st_privacy_commitment_sub,
-            category = strings.cat_about,
-            icon = Icons.Default.Handshake,
-            onClick = { onOpenDialog("ethical_manifesto") }
-        ),
-        SettingItemData(
-            id = "third_party_licenses",
-            title = strings.st_licenses_title,
-            subtitle = strings.st_licenses_sub,
-            category = strings.cat_about,
-            icon = Icons.Default.Code,
-            onClick = { onOpenDialog("third_party_licenses") }
         )
     )
 }
