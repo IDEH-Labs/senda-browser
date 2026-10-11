@@ -7,6 +7,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.BroadcastReceiver
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -88,6 +89,7 @@ object SendaTvMode {
         appContext = context.applicationContext
         // If the process died with the TV aspect ratio in place, return the screen to normal
         if (mirroringDisplay() == null) restoreDisplaySize()
+        setRestoreReceiver(appContext.getSharedPreferences(STATE_PREFS, Context.MODE_PRIVATE).getBoolean(KEY_FORCED, false))
         appContext.getSystemService(DisplayManager::class.java)?.registerDisplayListener(displayListener, mainHandler)
         evaluate()
     }
@@ -298,6 +300,7 @@ object SendaTvMode {
                     .putInt(KEY_ORIGINAL_W, if (base == initial) 0 else base.x)
                     .putInt(KEY_ORIGINAL_H, if (base == initial) 0 else base.y)
                     .commit()
+                setRestoreReceiver(true)
             }
             iface.getMethod("setForcedDisplaySize", Int::class.java, Int::class.java, Int::class.java)
                 .invoke(wms, Display.DEFAULT_DISPLAY, w, h)
@@ -333,10 +336,23 @@ object SendaTvMode {
                 }
             }
             state.edit().putBoolean(KEY_FORCED, false).remove(KEY_ORIGINAL_DENSITY).commit()
+            setRestoreReceiver(false)
             Log.i(TAG, "Pantalla del móvil restaurada")
         } catch (e: Exception) {
             Log.w(TAG, "No se pudo restaurar la pantalla: ${e.cause?.message ?: e.message}")
         }
+    }
+
+    /**
+     * The restore receiver is only on while the screen has the TV size: otherwise every reboot and every update
+     * started Senda in the background (the engine, and Tor if it was on) for nothing.
+     */
+    private fun setRestoreReceiver(enabled: Boolean) {
+        appContext.packageManager.setComponentEnabledSetting(
+            ComponentName(appContext, SendaTvModeRestoreReceiver::class.java),
+            if (enabled) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+            PackageManager.DONT_KILL_APP
+        )
     }
 
     private fun windowManagerService(): Any =

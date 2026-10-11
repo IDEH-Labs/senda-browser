@@ -33,7 +33,7 @@ object SendaNet {
         return conn
     }
 
-    /** The same Tor or proxy as browsing (direct on the local network). The Anthropic client uses it too. */
+    /** The same Tor or proxy as browsing (direct on the local network). */
     fun proxyFor(host: String?): Proxy {
         val prefs = SendaGeckoEngine.appContext?.let { PreferencesManager(it) } ?: return Proxy.NO_PROXY
         if (host == null || isLocal(host)) return Proxy.NO_PROXY
