@@ -1,0 +1,1 @@
+Removes Google Safe Browsing: Firefox kept contacting Google for it even when it was turned off. Measured: Senda no longer contacts Google on its own. Now licensed GPL-3.0-or-later. Wallpapers download from Codeberg first.
