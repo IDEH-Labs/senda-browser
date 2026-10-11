@@ -119,6 +119,24 @@ object SendaGeckoEngine {
         "  network.proxy.type: 1\n  network.proxy.socks: \"$host\"\n  network.proxy.socks_port: $port\n" +
             "  network.proxy.socks_version: 5\n  network.proxy.socks_remote_dns: $remoteDns\n"
 
+    /**
+     * Without a hardware AV1 decoder (e.g. Snapdragon 695), AV1 is decoded by the CPU: YouTube serves it to Firefox
+     * when it is available, and the phone heats up and drops frames. Without AV1, sites send VP9 or H.264, which the
+     * phone's hardware decodes. Phones that do have it keep AV1.
+     */
+    private fun av1Prefs(): String {
+        val hardwareAv1 = runCatching {
+            android.media.MediaCodecList(android.media.MediaCodecList.REGULAR_CODECS).codecInfos.any { info ->
+                // Before Android 10 there is no isHardwareAccelerated: Android's own software decoders have these names
+                val hardware = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) info.isHardwareAccelerated
+                    else !info.name.startsWith("OMX.google.") && !info.name.startsWith("c2.android.")
+                !info.isEncoder && hardware &&
+                    info.supportedTypes.any { it.equals("video/av01", ignoreCase = true) }
+            }
+        }.getOrDefault(true)
+        return if (hardwareAv1) "" else "  media.av1.enabled: false\n"
+    }
+
     private fun writeGeckoConfig(context: Context, prefs: PreferencesManager?): String {
         val file = java.io.File(context.filesDir, "geckoview-config.yaml")
         file.writeText(
@@ -136,6 +154,7 @@ object SendaGeckoEngine {
                 // real IP; nor may anything bypass the proxy (the same as Tor Browser)
                 "  network.proxy.failover_direct: false\n" +
                 "  network.proxy.allow_bypass: false\n" +
+                av1Prefs() +
                 startupProxyPrefs(prefs)
         )
         return file.absolutePath
