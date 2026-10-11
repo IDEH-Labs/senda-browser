@@ -67,7 +67,7 @@ object SendaGeckoEngine {
                     .queryParameterStrippingEnabled(true)
                     .queryParameterStrippingPrivateBrowsingEnabled(true)
                     .cookiePurging(true)
-                    .safeBrowsing(if (prefs?.safeBrowsingEnabled != false) ContentBlocking.SafeBrowsing.DEFAULT else ContentBlocking.SafeBrowsing.NONE)
+                    .safeBrowsing(ContentBlocking.SafeBrowsing.NONE)
                     .build()
             )
             // No Firefox captive portal detection: Android already does it, and this way Senda does not contact Mozilla at startup
@@ -154,10 +154,28 @@ object SendaGeckoEngine {
                 // real IP; nor may anything bypass the proxy (the same as Tor Browser)
                 "  network.proxy.failover_direct: false\n" +
                 "  network.proxy.allow_bypass: false\n" +
+                googleSafeBrowsingOffPrefs() +
                 av1Prefs() +
                 startupProxyPrefs(prefs)
         )
         return file.absolutePath
+    }
+
+    /**
+     * Senda does not use Google Safe Browsing. Turning it off in GeckoView was not enough: measured on 2026-10-11, the
+     * "google5" provider still downloaded a Google list (the "global cache"). Every Google feature is off, the v5
+     * provider is not created, and the servers of every Google provider are empty, so nothing can reach them.
+     */
+    private fun googleSafeBrowsingOffPrefs(): String {
+        val off = listOf(
+            "browser.safebrowsing.malware.enabled", "browser.safebrowsing.phishing.enabled",
+            "browser.safebrowsing.downloads.enabled", "browser.safebrowsing.downloads.remote.enabled",
+            "browser.safebrowsing.globalCache.enabled", "browser.safebrowsing.provider.google5.enabled"
+        )
+        val noServer = listOf("google", "google4", "google5").flatMap { provider ->
+            listOf("updateURL", "gethashURL").map { "browser.safebrowsing.provider.$provider.$it" }
+        } + "browser.safebrowsing.downloads.remote.url"
+        return off.joinToString("") { "  $it: false\n" } + noServer.joinToString("") { "  $it: \"\"\n" }
     }
 
     fun getRuntime(): GeckoRuntime {
@@ -175,10 +193,6 @@ object SendaGeckoEngine {
 
         // USB remote debugging
         s.setRemoteDebuggingEnabled(prefs.remoteDebuggingEnabled)
-
-        s.contentBlocking.setSafeBrowsing(
-            if (prefs.safeBrowsingEnabled) ContentBlocking.SafeBrowsing.DEFAULT else ContentBlocking.SafeBrowsing.NONE
-        )
 
         // Accessibility: force zoom on stubborn sites and text size factor
         s.setForceUserScalableEnabled(prefs.forceEnableZoom)

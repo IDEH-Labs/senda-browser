@@ -28,9 +28,10 @@ Senda is a free web browser for Android built on Mozilla's GeckoView engine, ind
 
 <b>Connections Senda makes on its own</b>
 <ul>
-<li>Google Safe Browsing, on by default (can be turned off in Settings).</li>
+<li>DNS over HTTPS through Quad9 by default (can be changed in Settings).</li>
+<li>Mozilla's tracking protection lists.</li>
 <li>uBlock Origin filter list updates.</li>
 <li>Home page news from the RSS feeds of MuyLinux, EFF and FSF, only in layouts that show news.</li>
 <li>Translation models from Mozilla, the first time a language is translated.</li>
-<li>Wallpapers that are not included, only when you choose one, from the project's release on GitHub (GitLab as a fallback), with their SHA-256 checked.</li>
+<li>Wallpapers that are not included, only when you choose one, from the project's release on Codeberg (GitHub and GitLab as fallbacks), with their SHA-256 checked.</li>
 </ul>

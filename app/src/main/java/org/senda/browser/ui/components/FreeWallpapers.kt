@@ -458,10 +458,11 @@ object FreeWallpapers {
  * size and SHA-256 match the ones built into Senda ([WallpaperDownloads]).
  */
 object WallpaperFiles {
+    // Codeberg first (free software, non-profit); GitHub and GitLab are mirrors with the same files
+    private const val CODEBERG = "https://codeberg.org/IDEH-Labs/senda-browser/releases/download/"
     private const val GITHUB = "https://github.com/IDEH-Labs/senda-browser/releases/download/"
-    // Mirror: GitLab generic package with the same files
     private const val GITLAB = "https://gitlab.com/api/v4/projects/ideh-labs%2Fsenda-browser/packages/generic/wallpapers/"
-    const val SOURCE_LABEL = "github.com/IDEH-Labs/senda-browser"
+    const val SOURCE_LABEL = "codeberg.org/IDEH-Labs/senda-browser"
 
     /** Changes after each download, so the screens that show wallpapers refresh. */
     var revision by mutableIntStateOf(0)
@@ -497,7 +498,8 @@ object WallpaperFiles {
         val spec = WallpaperDownloads.files[wp.id] ?: return@withContext false
         val name = fileName(wp) ?: return@withContext false
         val version = WallpaperDownloads.RELEASE.removePrefix("wallpapers-")
-        for (url in listOf("$GITHUB${WallpaperDownloads.RELEASE}/$name", "$GITLAB$version/$name")) {
+        val release = WallpaperDownloads.RELEASE
+        for (url in listOf("$CODEBERG$release/$name", "$GITHUB$release/$name", "$GITLAB$version/$name")) {
             val data = try { fetch(url, spec.bytes) } catch (e: Exception) {
                 android.util.Log.w("SendaWallpaper", "$name: ${e.javaClass.simpleName}")
                 null

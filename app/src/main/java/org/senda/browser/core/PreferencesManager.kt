@@ -74,6 +74,8 @@ class PreferencesManager(context: Context) {
                 prefs.all.keys.filter { it.startsWith("ai_") || it == "selected_local_ai_model" }.forEach { remove(it) }
             }.apply()
         }
+        // Google Safe Browsing was removed (it contacted Google even when turned off): forget its old setting
+        if (prefs.contains("safe_browsing_enabled")) prefs.edit().remove("safe_browsing_enabled").apply()
         // Earlier versions faked Firefox Sync: delete the "connected account" that never existed.
         if (prefs.contains("fxa_is_connected") || prefs.contains("sync_type")) {
             prefs.edit()
@@ -532,11 +534,6 @@ class PreferencesManager(context: Context) {
         set(value) = prefs.edit().putBoolean("offer_translations", value).apply()
 
     // --- SENDA LABS & DEVELOPER ---
-    /** Safe Browsing downloads Google lists at startup: on by default, but the user can turn it off. */
-    var safeBrowsingEnabled: Boolean
-        get() = prefs.getBoolean("safe_browsing_enabled", true)
-        set(value) = prefs.edit().putBoolean("safe_browsing_enabled", value).apply()
-
     var remoteDebuggingEnabled: Boolean
         get() = prefs.getBoolean("remote_debugging_enabled", false)
         set(value) = prefs.edit().putBoolean("remote_debugging_enabled", value).apply()
@@ -732,7 +729,7 @@ class PreferencesManager(context: Context) {
         "block_fingerprinting", "block_social_trackers", "block_web_popups", "close_tabs_policy", "cookie_policy",
         "dns_over_https_mode", "doh_provider", "enable_anti_snooping", "font_hinting", "font_scale_percent",
         "force_enable_zoom", "https_only_mode", "offer_translations", "open_links_in_apps", "open_links_in_background",
-        "reader_font_family", "reader_font_size_percent", "reader_theme", "require_biometrics", "safe_browsing_enabled",
+        "reader_font_family", "reader_font_size_percent", "reader_theme", "require_biometrics",
         "search_engine_name", "search_engine_url", "search_suggestions_enabled", "selected_wallpaper_id",
         "show_back_button", "show_bookmarks_bar", "show_bookmarks_button", "show_cast_button", "show_devtools_button",
         "show_forward_button", "show_home_button", "show_menu_button", "show_new_tab_button", "show_reader_button",

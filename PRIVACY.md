@@ -20,18 +20,22 @@ Uninstalling Senda deletes all of it. Android backups of Senda's data are disabl
 
 Besides the pages you visit, Senda connects only to:
 
-- **Google Safe Browsing**, on by default, to download lists of dangerous sites. It can be turned off in Settings.
+- **Your DNS over HTTPS provider** (Quad9 by default; it can be changed or turned off in Settings) to look up the
+  addresses of the pages you visit.
+- **Mozilla's tracking protection lists**, updated every few hours, as in Firefox.
 - **uBlock Origin filter lists**, which it updates periodically from each list's servers.
 - **News feeds** (MuyLinux, EFF, FSF), only in the home page layouts that show news.
 - **Mozilla's translation models**, only the first time you translate a language.
 - **Wallpapers**: only when you choose one that is not included, and after asking, from this project's release on
-  GitHub (GitLab as a fallback). The file's fingerprint is checked.
+  Codeberg (GitHub and GitLab as fallbacks). The file's fingerprint is checked.
 
 Once only, when updating from a version that had the AI assistant (removed in October 2026): if you had signed in
 with ChatGPT, Senda asks OpenAI to revoke that session, so it does not stay valid on their side. The assistant's
 keys, conversation and settings are deleted from the phone.
 
 If you use Tor or a proxy, these connections go through it too.
+
+Senda does not include Google Safe Browsing: it never contacts Google on its own.
 
 ## Services you choose to use
 
