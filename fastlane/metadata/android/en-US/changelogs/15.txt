@@ -1,0 +1,1 @@
+Fixes: Tor starts again when Android stops it in the background; switching from Tor or a proxy to a direct connection now restarts Senda so it really goes direct; open tabs are no longer lost after a restart.
