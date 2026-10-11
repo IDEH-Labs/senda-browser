@@ -1,0 +1,1 @@
+Fixes switching between Tor and a direct connection: going back to Tor could leave pages loading or showing an error. Tor now keeps running until Senda closes, so switching is instant.
