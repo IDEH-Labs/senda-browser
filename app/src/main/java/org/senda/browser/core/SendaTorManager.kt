@@ -45,58 +45,53 @@ object SendaTorManager {
     private var timeoutJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
+    /** Whether Senda wants Tor (Tor mode chosen). Switching mode leaves Tor running, but it is not started again. */
+    private var wanted = false
+    private var appContext: Context? = null
+    /** Android stopped a running Tor and its thread has not ended yet: a new Tor waits for it ([waitForOldTor]). */
+    @Volatile private var oldTorClosing = false
+
     private val statusReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             val status = intent?.getStringExtra(TorService.EXTRA_STATUS) ?: return
-            Log.i(TAG, "Tor broadcast recibido: status=$status")
-            when (status) {
-                TorService.STATUS_STARTING -> {
-                    state = TorState.STARTING
-                    statusMessage = "Construyendo circuito Tor..."
-                }
-                TorService.STATUS_ON -> {
-                    if (state == TorState.CONNECTED) return
-                    state = TorState.CONNECTED
-                    // tor-android 0.4.9 no longer exposes the port as a static field: it is the one set in ensureTorrc()
-                    socksPort = TOR_SOCKS_PORT
-                    statusMessage = "Conectado a la Red Tor (127.0.0.1:$socksPort)"
-                    Log.i(TAG, "Tor conectado exitosamente en puerto $socksPort")
-                    onStateChanged?.invoke()
-                }
-                TorService.STATUS_STOPPING -> {
-                    state = TorState.STOPPING
-                    statusMessage = "Deteniendo Tor..."
-                }
-                TorService.STATUS_OFF -> {
-                    state = TorState.STOPPED
-                    statusMessage = "Tor apagado"
-                    // Android can stop Tor while Senda is in the background: pages wait again (instead of failing
-                    // against an empty port) until Tor is started again when Senda comes back ([resume])
-                    onStateChanged?.invoke()
-                }
+            Log.i(TAG, "Tor broadcast recibido: status=$status (estado=$state)")
+            val result = TorStatusRules.onStatus(state, status, wanted, oldTorClosing) ?: return
+            if (result.oldTorStillClosing) oldTorClosing = true
+            if (result.oldTorFinished) {
+                oldTorClosing = false
+                return
             }
+            changeState(result.state)
+            if (result.state == TorState.CONNECTED) {
+                // tor-android 0.4.9 no longer exposes the port as a static field: it is the one set in ensureTorrc()
+                socksPort = TOR_SOCKS_PORT
+                Log.i(TAG, "Tor conectado exitosamente en puerto $socksPort")
+            }
+            // Android stops Tor when Senda stays in the background: before, the OFF often arrived just after Senda
+            // came back to the front, nothing started Tor again and every page failed against the empty port
+            if (result.restart) appContext?.let { start(it) }
         }
     }
 
-    @Suppress("DEPRECATION")
+    private fun changeState(newState: TorState) {
+        state = newState
+        statusMessage = when (newState) {
+            TorState.STOPPED -> "Tor apagado"
+            TorState.STARTING -> "Construyendo circuito Tor..."
+            TorState.CONNECTED -> "Conectado a la Red Tor (127.0.0.1:$socksPort)"
+            TorState.STOPPING -> "Deteniendo Tor..."
+            TorState.ERROR -> "Tor no pudo conectarse"
+        }
+        // While Tor is not ready, pages wait for it (never a direct connection) or fail with ERROR
+        onStateChanged?.invoke()
+    }
+
     fun init(context: Context) {
+        appContext = context.applicationContext
         if (!receiverRegistered) {
-            val filter = IntentFilter(TorService.ACTION_STATUS)
-            try {
-                LocalBroadcastManager.getInstance(context).registerReceiver(statusReceiver, filter)
-            } catch (e: Exception) {
-                Log.w(TAG, "LocalBroadcastManager error: ${e.message}")
-            }
-            try {
-                androidx.core.content.ContextCompat.registerReceiver(
-                    context,
-                    statusReceiver,
-                    filter,
-                    androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED
-                )
-            } catch (e: Exception) {
-                Log.w(TAG, "Receiver ya registrado o error leve: ${e.message}")
-            }
+            // Only the local broadcast: TorService sends every status both locally and globally, and listening to
+            // both delivered each one twice
+            LocalBroadcastManager.getInstance(context).registerReceiver(statusReceiver, IntentFilter(TorService.ACTION_STATUS))
             receiverRegistered = true
         }
     }
@@ -111,6 +106,8 @@ object SendaTorManager {
             prefs.proxyPort = 9050
             prefs.proxyDnsRemote = true
             start(context)
+        } else {
+            wanted = false
         }
         // Switching away from Tor leaves it running until Senda closes. Starting Tor again in the same process
         // often failed (tor-android frees its lock before the old Tor has closed): pages stayed loading or
@@ -129,27 +126,25 @@ object SendaTorManager {
 
     fun start(context: Context) {
         init(context)
+        wanted = true
         if (state == TorState.CONNECTED || state == TorState.STARTING) return
 
-        state = TorState.STARTING
-        statusMessage = "Iniciando demonio Tor embebido..."
-        onStateChanged?.invoke()
+        changeState(TorState.STARTING)
 
         val app = context.applicationContext
         timeoutJob?.cancel()
         timeoutJob = scope.launch {
-            // A Tor that Android just stopped can still hold its port for a moment: a new Tor started then cannot
-            // open it and never connects
+            // A Tor that Android just stopped is still closing: tor-android frees its lock before that, so a new
+            // Tor would run beside it in the same process and could not open the port
+            waitForOldTor()
             withContext(Dispatchers.IO) { waitForFreePort() }
             if (launchService(app)) {
                 // The receiver switches to CONNECTED with STATUS_ON. Without it in time, pages stop waiting and show
                 // the connection error (never a direct connection); if Tor connects later, it is used from then on
                 delay(60_000)
                 if (state == TorState.STARTING) {
-                    state = TorState.ERROR
-                    statusMessage = "Tor no pudo conectarse"
                     Log.w(TAG, "Tor no conectó en 60 s")
-                    onStateChanged?.invoke()
+                    changeState(TorState.ERROR)
                 }
             }
         }
@@ -163,16 +158,22 @@ object SendaTorManager {
         } catch (e: IllegalStateException) {
             // Senda is in the background: Android does not allow starting the service. Pages wait; [resume] starts it
             Log.w(TAG, "Tor no se puede iniciar en segundo plano: ${e.message}")
-            state = TorState.STOPPED
-            statusMessage = "Tor apagado"
-            onStateChanged?.invoke()
+            changeState(TorState.STOPPED)
         } catch (e: Exception) {
             Log.e(TAG, "Error al iniciar TorService: ${e.message}", e)
-            state = TorState.ERROR
-            statusMessage = "Error al iniciar Tor: ${e.localizedMessage}"
-            onStateChanged?.invoke()
+            changeState(TorState.ERROR)
         }
         return false
+    }
+
+    /** Waits (up to 10 s) for the STOPPING of a Tor that Android stopped while it was running. */
+    private suspend fun waitForOldTor() {
+        repeat(40) {
+            if (!oldTorClosing) return
+            delay(250)
+        }
+        Log.w(TAG, "El Tor anterior no terminó en 10 s")
+        oldTorClosing = false
     }
 
     /** Waits (up to 10 s) until nothing answers on Tor's port. */
