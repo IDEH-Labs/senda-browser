@@ -111,9 +111,10 @@ object SendaTorManager {
             prefs.proxyPort = 9050
             prefs.proxyDnsRemote = true
             start(context)
-        } else {
-            stop(context)
         }
+        // Switching away from Tor leaves it running until Senda closes. Starting Tor again in the same process
+        // often failed (tor-android frees its lock before the old Tor has closed): pages stayed loading or
+        // showed an error. With Tor kept running, switching back is instant
         SendaGeckoEngine.applyProxy(prefs)
     }
 
@@ -134,15 +135,13 @@ object SendaTorManager {
         statusMessage = "Iniciando demonio Tor embebido..."
         onStateChanged?.invoke()
 
-        try {
-            ensureTorrc(context)
-            val intent = Intent(context, TorService::class.java).apply {
-                action = TorService.ACTION_START
-            }
-            context.startService(intent)
-
-            timeoutJob?.cancel()
-            timeoutJob = scope.launch {
+        val app = context.applicationContext
+        timeoutJob?.cancel()
+        timeoutJob = scope.launch {
+            // A Tor that Android just stopped can still hold its port for a moment: a new Tor started then cannot
+            // open it and never connects
+            withContext(Dispatchers.IO) { waitForFreePort() }
+            if (launchService(app)) {
                 // The receiver switches to CONNECTED with STATUS_ON. Without it in time, pages stop waiting and show
                 // the connection error (never a direct connection); if Tor connects later, it is used from then on
                 delay(60_000)
@@ -153,6 +152,14 @@ object SendaTorManager {
                     onStateChanged?.invoke()
                 }
             }
+        }
+    }
+
+    private fun launchService(context: Context): Boolean {
+        try {
+            ensureTorrc(context)
+            context.startService(Intent(context, TorService::class.java).apply { action = TorService.ACTION_START })
+            return true
         } catch (e: IllegalStateException) {
             // Senda is in the background: Android does not allow starting the service. Pages wait; [resume] starts it
             Log.w(TAG, "Tor no se puede iniciar en segundo plano: ${e.message}")
@@ -165,21 +172,20 @@ object SendaTorManager {
             statusMessage = "Error al iniciar Tor: ${e.localizedMessage}"
             onStateChanged?.invoke()
         }
+        return false
     }
 
-    fun stop(context: Context) {
-        timeoutJob?.cancel()
-        state = TorState.STOPPING
-        statusMessage = "Deteniendo Tor para conservar batería..."
-        try {
-            val intent = Intent(context, TorService::class.java)
-            context.stopService(intent)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error al detener TorService: ${e.message}")
-        } finally {
-            state = TorState.STOPPED
-            statusMessage = "Tor apagado"
+    /** Waits (up to 10 s) until nothing answers on Tor's port. */
+    private fun waitForFreePort() {
+        repeat(40) {
+            try {
+                java.net.Socket().use { it.connect(java.net.InetSocketAddress("127.0.0.1", TOR_SOCKS_PORT), 200) }
+            } catch (e: java.io.IOException) {
+                return
+            }
+            Thread.sleep(250)
         }
+        Log.w(TAG, "El puerto $TOR_SOCKS_PORT sigue ocupado")
     }
 
     private fun ensureTorrc(context: Context) {
