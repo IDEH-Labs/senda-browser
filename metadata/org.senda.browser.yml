@@ -1,13 +1,13 @@
 AntiFeatures:
   NonFreeNet:
     en-US: |-
-      Google Safe Browsing is on by default (it can be turned off in Settings). Wallpapers that are
-      not included are downloaded, only when the user picks one, from the project's release on GitHub (GitLab as
-      a fallback).
+      Wallpapers that are not included are downloaded, only when the user picks one, from the project's release on
+      Codeberg, with GitHub (a proprietary service) and GitLab as fallbacks. Senda does not include Google Safe
+      Browsing.
 Categories:
   - Internet
   - Security
-License: GPL-3.0-only
+License: GPL-3.0-or-later
 AuthorName: IDEH Labs
 AuthorWebSite: https://ideh.top/
 SourceCode: https://github.com/IDEH-Labs/senda-browser

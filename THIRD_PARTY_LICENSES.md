@@ -1,6 +1,6 @@
 # Third-party components
 
-Senda is distributed under the **GNU GPL v3** (see `LICENSE`). It includes or uses these components, each under its own license:
+Senda is distributed under the **GNU GPL v3 or later** (GPL-3.0-or-later; see `LICENSE`). It includes or uses these components, each under its own license:
 
 | Component | Author | License | Use in Senda |
 |---|---|---|---|

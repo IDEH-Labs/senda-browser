@@ -55,12 +55,17 @@ The interface is available in 8 languages: Spanish, English, German, French, Por
 
 So you know exactly what leaves your phone without you asking:
 
-- **Safe Browsing (Google)**, on by default: downloads lists of dangerous sites. It can be turned off in Settings.
+- **DNS over HTTPS**: page addresses are looked up through Quad9 by default (another provider or none can be chosen in Settings).
+- **Tracking protection lists**: Mozilla's lists of trackers, updated every few hours, as in Firefox.
 - **uBlock Origin**: periodically updates its filter lists from each list's servers.
 - **Home page news**, in the Inspirational and Informational layouts, and in Custom if you turn news on: reads the RSS feeds of MuyLinux, EFF and FSF. The Focused layout neither shows nor downloads news.
 - **Translation**: the first time you translate a language, it downloads that language's model from Mozilla. Translation then runs on the phone.
 - **Removed assistant**: once only, when updating from a version that had the AI assistant, a ChatGPT session you had signed in with is revoked at OpenAI; the assistant's data is deleted from the phone.
-- **Wallpapers**: only when you choose a wallpaper that is not included (and after asking), it is downloaded from this repository's `wallpapers-1` release on GitHub (GitLab as fallback), through the same Tor or proxy as browsing; its SHA-256 is checked.
+- **Wallpapers**: only when you choose a wallpaper that is not included (and after asking), it is downloaded from this repository's `wallpapers-1` release on Codeberg (GitHub and GitLab as fallbacks), through the same Tor or proxy as browsing; its SHA-256 is checked.
+
+With Tor on, these connections go through Tor too, like your browsing.
+
+Senda does **not** include Google Safe Browsing, so it does not warn about phishing or malware sites by itself. Firefox keeps contacting Google for it even when it is turned off (measured on October 11, 2026), so Senda turns it off completely and leaves its Google servers empty.
 
 Senda includes no telemetry or usage reports. Firefox's captive portal detection is turned off.
 
@@ -110,7 +115,7 @@ adb shell am instrument -w org.senda.browser.test/androidx.test.runner.AndroidJU
 
 ## License
 
-Senda is free software under the **GNU General Public License v3** (see [`LICENSE`](LICENSE)). Third-party components and their licenses are listed in [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md).
+Senda is free software: you can redistribute it and/or modify it under the terms of the **GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version** (GPL-3.0-or-later; see [`LICENSE`](LICENSE)). Third-party components and their licenses are listed in [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md).
 
 ---
 
