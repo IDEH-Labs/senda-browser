@@ -137,7 +137,7 @@ fun TvControlsCard(onDone: () -> Unit) {
                         )
                     }
                     IconButton(onClick = {
-                        SendaTvPlayer.requestReturn?.invoke()
+                        SendaTvPlayer.requestReturn?.invoke(true)
                         onDone()
                     }) {
                         Icon(
@@ -215,7 +215,7 @@ private class TvVideoPresentation(
             is SendaTvPlayer.Playback.YouTube -> showYouTube(root, playback)
             is SendaTvPlayer.Playback.File -> showFile(root, playback)
         }
-        SendaTvPlayer.requestReturn = { finish(userExit = true) }
+        SendaTvPlayer.requestReturn = { resume -> finish(userExit = true, resumeOnPhone = resume) }
         SendaTvPlayer.requestLeave = {
             SendaTvPlayer.rememberResume(playback.key, positionSeconds())
             finish(userExit = false, resumeOnPhone = false)
@@ -328,9 +328,9 @@ private class TvVideoPresentation(
         handler.post { close() }
     }
 
-    /** The TV disconnected or Android removed the secondary display. */
+    /** The TV disconnected or Android removed the secondary display: the video stays paused, it does not sound on the phone. */
     override fun onStop() {
-        finish(userExit = false)
+        finish(userExit = false, resumeOnPhone = false)
         super.onStop()
     }
 

@@ -91,9 +91,9 @@ object SendaTvPlayer {
         if (!enabled || tab == null || tab.isPrivate) return
         val key = SendaYouTube.youTubeVideoId(tab.url) ?: SendaMediaCatalog.bestFor(tab.url)?.url ?: return
         if (key == skippedKey || key == playback?.key) return
-        // Another video while the TV is showing one: the new one replaces it
+        // Another video while the TV is showing one: the new one replaces it (the old one stays paused in its tab)
         if (playback != null) {
-            requestReturn?.invoke()
+            requestReturn?.invoke(false)
             if (playback != null) return
         }
         start(tab)
@@ -151,8 +151,11 @@ object SendaTvPlayer {
         Log.i(TAG, "Video de vuelta al teléfono en ${positionSeconds.toInt()}s (mismo video: $sameVideo)")
     }
 
-    /** Asks the TV player to return the video to the phone (with its position). */
-    var requestReturn: (() -> Unit)? = null
+    /**
+     * Asks the TV player to return the video to the phone (with its position). [resumeOnPhone]: only "Watch on the
+     * phone" continues playing there; when the video is replaced, its tab closes or the TV is disconnected it stays paused.
+     */
+    var requestReturn: ((resumeOnPhone: Boolean) -> Unit)? = null
 
     /**
      * Senda went to the background: the TV shows the phone again (another app, e.g. Telegram). Where the video

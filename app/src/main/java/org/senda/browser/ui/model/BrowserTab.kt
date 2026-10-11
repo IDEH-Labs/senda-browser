@@ -1758,6 +1758,10 @@ class BrowserTab(
     }
 
     fun close() {
+        // Its video on the TV ends with it (the TV plays it in a session of its own)
+        if (org.senda.browser.core.cast.SendaTvPlayer.playback?.tab === this) {
+            org.senda.browser.core.cast.SendaTvPlayer.requestReturn?.invoke(false)
+        }
         // Also resolve the ones waiting their turn: an uncompleted GeckoResult leaves Gecko waiting
         while (activePrompt != null) dismissActivePrompt()
         thumbnail = null

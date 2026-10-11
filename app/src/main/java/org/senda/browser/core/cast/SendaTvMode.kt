@@ -144,7 +144,7 @@ object SendaTvMode {
      * moto g34; MediaRouter did not do it). If it did not work, the "Cast screen" panel is opened to tap "Disconnect".
      */
     fun disconnect(context: Context) {
-        SendaTvPlayer.requestReturn?.invoke()
+        SendaTvPlayer.requestReturn?.invoke(false)
         try {
             DisplayManager::class.java.getMethod("disconnectWifiDisplay")
                 .invoke(context.getSystemService(DisplayManager::class.java))
