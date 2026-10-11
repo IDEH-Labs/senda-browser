@@ -74,6 +74,15 @@
             </intent-filter>
         </activity>
 
+        <!-- Opens Senda again in a new process when Gecko must re-read the proxy (Tor or proxy to direct) -->
+        <activity
+            android:name=".SendaRestartActivity"
+            android:exported="false"
+            android:process=":restart"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@style/Theme.Senda" />
+
         <service
             android:name=".core.cast.SendaTvModeService"
             android:exported="false"

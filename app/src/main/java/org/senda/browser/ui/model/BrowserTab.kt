@@ -424,6 +424,11 @@ class BrowserTab(
                     if (newUrl == "about:blank" && url.startsWith("moz-extension://")) {
                         return
                     }
+                    // A tab restored without loading opens on about:blank: it keeps its address, otherwise it was
+                    // dropped the next time the open tabs were saved (lost on the second restart)
+                    if (newUrl == "about:blank" && pendingLoad != null) {
+                        return
+                    }
                     // Senda error page: the bar keeps the address that failed
                     val failed = pendingErrorUrl
                     if (failed != null && newUrl.startsWith("data:text/html")) {

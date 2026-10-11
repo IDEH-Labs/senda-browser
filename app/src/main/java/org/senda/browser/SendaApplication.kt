@@ -23,12 +23,11 @@ class SendaApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         // Make sure GeckoRuntime is only initialized in the main UI process,
-        // not in Gecko's child processes (:tab, :gpu, :crashhelper, etc.)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            val processName = Application.getProcessName()
-            if (processName != packageName) {
-                return
-            }
+        // not in Gecko's child processes (:tab, :gpu, :crashhelper, etc.) nor in ":restart"
+        val processName = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) Application.getProcessName()
+            else runCatching { java.io.File("/proc/self/cmdline").readText().substringBefore('\u0000') }.getOrNull()
+        if (processName != null && processName != packageName) {
+            return
         }
         // Catch and log uncaught exceptions to avoid silent crashes
         val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
@@ -64,7 +63,12 @@ class SendaApplication : Application() {
         // Initialize the built-in Tor manager
         org.senda.browser.core.SendaTorManager.init(this)
         org.senda.browser.core.SendaTorManager.onStateChanged = { SendaGeckoEngine.applyProxy(prefs) }
-        if (prefs.proxyMode == "TOR_ORBOT") org.senda.browser.core.SendaTorManager.start(this)
+        if (prefs.proxyMode == "TOR_ORBOT") {
+            org.senda.browser.core.SendaTorManager.start(this)
+        } else {
+            // Android starts tor-android's sticky service again after the process ends: without Tor mode it is not used
+            stopService(android.content.Intent(this, org.torproject.jni.TorService::class.java))
+        }
     }
 
     companion object {

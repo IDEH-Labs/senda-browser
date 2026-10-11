@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.sp
 import org.senda.browser.core.PreferencesManager
 import org.senda.browser.core.SendaGeckoEngine
 import org.senda.browser.core.SendaTorManager
+import org.senda.browser.MainActivity
 import org.senda.browser.core.TorState
 import org.senda.browser.core.SendaStringPack
 
@@ -282,6 +283,11 @@ fun SettingsTorDialog(
                     SendaTorManager.applyMode(context, prefs)
                     onSettingsChanged()
                     onDismiss()
+                    if (SendaGeckoEngine.needsRestartFor(selectedMode)) {
+                        var activity = context
+                        while (activity is android.content.ContextWrapper && activity !is MainActivity) activity = activity.baseContext
+                        (activity as? MainActivity)?.restartSenda()
+                    }
                 }
             ) {
                 Text(strings.general_save)

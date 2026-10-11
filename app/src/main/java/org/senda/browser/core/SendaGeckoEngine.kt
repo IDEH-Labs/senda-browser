@@ -102,6 +102,7 @@ object SendaGeckoEngine {
      */
     private fun startupProxyPrefs(prefs: PreferencesManager?): String {
         val mode = prefs?.proxyMode ?: return ""
+        startupProxyMode = mode
         // Only characters of a host name or address: the value goes into YAML
         val host = prefs.proxyHost.filter { it.isLetterOrDigit() || it in ".:-[]" }.ifBlank { "127.0.0.1" }
         val port = prefs.proxyPort.coerceIn(1, 65535)
@@ -114,6 +115,16 @@ object SendaGeckoEngine {
             else -> ""
         }
     }
+
+    /** Proxy mode set in Gecko's prefs when this process started ([startupProxyPrefs]). */
+    private var startupProxyMode = "OFF"
+
+    /**
+     * Whether switching to [mode] needs Senda to start again: Gecko keeps the proxy set at startup when the proxy
+     * extension asks for a direct connection (ProxyChannelFilter: "direct" returns the default proxy). Any other
+     * proxy from the extension does replace it.
+     */
+    fun needsRestartFor(mode: String) = mode == "OFF" && startupProxyMode in setOf("TOR_ORBOT", "CUSTOM_SOCKS5", "CUSTOM_HTTP")
 
     private fun socksPrefs(host: String, port: Int, remoteDns: Boolean) =
         "  network.proxy.type: 1\n  network.proxy.socks: \"$host\"\n  network.proxy.socks_port: $port\n" +

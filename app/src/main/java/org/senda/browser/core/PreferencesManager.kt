@@ -1,5 +1,6 @@
 package org.senda.browser.core
 
+import androidx.core.content.edit
 import android.content.Context
 import android.content.SharedPreferences
 
@@ -352,6 +353,11 @@ class PreferencesManager(context: Context) {
     var startupMode: String
         get() = prefs.getString("startup_mode", "HOME") ?: "HOME"
         set(value) = prefs.edit().putString("startup_mode", value).apply()
+
+    /** Writes every pending change to disk now (apply() writes later; needed before the process ends). */
+    fun flush() {
+        prefs.edit(commit = true) {}
+    }
 
     fun saveOpenTabs(tabs: List<SavedTab>, activeIndex: Int) {
         val array = org.json.JSONArray()

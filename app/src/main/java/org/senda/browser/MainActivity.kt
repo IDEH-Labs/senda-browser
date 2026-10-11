@@ -127,7 +127,7 @@ class MainActivity : FragmentActivity() {
             // Initialize with the first tab
             LaunchedEffect(Unit) {
                 if (tabs.isEmpty()) {
-                    val startupMode = if (recreated) "RESUME" else prefs.startupMode
+                    val startupMode = if (recreated || intent.getBooleanExtra(EXTRA_RESUME, false)) "RESUME" else prefs.startupMode
                     // Reopen the tabs of the previous session (private ones are never saved)
                     if (!prefs.alwaysPrivateMode && startupMode != "CLEAN") {
                         val (saved, activeIndex) = prefs.loadOpenTabs()
@@ -246,20 +246,24 @@ class MainActivity : FragmentActivity() {
             // with hidden bars and locked orientation, and back in the system the immersive window keeps claiming the screen
             // Save the open tabs when leaving Senda, to reopen them next time
             DisposableEffect(Unit) {
-                val observer = LifecycleEventObserver { _, event ->
-                    if (event == Lifecycle.Event.ON_STOP) {
-                        val keep = tabs.filter { tab ->
-                            !tab.isPrivate && (tab.url.startsWith("http://") || tab.url.startsWith("https://"))
-                        }
-                        val active = keep.indexOfFirst { it.id == activeTabId }.coerceAtLeast(0)
-                        prefs.saveOpenTabs(
-                            keep.map { PreferencesManager.SavedTab(it.url, it.title, it.lastUsed) },
-                            active
-                        )
+                saveOpenTabs = {
+                    val keep = tabs.filter { tab ->
+                        !tab.isPrivate && (tab.url.startsWith("http://") || tab.url.startsWith("https://"))
                     }
+                    val active = keep.indexOfFirst { it.id == activeTabId }.coerceAtLeast(0)
+                    prefs.saveOpenTabs(
+                        keep.map { PreferencesManager.SavedTab(it.url, it.title, it.lastUsed) },
+                        active
+                    )
+                }
+                val observer = LifecycleEventObserver { _, event ->
+                    if (event == Lifecycle.Event.ON_STOP) saveOpenTabs?.invoke()
                 }
                 lifecycle.addObserver(observer)
-                onDispose { lifecycle.removeObserver(observer) }
+                onDispose {
+                    lifecycle.removeObserver(observer)
+                    saveOpenTabs = null
+                }
             }
 
             DisposableEffect(activeTab) {
@@ -479,6 +483,30 @@ class MainActivity : FragmentActivity() {
     override fun onStop() {
         getSystemService(DisplayManager::class.java)?.unregisterDisplayListener(displayListener)
         super.onStop()
+    }
+
+    /** Saves the open tabs (set by the browser screen). */
+    private var saveOpenTabs: (() -> Unit)? = null
+
+    companion object {
+        /** Opened again by [SendaRestartActivity]: continue in the last tab, as after a rotation. */
+        const val EXTRA_RESUME = "org.senda.browser.RESUME_TABS"
+    }
+
+    /**
+     * Closes this process and opens Senda again in a new one ([SendaRestartActivity]), continuing in the last tab.
+     * The same order as ProcessPhoenix: the tabs and settings are written to disk first, because the process ends at once.
+     */
+    fun restartSenda() {
+        saveOpenTabs?.invoke()
+        prefs.flush()
+        // tor-android's service is sticky: Android would start it again in the new process, also in direct mode
+        stopService(Intent(this, org.torproject.jni.TorService::class.java))
+        startActivity(
+            Intent(this, SendaRestartActivity::class.java).putExtra(SendaRestartActivity.EXTRA_PID, android.os.Process.myPid())
+        )
+        finish()
+        Runtime.getRuntime().exit(0)
     }
 
     private fun updateRefreshRateForMirroring() {
