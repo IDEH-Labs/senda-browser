@@ -415,7 +415,8 @@ class PreferencesManager(context: Context) {
 
     // --- TOR ROUTING & SECURE PROXY ---
     var proxyMode: String
-        get() = prefs.getString("proxy_mode", "OFF") ?: "OFF" // OFF, TOR_ORBOT, CUSTOM_SOCKS5, CUSTOM_HTTP
+        // OFF, TOR_ORBOT, CUSTOM_SOCKS5, CUSTOM_HTTP. Settings saved "NONE" for off until 0.2.0-beta.6
+        get() = prefs.getString("proxy_mode", "OFF")?.takeIf { it != "NONE" } ?: "OFF"
         set(value) = prefs.edit().putString("proxy_mode", value).apply()
 
     var proxyHost: String

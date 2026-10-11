@@ -111,7 +111,7 @@ fun SettingsTorDialog(
                 )
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // 1. Built-in Tor / Orbot
+                // 1. Built-in Tor
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -174,14 +174,43 @@ fun SettingsTorDialog(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // 3. Off (direct)
+                // 3. HTTP/HTTPS
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(10.dp))
-                        .clickable { selectedMode = "NONE" },
-                    color = if (selectedMode == "NONE") MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    border = BorderStroke(1.dp, if (selectedMode == "NONE") MaterialTheme.colorScheme.primary else Color.Transparent)
+                        .clickable { selectedMode = "CUSTOM_HTTP" },
+                    color = if (selectedMode == "CUSTOM_HTTP") MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    border = BorderStroke(1.dp, if (selectedMode == "CUSTOM_HTTP") MaterialTheme.colorScheme.primary else Color.Transparent)
+                ) {
+                    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("🌐", fontSize = 20.sp)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(strings.dlg_proxy_http, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text(
+                                text = strings.dlg_proxy_http_sub,
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        RadioButton(
+                            selected = selectedMode == "CUSTOM_HTTP",
+                            onClick = { selectedMode = "CUSTOM_HTTP" }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // 4. Off (direct)
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable { selectedMode = "OFF" },
+                    color = if (selectedMode == "OFF") MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    border = BorderStroke(1.dp, if (selectedMode == "OFF") MaterialTheme.colorScheme.primary else Color.Transparent)
                 ) {
                     Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text("⚡", fontSize = 20.sp)
@@ -195,13 +224,13 @@ fun SettingsTorDialog(
                             )
                         }
                         RadioButton(
-                            selected = selectedMode == "NONE",
-                            onClick = { selectedMode = "NONE" }
+                            selected = selectedMode == "OFF",
+                            onClick = { selectedMode = "OFF" }
                         )
                     }
                 }
 
-                if (selectedMode == "CUSTOM_SOCKS5") {
+                if (selectedMode == "CUSTOM_SOCKS5" || selectedMode == "CUSTOM_HTTP") {
                     Spacer(modifier = Modifier.height(14.dp))
                     OutlinedTextField(
                         value = hostInput,
@@ -236,15 +265,6 @@ fun SettingsTorDialog(
                         text = strings.dlg_proxy_remote_dns_sub,
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                if (selectedMode == "TOR_ORBOT") {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = strings.dlg_tor_orbot_note,
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.primary
                     )
                 }
             }

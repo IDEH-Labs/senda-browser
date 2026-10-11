@@ -70,6 +70,9 @@ object SendaTorManager {
                 TorService.STATUS_OFF -> {
                     state = TorState.STOPPED
                     statusMessage = "Tor apagado"
+                    // Android can stop Tor while Senda is in the background: pages wait again (instead of failing
+                    // against an empty port) until Tor is started again when Senda comes back ([resume])
+                    onStateChanged?.invoke()
                 }
             }
         }
@@ -114,12 +117,22 @@ object SendaTorManager {
         SendaGeckoEngine.applyProxy(prefs)
     }
 
+    /**
+     * Starts Tor again if it is not running when Senda comes to the front. When Android starts the process in the
+     * background (after a reboot or an update, through the TV mode receiver) it does not allow starting Tor, and it
+     * can stop Tor later: before this, browsing stayed without Tor until Senda was force-stopped.
+     */
+    fun resume(context: Context, prefs: PreferencesManager) {
+        if (prefs.proxyMode == "TOR_ORBOT" && (state == TorState.STOPPED || state == TorState.ERROR)) start(context)
+    }
+
     fun start(context: Context) {
         init(context)
         if (state == TorState.CONNECTED || state == TorState.STARTING) return
 
         state = TorState.STARTING
         statusMessage = "Iniciando demonio Tor embebido..."
+        onStateChanged?.invoke()
 
         try {
             ensureTorrc(context)
@@ -140,6 +153,12 @@ object SendaTorManager {
                     onStateChanged?.invoke()
                 }
             }
+        } catch (e: IllegalStateException) {
+            // Senda is in the background: Android does not allow starting the service. Pages wait; [resume] starts it
+            Log.w(TAG, "Tor no se puede iniciar en segundo plano: ${e.message}")
+            state = TorState.STOPPED
+            statusMessage = "Tor apagado"
+            onStateChanged?.invoke()
         } catch (e: Exception) {
             Log.e(TAG, "Error al iniciar TorService: ${e.message}", e)
             state = TorState.ERROR

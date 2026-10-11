@@ -471,6 +471,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onStart() {
         super.onStart()
+        org.senda.browser.core.SendaTorManager.resume(this, prefs)
         getSystemService(DisplayManager::class.java)?.registerDisplayListener(displayListener, null)
         updateRefreshRateForMirroring()
     }

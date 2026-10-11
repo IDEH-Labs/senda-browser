@@ -1203,7 +1203,7 @@ fun SendaToolbar(
                                     Column {
                                         Text(strings.tb_tor_proxy, fontWeight = FontWeight.SemiBold)
                                         val proxySub = when (activeTab?.prefs?.proxyMode) {
-                                             "TOR_ORBOT" -> "🧅 Tor / Orbot"
+                                             "TOR_ORBOT" -> "🧅 Tor"
                                              "CUSTOM_SOCKS5" -> "🛡️ SOCKS5"
                                              "CUSTOM_HTTP" -> "🌐 HTTP"
                                              else -> strings.dlg_proxy_off
@@ -1564,200 +1564,17 @@ fun SendaToolbar(
         )
     }
 
-    // DIALOG: TOR & PROXY ROUTING
+    // DIALOG: TOR & PROXY ROUTING (the same one as in Settings)
     if (showProxyDialog) {
-        val prefs = activeTab?.prefs
-        var selectedMode by remember { mutableStateOf(prefs?.proxyMode ?: "OFF") }
-        var hostInput by remember { mutableStateOf(prefs?.proxyHost ?: "127.0.0.1") }
-        var portInput by remember { mutableStateOf((prefs?.proxyPort ?: 9050).toString()) }
-        var dnsRemote by remember { mutableStateOf(prefs?.proxyDnsRemote ?: true) }
-
-        AlertDialog(
-            onDismissRequest = { showProxyDialog = false },
-            title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.VpnKey,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(strings.st_tor_title, style = MaterialTheme.typography.titleMedium)
-                }
-            },
-            text = {
-                Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-                    Text(
-                        text = strings.dlg_tor_desc,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // 1. Built-in Tor / Orbot
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .clickable { selectedMode = "TOR_ORBOT" },
-                        color = if (selectedMode == "TOR_ORBOT") MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        border = BorderStroke(1.dp, if (selectedMode == "TOR_ORBOT") MaterialTheme.colorScheme.primary else Color.Transparent)
-                    ) {
-                        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text("🧅", fontSize = 20.sp)
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(strings.dlg_tor_integrated, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                Text(
-                                    text = if (org.senda.browser.core.SendaTorManager.state == org.senda.browser.core.TorState.CONNECTED)
-                                        strings.dlg_tor_status_connected
-                                    else if (org.senda.browser.core.SendaTorManager.state == org.senda.browser.core.TorState.STARTING)
-                                        strings.dlg_tor_status_connecting
-                                    else
-                                        strings.dlg_tor_integrated_sub,
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            RadioButton(
-                                selected = selectedMode == "TOR_ORBOT",
-                                onClick = { selectedMode = "TOR_ORBOT" }
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // 2. Custom SOCKS5
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .clickable { selectedMode = "CUSTOM_SOCKS5" },
-                        color = if (selectedMode == "CUSTOM_SOCKS5") MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        border = BorderStroke(1.dp, if (selectedMode == "CUSTOM_SOCKS5") MaterialTheme.colorScheme.primary else Color.Transparent)
-                    ) {
-                        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Security, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(strings.dlg_proxy_socks5, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                Text(strings.dlg_proxy_socks5_sub, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            RadioButton(
-                                selected = selectedMode == "CUSTOM_SOCKS5",
-                                onClick = { selectedMode = "CUSTOM_SOCKS5" }
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // 3. HTTP/HTTPS
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .clickable { selectedMode = "CUSTOM_HTTP" },
-                        color = if (selectedMode == "CUSTOM_HTTP") MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        border = BorderStroke(1.dp, if (selectedMode == "CUSTOM_HTTP") MaterialTheme.colorScheme.primary else Color.Transparent)
-                    ) {
-                        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Language, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(strings.dlg_proxy_http, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                Text(strings.dlg_proxy_http_sub, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            RadioButton(
-                                selected = selectedMode == "CUSTOM_HTTP",
-                                onClick = { selectedMode = "CUSTOM_HTTP" }
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // 4. Direct connection (OFF)
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .clickable { selectedMode = "OFF" },
-                        color = if (selectedMode == "OFF") MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        border = BorderStroke(1.dp, if (selectedMode == "OFF") MaterialTheme.colorScheme.primary else Color.Transparent)
-                    ) {
-                        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.PowerSettingsNew, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(strings.dlg_proxy_off, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                Text(strings.dlg_proxy_off_sub, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            RadioButton(
-                                selected = selectedMode == "OFF",
-                                onClick = { selectedMode = "OFF" }
-                            )
-                        }
-                    }
-
-                    if (selectedMode == "CUSTOM_SOCKS5" || selectedMode == "CUSTOM_HTTP") {
-                        Spacer(modifier = Modifier.height(14.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedTextField(
-                                value = hostInput,
-                                onValueChange = { hostInput = it },
-                                label = { Text(strings.dlg_proxy_host) },
-                                singleLine = true,
-                                modifier = Modifier.weight(2f)
-                            )
-                            OutlinedTextField(
-                                value = portInput,
-                                onValueChange = { portInput = it },
-                                label = { Text(strings.dlg_proxy_port) },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                singleLine = true,
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth().clickable { dnsRemote = !dnsRemote },
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Checkbox(checked = dnsRemote, onCheckedChange = { dnsRemote = it })
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(strings.dlg_proxy_remote_dns_sub, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val parsedPort = portInput.toIntOrNull() ?: 9050
-                        prefs?.let { p ->
-                            p.proxyMode = selectedMode
-                            p.proxyHost = hostInput.trim()
-                            p.proxyPort = parsedPort
-                            p.proxyDnsRemote = dnsRemote
-                            org.senda.browser.core.SendaTorManager.applyMode(context, p)
-                        }
-                        showProxyDialog = false
-                    }
-                ) {
-                    Text(strings.general_save)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showProxyDialog = false }) {
-                    Text(strings.general_cancel)
-                }
-            }
-        )
+        activeTab?.prefs?.let { p ->
+            org.senda.browser.ui.screens.settings.SettingsTorDialog(
+                context = context,
+                prefs = p,
+                strings = strings,
+                onSettingsChanged = {},
+                onDismiss = { showProxyDialog = false }
+            )
+        }
     }
 }
 
