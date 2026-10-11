@@ -30,6 +30,8 @@ class BrowserTab(
     lazyLoad: Boolean = false
 ) {
     private var pendingLoad: String? = if (lazyLoad && initialUrl != "about:blank") initialUrl else null
+    // Restored tab: keeps its address until its page arrives (with Tor starting it can take a while)
+    private var restoring = pendingLoad != null
     var lastUsed: Long = System.currentTimeMillis()
 
     val session: GeckoSession = existingSession ?: SendaGeckoEngine.createSession(isPrivate)
@@ -426,9 +428,10 @@ class BrowserTab(
                     }
                     // A tab restored without loading opens on about:blank: it keeps its address, otherwise it was
                     // dropped the next time the open tabs were saved (lost on the second restart)
-                    if (newUrl == "about:blank" && pendingLoad != null) {
+                    if (newUrl == "about:blank" && restoring) {
                         return
                     }
+                    restoring = false
                     // Senda error page: the bar keeps the address that failed
                     val failed = pendingErrorUrl
                     if (failed != null && newUrl.startsWith("data:text/html")) {
