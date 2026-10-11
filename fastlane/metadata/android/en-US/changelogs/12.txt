@@ -1,0 +1,1 @@
+Fixes Tor: in 0.2.0-beta.6, with Tor on, pages could stop loading after a reboot or an update until Senda was closed. Videos that leave the TV now stay paused. Smoother video on phones without a hardware AV1 decoder.

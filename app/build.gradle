@@ -27,8 +27,8 @@ android {
         applicationId 'org.senda.browser'
         minSdk 26
         targetSdk 36
-        versionCode 11
-        versionName '0.2.0-beta.6'
+        versionCode 12
+        versionName '0.2.0-beta.7'
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
