@@ -1,0 +1,1 @@
+New JavaScript setting: all, none, or only free JavaScript with GNU LibreJS. uBlock Origin's quick panel now shows the site you are on; it used to show a blank page.
