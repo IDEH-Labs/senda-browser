@@ -10,7 +10,7 @@ import java.net.URL
  * They use the same Tor or proxy as browsing: otherwise, with Tor on, these requests went out
  * directly, with the real IP. If Tor is not ready the connection fails; it never goes out unprotected.
  *
- * Local network addresses (a TV or WebDAV at home) go direct: an external
+ * Local network addresses (a TV at home) go direct: an external
  * proxy cannot reach them.
  */
 object SendaNet {
