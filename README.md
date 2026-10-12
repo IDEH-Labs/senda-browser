@@ -32,6 +32,9 @@ The interface is available in 8 languages: Spanish, English, German, French, Por
 **Privacy and security**
 - Strict tracking protection, isolated third-party cookies, tracking-parameter stripping in URLs, and Global Privacy Control.
 - Built-in uBlock Origin.
+- JavaScript setting: all of it, none, or only free JavaScript with [GNU LibreJS](https://www.gnu.org/software/librejs/),
+  which blocks nonfree, nontrivial scripts as the Free Software Foundation defines them. Many sites stop working in that
+  mode; a site can be allowed from LibreJS's panel in the menu.
 - HTTPS-only mode and DNS over HTTPS, both on by default.
 - Built-in Tor network (optional), or your own SOCKS5/HTTP proxy. It applies from the very first connection: pages wait
   while Tor connects, and a connection that fails through Tor or the proxy fails instead of going out directly.
@@ -59,6 +62,8 @@ So you know exactly what leaves your phone without you asking:
 - **DNS over HTTPS**: page addresses are looked up through Quad9 by default (another provider or none can be chosen in Settings).
 - **Tracking protection lists**: Mozilla's lists of trackers, updated every few hours, as in Firefox.
 - **uBlock Origin**: periodically updates its filter lists from each list's servers.
+- **GNU LibreJS**, only with JavaScript set to "free only": it makes no connections of its own; when a site links its
+  own license page (JavaScript Web Labels), LibreJS reads that page from the site.
 - **Home page news**, in the Inspirational and Informational layouts, and in Custom if you turn news on: reads the RSS feeds of MuyLinux, EFF and FSF. The Focused layout neither shows nor downloads news.
 - **Translation**: the first time you translate a language, it downloads that language's model from Mozilla. Translation then runs on the phone.
 - **Removed assistant**: once only, when updating from a version that had the AI assistant, a ChatGPT session you had signed in with is revoked at OpenAI; the assistant's data is deleted from the phone.
@@ -84,7 +89,7 @@ Mozilla's prebuilt GeckoView.
 
 ## Building
 
-Requirements: JDK 17, the Android SDK with platform 37, and network access: Gradle downloads the dependencies and the official signed uBlock Origin release, which is checked against a pinned SHA-256 (see `app/bundled-assets.gradle`). The APK only includes `arm64-v8a`, and the app runs on Android 8.0 (API 26) and later.
+Requirements: JDK 17, the Android SDK with platform 37, and network access: Gradle downloads the dependencies, the official signed uBlock Origin release and the official GNU LibreJS release, each checked against a pinned SHA-256 (see `app/bundled-assets.gradle`). The APK only includes `arm64-v8a`, and the app runs on Android 8.0 (API 26) and later.
 
 ```bash
 git clone https://github.com/IDEH-Labs/senda-browser.git

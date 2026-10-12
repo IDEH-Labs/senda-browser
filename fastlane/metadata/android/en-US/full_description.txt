@@ -6,6 +6,7 @@ Senda is a free web browser for Android built on Mozilla's GeckoView engine, ind
 <ul>
 <li>Strict tracking protection, isolated third-party cookies, tracking-parameter stripping and Global Privacy Control.</li>
 <li>Built-in uBlock Origin.</li>
+<li>JavaScript setting: all, none, or only free JavaScript with GNU LibreJS.</li>
 <li>HTTPS-only mode and DNS over HTTPS, both on by default.</li>
 <li>Built-in Tor network (optional), or your own SOCKS5/HTTP proxy.</li>
 <li>Password vault encrypted with AES-256-GCM, with the key kept in the phone's secure hardware and unlocked with fingerprint or PIN. Import and export passwords (CSV from Chrome, Brave, Edge, Firefox, Bitwarden or KeePassXC).</li>

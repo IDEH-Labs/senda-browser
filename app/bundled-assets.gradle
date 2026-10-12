@@ -12,12 +12,19 @@ def ublockVersion = '1.75.0'
 def ublockSha256 = '5b74415860456370644bd80f16125e865b0e6c356bb5dfcfb84069967eaa5287'
 def ublockUrl = "https://github.com/gorhill/uBlock/releases/download/${ublockVersion}/uBlock0_${ublockVersion}.firefox.signed.xpi"
 
+// GNU LibreJS: the official GNU release (GPG-signed on ftp.gnu.org, byte-identical to the one on
+// addons.mozilla.org). Senda loads it as a built-in extension, only when "free JavaScript only" is chosen
+def librejsVersion = '7.21.1'
+def librejsSha256 = '60c5b1663ab2507dc12112e44076bb99c8feed0777b4d40ee74b9aef1b0c7256'
+def librejsUrl = "https://ftp.gnu.org/gnu/librejs/librejs-${librejsVersion}.xpi"
+
 // Mozilla Public Suffix List, kept as text (the official file, MPL 2.0) and turned into the
 // per-TLD archive PublicSuffixList.kt reads
 def pslSource = rootProject.file('third_party/publicsuffix/public_suffix_list.dat')
 
 def ublockDir = layout.buildDirectory.dir('generated/senda-assets/ublock')
 def pslDir = layout.buildDirectory.dir('generated/senda-assets/psl')
+def librejsDir = layout.buildDirectory.dir('generated/senda-assets/librejs')
 
 static String sha256Of(File file) {
     def digest = MessageDigest.getInstance('SHA-256')
@@ -46,6 +53,33 @@ def fetchUBlockOrigin = tasks.register('fetchUBlockOrigin') {
             throw new GradleException("uBlock Origin ${ublockVersion}: SHA-256 is ${actual}, expected ${ublockSha256}")
         }
         if (!partial.renameTo(target)) throw new GradleException("Could not move ${partial} to ${target}")
+    }
+}
+
+def fetchLibreJS = tasks.register('fetchLibreJS') {
+    description = 'Downloads the official GNU LibreJS release, verifies its SHA-256 and unpacks it as a built-in extension'
+    inputs.property('url', librejsUrl)
+    inputs.property('sha256', librejsSha256)
+    outputs.dir(librejsDir)
+    doLast {
+        File xpi = new File(temporaryDir, "librejs-${librejsVersion}.xpi")
+        if (!(xpi.isFile() && sha256Of(xpi) == librejsSha256)) {
+            File partial = new File(xpi.path + '.part')
+            new URL(librejsUrl).withInputStream { input -> partial.withOutputStream { it << input } }
+            String actual = sha256Of(partial)
+            if (actual != librejsSha256) {
+                partial.delete()
+                throw new GradleException("GNU LibreJS ${librejsVersion}: SHA-256 is ${actual}, expected ${librejsSha256}")
+            }
+            if (!partial.renameTo(xpi)) throw new GradleException("Could not move ${partial} to ${xpi}")
+        }
+        // A built-in extension is a plain folder: Mozilla's signature (META-INF) is not needed
+        File target = librejsDir.get().dir('extensions/librejs').asFile
+        project.delete(target)
+        project.copy {
+            from(project.zipTree(xpi)) { exclude 'META-INF/**' }
+            into target
+        }
     }
 }
 
@@ -88,6 +122,6 @@ def generatePublicSuffixList = tasks.register('generatePublicSuffixList') {
     }
 }
 
-android.sourceSets.main.assets.srcDirs += [ublockDir.get().asFile, pslDir.get().asFile]
+android.sourceSets.main.assets.srcDirs += [ublockDir.get().asFile, pslDir.get().asFile, librejsDir.get().asFile]
 
-tasks.named('preBuild') { dependsOn fetchUBlockOrigin, generatePublicSuffixList }
+tasks.named('preBuild') { dependsOn fetchUBlockOrigin, fetchLibreJS, generatePublicSuffixList }

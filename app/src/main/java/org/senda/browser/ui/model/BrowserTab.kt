@@ -195,7 +195,7 @@ class BrowserTab(
     init {
         setupDelegates()
         if (initialUrl.startsWith("moz-extension://")) {
-            title = "uBlock Origin"
+            title = SendaGeckoEngine.extensionNameFor(initialUrl)
         }
         if (initialUrl != "about:blank" && existingSession == null && !lazyLoad) {
             loadUri(initialUrl)
@@ -1046,7 +1046,7 @@ class BrowserTab(
         val target = SendaUrlResolver.resolve(uri, searchEngine)
         url = target
         if (target.startsWith("moz-extension://")) {
-            title = "uBlock Origin"
+            title = SendaGeckoEngine.extensionNameFor(target)
         }
         session.loadUri(target)
     }
@@ -1762,6 +1762,8 @@ class BrowserTab(
         try {
             session.setActive(isActive)
             session.setPriorityHint(if (isActive) GeckoSession.PRIORITY_HIGH else GeckoSession.PRIORITY_DEFAULT)
+            // For extensions, the tab in front is the "active tab": their buttons (uBlock, LibreJS) open their panel on it
+            SendaGeckoEngine.setExtensionTabActive(session, isActive)
         } catch (_: Exception) {}
     }
 

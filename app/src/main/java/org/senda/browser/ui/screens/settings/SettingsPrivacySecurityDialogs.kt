@@ -410,6 +410,65 @@ fun SettingsHttpsOnlyDialog(
 }
 
 @Composable
+fun SettingsJavaScriptDialog(
+    prefs: PreferencesManager,
+    strings: SendaStringPack,
+    onSettingsChanged: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    var jsMode by remember { mutableStateOf(prefs.javascriptMode) }
+    fun choose(code: String) {
+        jsMode = code
+        prefs.javascriptMode = code
+        onSettingsChanged()
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("JavaScript") },
+        text = {
+            Column {
+                Text(
+                    text = strings.dlg_js_desc,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                listOf(
+                    "NORMAL" to strings.dlg_js_normal,
+                    "FREE" to strings.dlg_js_free,
+                    "OFF" to strings.dlg_js_off
+                ).forEach { (code, label) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { choose(code) }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(selected = jsMode == code, onClick = { choose(code) })
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = label, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+                if (jsMode == "FREE") {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = strings.dlg_js_free_note,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(strings.general_ok)
+            }
+        }
+    )
+}
+
+@Composable
 fun SettingsDohDialog(
     prefs: PreferencesManager,
     strings: SendaStringPack,

@@ -99,7 +99,8 @@ fun SettingsScreen(
         }
     }
 
-    val allSettings = remember(prefs, strings, isDefaultBrowserApp) {
+    // Rebuilt when a dialog opens or closes: summaries show the value just chosen
+    val allSettings = remember(prefs, strings, isDefaultBrowserApp, activeDialog) {
         buildSettingsList(
             context = context,
             prefs = prefs,
@@ -465,6 +466,16 @@ fun SettingsScreen(
     // DIALOG: HTTPS-ONLY MODE
     if (activeDialog == "https_only") {
         SettingsHttpsOnlyDialog(
+            prefs = prefs,
+            strings = strings,
+            onSettingsChanged = onSettingsChanged,
+            onDismiss = { activeDialog = null }
+        )
+    }
+
+    // DIALOG: JAVASCRIPT (ALL / FREE ONLY WITH GNU LIBREJS / OFF)
+    if (activeDialog == "javascript") {
+        SettingsJavaScriptDialog(
             prefs = prefs,
             strings = strings,
             onSettingsChanged = onSettingsChanged,

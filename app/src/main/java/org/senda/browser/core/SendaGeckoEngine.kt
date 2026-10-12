@@ -11,6 +11,7 @@ import org.mozilla.geckoview.WebExtension
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.setValue
+import androidx.core.net.toUri
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -20,6 +21,144 @@ object SendaGeckoEngine {
 
     private var runtime: GeckoRuntime? = null
     val EMBEDDED_EXTENSION_IDS = setOf("uBlock0@raymondhill.net", "proxy@senda.org", "media@senda.org", "labs@senda.org")
+
+    const val UBLOCK_ID = "uBlock0@raymondhill.net"
+
+    /** GNU LibreJS: bundled, but only installed and enabled while JavaScript is set to "free only". */
+    const val LIBREJS_ID = "jid1-KtlZuoiikVfFew@jetpack"
+    private const val LIBREJS_URI = "resource://android/assets/extensions/librejs/"
+
+    /** Extensions that come with Senda: the extension list does not show them. */
+    fun isBundledExtension(id: String) = id in EMBEDDED_EXTENSION_IDS || id == LIBREJS_ID
+
+    // Buttons of the bundled extensions (uBlock Origin, LibreJS): clicking one opens its panel for the tab in front
+    private val extensionActions = androidx.compose.runtime.mutableStateMapOf<String, WebExtension.Action>()
+
+    /** true while extension [id] runs and its panel can be opened. */
+    fun hasExtensionPanel(id: String) = id in extensionActions
+
+    /** Panel an extension opened from its button; the browser shows it while it is not null. */
+    var extensionPopup by androidx.compose.runtime.mutableStateOf<GeckoSession?>(null)
+        private set
+
+    fun closeExtensionPopup() {
+        extensionPopup?.close()
+        extensionPopup = null
+    }
+
+    /** Opens the panel of extension [id] for the tab in front; false if it is not running. */
+    fun openExtensionPanel(id: String): Boolean {
+        val action = extensionActions[id] ?: return false
+        action.click()
+        return true
+    }
+
+    // Mode last applied to Gecko; pages already open load it on their next reload
+    var appliedJavaScriptMode: String? = null
+        private set
+
+    /**
+     * Applies the JavaScript setting: OFF turns it off in Gecko; FREE runs GNU LibreJS, which blocks nonfree
+     * nontrivial scripts. LibreJS is installed the first time FREE is chosen and only disabled afterwards, so its
+     * lists of allowed and blocked sites stay.
+     */
+    fun applyJavaScriptMode(mode: String) {
+        val rt = runtime ?: return
+        appliedJavaScriptMode = mode
+        rt.settings.setJavaScriptEnabled(mode != "OFF")
+        val controller = rt.webExtensionController
+        val installed = installedExtensions.firstOrNull { it.id == LIBREJS_ID }
+        if (mode == "FREE") {
+            installBuiltInFolder(LIBREJS_URI, LIBREJS_ID) { ext ->
+                if (ext.metaData.enabled) {
+                    setupExtensionPanel(ext)
+                } else {
+                    controller.enable(ext, org.mozilla.geckoview.WebExtensionController.EnableSource.APP).accept(
+                        { enabled -> enabled?.let { replaceInstalled(it); setupExtensionPanel(it) } },
+                        { e -> android.util.Log.e("Senda", "No se pudo activar LibreJS: ${e?.message}") }
+                    )
+                }
+            }
+        } else if (installed != null && installed.metaData.enabled) {
+            extensionActions.remove(LIBREJS_ID)
+            closeExtensionPopup()
+            controller.disable(installed, org.mozilla.geckoview.WebExtensionController.EnableSource.APP).accept(
+                { disabled -> disabled?.let { replaceInstalled(it) } },
+                { e -> android.util.Log.e("Senda", "No se pudo desactivar LibreJS: ${e?.message}") }
+            )
+        }
+    }
+
+    fun setExtensionTabActive(session: GeckoSession, active: Boolean) {
+        runtime?.webExtensionController?.setTabActive(session, active)
+    }
+
+    private fun replaceInstalled(ext: WebExtension) {
+        installedExtensions.removeAll { it.id == ext.id }
+        installedExtensions.add(ext)
+    }
+
+    private val panelDelegate = object : WebExtension.ActionDelegate {
+        override fun onBrowserAction(extension: WebExtension, session: GeckoSession?, action: WebExtension.Action) {
+            // The default button (session null); clicking it opens the panel for the tab in front
+            if (session == null) extensionActions[extension.id] = action
+        }
+
+        override fun onOpenPopup(extension: WebExtension, action: WebExtension.Action) = showExtensionPopup()
+
+        override fun onTogglePopup(extension: WebExtension, action: WebExtension.Action) = showExtensionPopup()
+    }
+
+    private fun setupExtensionPanel(ext: WebExtension) {
+        ext.setActionDelegate(panelDelegate)
+        // Its settings and pages it opens (the LibreJS report, the uBlock dashboard) go in a normal tab
+        ext.tabDelegate = object : WebExtension.TabDelegate {
+            override fun onNewTab(
+                extension: WebExtension,
+                createDetails: WebExtension.CreateTabDetails
+            ): org.mozilla.geckoview.GeckoResult<GeckoSession>? {
+                val session = createSession(isPrivate = false, open = false)
+                return if (openExtensionTab(createDetails.url ?: "about:blank", session)) {
+                    org.mozilla.geckoview.GeckoResult.fromValue(session)
+                } else null
+            }
+
+            override fun onOpenOptionsPage(extension: WebExtension) {
+                extension.metaData.optionsPageUrl?.let { openExtensionTab(it, null) }
+            }
+        }
+    }
+
+    private fun openExtensionTab(url: String, session: GeckoSession?): Boolean {
+        val opener = org.senda.browser.ui.model.BrowserTab.tabOpener ?: return false
+        closeExtensionPopup()
+        val prefs = cachedPrefs
+        opener(
+            org.senda.browser.ui.model.BrowserTab(
+                searchBaseUrl = prefs?.customSearchEngineUrl ?: "https://duckduckgo.com/?q=",
+                prefs = prefs,
+                initialUrl = url,
+                existingSession = session
+            ),
+            false
+        )
+        return true
+    }
+
+    // GeckoView marks the session as an extension popup and loads the panel in it: it is not a tab
+    private fun showExtensionPopup(): org.mozilla.geckoview.GeckoResult<GeckoSession> {
+        closeExtensionPopup()
+        val session = createSession(isPrivate = false)
+        // The panel closes itself (window.close) after some buttons
+        session.contentDelegate = object : GeckoSession.ContentDelegate {
+            override fun onCloseRequest(closing: GeckoSession) {
+                if (closing === extensionPopup) closeExtensionPopup()
+            }
+        }
+        extensionPopup = session
+        return org.mozilla.geckoview.GeckoResult.fromValue(session)
+    }
+
     val installedExtensions = mutableStateListOf<WebExtension>()
     var cachedUBlockOptionsUrl: String? = null
         private set
@@ -82,6 +221,8 @@ object SendaGeckoEngine {
             .globalPrivacyControlEnabled(true)
             // 6. Proactive low-memory detection to purge caches before the OS kills the process
             .lowMemoryDetection(true)
+            // 7. JavaScript off only if the user chose it
+            .javaScriptEnabled(prefs?.javascriptMode != "OFF")
             .build()
 
         runtime = GeckoRuntime.create(context.applicationContext, settings)
@@ -201,6 +342,9 @@ object SendaGeckoEngine {
     fun applyPreferences(prefs: PreferencesManager) {
         val rt = runtime ?: return
         val s = rt.settings
+
+        // JavaScript: only when it changes (FREE checks the LibreJS install)
+        if (prefs.javascriptMode != appliedJavaScriptMode) applyJavaScriptMode(prefs.javascriptMode)
 
         // USB remote debugging
         s.setRemoteDebuggingEnabled(prefs.remoteDebuggingEnabled)
@@ -362,13 +506,18 @@ object SendaGeckoEngine {
                     )
                 }
 
+                // GNU LibreJS, only with JavaScript set to "free only"
+                applyJavaScriptMode(cachedPrefs?.javascriptMode ?: "NORMAL")
+
                 // 1. uBlock Origin
-                val hasUBlock = list?.any { it.id == "uBlock0@raymondhill.net" } == true
+                val hasUBlock = list?.any { it.id == UBLOCK_ID } == true
                 if (!hasUBlock) {
                     installSignedXpi(context, "ublock.xpi") { ext ->
                         android.util.Log.i("Senda", "uBlock Origin instalado con éxito: ${ext.id}")
+                        setupExtensionPanel(ext)
                     }
                 } else {
+                    list?.firstOrNull { it.id == UBLOCK_ID }?.let { setupExtensionPanel(it) }
                     // Except Senda Labs: the user's own CSS and script must never run in private tabs
                     list?.filter { it.id != "labs@senda.org" }?.forEach { ext ->
                         controller.setAllowedInPrivateBrowsing(ext, true)
@@ -617,6 +766,15 @@ object SendaGeckoEngine {
         return ext
     }
 
+    /** Name of the extension a moz-extension:// page belongs to (uBlock Origin, LibreJS...). */
+    fun extensionNameFor(url: String): String {
+        val host = url.toUri().host
+        val ext = installedExtensions.firstOrNull { ext ->
+            host != null && ext.metaData.baseUrl?.toUri()?.host == host
+        }
+        return ext?.metaData?.name?.takeIf { it.isNotBlank() } ?: "Extension"
+    }
+
     fun getExtensionBaseUrl(ext: WebExtension): String? {
         val options = ext.metaData?.optionsPageUrl
         if (!options.isNullOrBlank() && options.startsWith("moz-extension://")) {
@@ -658,14 +816,6 @@ object SendaGeckoEngine {
         if (dash != null) {
             val root = dash.substringBefore("dashboard.html")
             return "${root}dashboard.html#3p-filters.html"
-        }
-        return null
-    }
-
-    fun getUBlockPopupUrl(): String? {
-        val base = cachedUBlockBaseUrl ?: (getUBlockExtension()?.let { getExtensionBaseUrl(it) })
-        if (base != null) {
-            return "${base}popup-fenix.html"
         }
         return null
     }

@@ -1375,6 +1375,25 @@ fun SendaToolbar(
                                     }
                                 )
 
+                                // GNU LibreJS panel: scripts blocked on this page and its exceptions
+                                if (SendaGeckoEngine.hasExtensionPanel(SendaGeckoEngine.LIBREJS_ID)) {
+                                    DropdownMenuItem(
+                                        text = { Text("LibreJS") },
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = Icons.Default.Code,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onSurface,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        },
+                                        onClick = {
+                                            showMenu = false
+                                            SendaGeckoEngine.openExtensionPanel(SendaGeckoEngine.LIBREJS_ID)
+                                        }
+                                    )
+                                }
+
                                 // Home screen shortcut
                                 DropdownMenuItem(
                                     text = { Text(strings.page_add_to_home) },
@@ -1610,7 +1629,7 @@ internal fun fitHostFromEnd(host: String, maxPx: Int, widthOf: (String) -> Int):
 
 private fun formatDisplayHost(raw: String): String {
     if (raw.isBlank() || raw == "about:blank") return ""
-    if (raw.startsWith("moz-extension://")) return "uBlock Origin"
+    if (raw.startsWith("moz-extension://")) return SendaGeckoEngine.extensionNameFor(raw)
     return try {
         val uri = android.net.Uri.parse(raw)
         val host = uri.host?.removePrefix("www.")

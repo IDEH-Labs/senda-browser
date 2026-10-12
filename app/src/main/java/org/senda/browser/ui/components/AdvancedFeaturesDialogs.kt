@@ -279,7 +279,7 @@ fun ExtensionsManagerDialog(
     var refreshTrigger by remember { mutableIntStateOf(0) }
 
     val installedList = remember(refreshTrigger, SendaGeckoEngine.installedExtensions.size) {
-        SendaGeckoEngine.installedExtensions.filter { it.id !in SendaGeckoEngine.EMBEDDED_EXTENSION_IDS }
+        SendaGeckoEngine.installedExtensions.filter { !SendaGeckoEngine.isBundledExtension(it.id) }
     }
 
     // Local .xpi file picker

@@ -219,6 +219,18 @@ fun buildSettingsList(
             onClick = { onOpenDialog("https_only") }
         ),
         SettingItemData(
+            id = "javascript",
+            title = "JavaScript",
+            subtitle = when (prefs.javascriptMode) {
+                "FREE" -> strings.dlg_js_free
+                "OFF" -> strings.dlg_js_off
+                else -> strings.dlg_js_normal
+            },
+            category = strings.cat_privacy,
+            icon = Icons.Default.Code,
+            onClick = { onOpenDialog("javascript") }
+        ),
+        SettingItemData(
             id = "dns_over_https",
             title = strings.st_doh_title,
             subtitle = dohSummary,

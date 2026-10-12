@@ -330,6 +330,9 @@ class MainActivity : FragmentActivity() {
                         SendaGeckoEngine.pendingExtensionInstall?.let { request ->
                             org.senda.browser.ui.components.ExtensionInstallDialog(request)
                         }
+                        SendaGeckoEngine.extensionPopup?.let { popup ->
+                            org.senda.browser.ui.components.ExtensionPopupDialog(popup)
+                        }
                         if (!isUnlocked) {
                             SendaLockScreen(onUnlock = {
                                 showBiometricAuth { success -> if (success) isUnlocked = true }
@@ -376,7 +379,10 @@ class MainActivity : FragmentActivity() {
                                             SendaLocaleManager.applyLocale(this@MainActivity, prefs.appLanguage)
                                         }
                                         updateAntiSnoopingFlag()
+                                        val javaScriptChanged = prefs.javascriptMode != SendaGeckoEngine.appliedJavaScriptMode
                                         SendaGeckoEngine.applyPreferences(prefs)
+                                        // The open page loads with the new JavaScript setting
+                                        if (javaScriptChanged) tabs.firstOrNull { it.id == activeTabId }?.reload()
                                         tabs.forEach { it.searchBaseUrl = prefs.customSearchEngineUrl }
                                     }
                                 )
@@ -441,7 +447,10 @@ class MainActivity : FragmentActivity() {
                                     onSettingsChanged = {
                                         themeRecomposeKey++
                                         updateAntiSnoopingFlag()
+                                        val javaScriptChanged = prefs.javascriptMode != SendaGeckoEngine.appliedJavaScriptMode
                                         SendaGeckoEngine.applyPreferences(prefs)
+                                        // The open page loads with the new JavaScript setting
+                                        if (javaScriptChanged) tabs.firstOrNull { it.id == activeTabId }?.reload()
                                         tabs.forEach { it.searchBaseUrl = prefs.customSearchEngineUrl }
                                     }
                                 )

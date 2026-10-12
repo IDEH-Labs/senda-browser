@@ -40,6 +40,8 @@ data class ZenShortcut(
 class PreferencesManager(context: Context) {
 
     private companion object {
+        val JAVASCRIPT_MODES = setOf("NORMAL", "FREE", "OFF")
+
         val historyExecutor: java.util.concurrent.ExecutorService =
             java.util.concurrent.Executors.newSingleThreadExecutor { r -> Thread(r, "senda-history") }
 
@@ -497,6 +499,14 @@ class PreferencesManager(context: Context) {
         get() = prefs.getBoolean("block_web_popups", true)
         set(value) = prefs.edit().putBoolean("block_web_popups", value).apply()
 
+    /**
+     * JavaScript on web pages: NORMAL = all of it, FREE = only free or trivial scripts (GNU LibreJS),
+     * OFF = none. Any other value (an old or edited backup) counts as NORMAL.
+     */
+    var javascriptMode: String
+        get() = prefs.getString("javascript_mode", "NORMAL").takeIf { it in JAVASCRIPT_MODES } ?: "NORMAL"
+        set(value) = prefs.edit().putString("javascript_mode", value.takeIf { it in JAVASCRIPT_MODES } ?: "NORMAL").apply()
+
     // --- DOWNLOADS AND EXTERNAL APPS ---
     var openLinksInApps: String
         get() = prefs.getString("open_links_in_apps", "ASK") ?: "ASK"
@@ -734,7 +744,7 @@ class PreferencesManager(context: Context) {
         "accent_color_hex", "always_private_mode", "app_language", "ask_download_location",
         "block_fingerprinting", "block_social_trackers", "block_web_popups", "close_tabs_policy", "cookie_policy",
         "dns_over_https_mode", "doh_provider", "enable_anti_snooping", "font_hinting", "font_scale_percent",
-        "force_enable_zoom", "https_only_mode", "offer_translations", "open_links_in_apps", "open_links_in_background",
+        "force_enable_zoom", "https_only_mode", "javascript_mode", "offer_translations", "open_links_in_apps", "open_links_in_background",
         "reader_font_family", "reader_font_size_percent", "reader_theme", "require_biometrics",
         "search_engine_name", "search_engine_url", "search_suggestions_enabled", "selected_wallpaper_id",
         "show_back_button", "show_bookmarks_bar", "show_bookmarks_button", "show_cast_button", "show_devtools_button",

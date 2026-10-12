@@ -24,6 +24,8 @@ Besides the pages you visit, Senda connects only to:
   addresses of the pages you visit.
 - **Mozilla's tracking protection lists**, updated every few hours, as in Firefox.
 - **uBlock Origin filter lists**, which it updates periodically from each list's servers.
+- **GNU LibreJS**, only with JavaScript set to "free only", makes no connections of its own; when a site links its own
+  license page (JavaScript Web Labels), LibreJS reads that page from the site.
 - **News feeds** (MuyLinux, EFF, FSF), only in the home page layouts that show news.
 - **Mozilla's translation models**, only the first time you translate a language.
 - **Wallpapers**: only when you choose one that is not included, and after asking, from this project's release on

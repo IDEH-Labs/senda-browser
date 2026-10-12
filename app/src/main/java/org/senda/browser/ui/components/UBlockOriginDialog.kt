@@ -42,9 +42,6 @@ fun UBlockOriginDialog(
     val dashboardUrl = remember(refreshKey, SendaGeckoEngine.installedExtensions.size) {
         SendaGeckoEngine.getUBlockDashboardUrl()
     }
-    val popupUrl = remember(refreshKey, SendaGeckoEngine.installedExtensions.size) {
-        SendaGeckoEngine.getUBlockPopupUrl()
-    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -112,16 +109,11 @@ fun UBlockOriginDialog(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(10.dp))
                         .clickable {
-                            val target = popupUrl ?: dashboardUrl ?: SendaGeckoEngine.getUBlockPopupUrl() ?: SendaGeckoEngine.getUBlockDashboardUrl()
-                            if (target != null) {
-                                onNavigate(target)
+                            // Its own panel, opened from its button so it knows which page it is about
+                            if (SendaGeckoEngine.openExtensionPanel(SendaGeckoEngine.UBLOCK_ID)) {
+                                onDismiss()
                             } else {
                                 Toast.makeText(context, strings.ublock_connecting, Toast.LENGTH_SHORT).show()
-                                SendaGeckoEngine.refreshExtensions {
-                                    refreshKey++
-                                    val fresh = SendaGeckoEngine.getUBlockPopupUrl() ?: SendaGeckoEngine.getUBlockDashboardUrl()
-                                    if (fresh != null) onNavigate(fresh)
-                                }
                             }
                         },
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
