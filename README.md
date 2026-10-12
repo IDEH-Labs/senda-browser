@@ -4,7 +4,7 @@
 
 The interface is available in 8 languages: Spanish, English, German, French, Portuguese, Italian, Japanese and Chinese.
 
-> **Status: beta (0.2.0-beta.10).** Its author uses it every day and it is ready for wider testing, but it is **not yet recommended for sensitive data**:
+> **Status: beta (0.2.0-beta.11).** Its author uses it every day and it is ready for wider testing, but it is **not yet recommended for sensitive data**:
 > - Tested on a single phone model (Motorola moto g34 5G, Android 15).
 > - Tried by hand on that phone across the 0.1 and 0.2 betas: browsing, reader mode, uBlock Origin, Settings, the password vault (it opens only after fingerprint or PIN; filling in and saving accounts), passkeys (webauthn.io, stored in Bitwarden), wallpaper downloads, and TV mode with an LG TV over Miracast.
 > - Measured on that phone (October 10, 2026): with Tor on, 4 of 4 cold starts went through Tor (check.torproject.org), a page on the local network was not reached directly, and Senda's own Tor works without Orbot. On the TV, a 1080p 60 fps VP9 video played without dropped frames, and YouTube used the phone's hardware VP9 decoder.

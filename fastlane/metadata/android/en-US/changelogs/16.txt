@@ -1,0 +1,1 @@
+Fixes a tab that could be lost if Senda was closed while that tab was reloading after a restart; it now keeps its address until its page arrives.
