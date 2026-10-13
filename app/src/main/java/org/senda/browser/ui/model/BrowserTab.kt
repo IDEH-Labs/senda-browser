@@ -262,7 +262,7 @@ class BrowserTab(
             // If it resolves to the system chooser, there is no specific app to name
             val label = target.activityInfo?.packageName
                 ?.takeIf { it != "android" }
-                ?.let { target.loadLabel(context.packageManager)?.toString() }
+                ?.let { target.loadLabel(context.packageManager).toString() }
             // A single decision: the dialog decides and is then dismissed (which notifies again with "no")
             val decided = java.util.concurrent.atomic.AtomicBoolean(false)
             activePrompt = SendaPrompt.OpenInApp(label) { open ->

@@ -633,9 +633,9 @@ object SendaGeckoEngine {
                         setupExtensionPanel(ext)
                     }
                 } else {
-                    list?.firstOrNull { it.id == UBLOCK_ID }?.let { setupExtensionPanel(it) }
+                    list.firstOrNull { it.id == UBLOCK_ID }?.let { setupExtensionPanel(it) }
                     // Except Senda Labs: the user's own CSS and script must never run in private tabs
-                    list?.filter { it.id != "labs@senda.org" }?.forEach { ext ->
+                    list.filter { it.id != "labs@senda.org" }.forEach { ext ->
                         controller.setAllowedInPrivateBrowsing(ext, true)
                     }
                 }
@@ -876,7 +876,7 @@ object SendaGeckoEngine {
 
     fun getUBlockExtension(): WebExtension? {
         val ext = installedExtensions.firstOrNull { it.id == "uBlock0@raymondhill.net" }
-        if (ext == null || ext.metaData?.optionsPageUrl == null) {
+        if (ext == null || ext.metaData.optionsPageUrl == null) {
             refreshExtensions()
         }
         return ext
@@ -886,20 +886,20 @@ object SendaGeckoEngine {
     fun extensionNameFor(url: String): String {
         val host = url.toUri().host
         val ext = installedExtensions.firstOrNull { ext ->
-            host != null && ext.metaData.baseUrl?.toUri()?.host == host
+            host != null && ext.metaData.baseUrl.toUri().host == host
         }
         return ext?.metaData?.name?.takeIf { it.isNotBlank() } ?: "Extension"
     }
 
     fun getExtensionBaseUrl(ext: WebExtension): String? {
-        val options = ext.metaData?.optionsPageUrl
+        val options = ext.metaData.optionsPageUrl
         if (!options.isNullOrBlank() && options.startsWith("moz-extension://")) {
             val idx = options.lastIndexOf('/')
             if (idx != -1) {
                 return options.substring(0, idx + 1)
             }
         }
-        val base = ext.metaData?.baseUrl
+        val base = ext.metaData.baseUrl
         if (!base.isNullOrBlank() && base.startsWith("moz-extension://")) {
             return if (base.endsWith("/")) base else "$base/"
         }

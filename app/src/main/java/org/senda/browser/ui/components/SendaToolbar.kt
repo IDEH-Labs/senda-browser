@@ -280,7 +280,6 @@ fun SendaToolbar(
                     strokeWidth = 1.dp.toPx()
                 )
             }
-            else -> Modifier
         }
     } else {
         Modifier
@@ -854,7 +853,7 @@ fun SendaToolbar(
                                     )
                                 } else {
                                     HostText(
-                                        host = formatDisplayHost(activeTab?.displayUrl ?: ""),
+                                        host = formatDisplayHost(activeTab.displayUrl),
                                         style = urlTextStyle,
                                         modifier = Modifier.weight(1f)
                                     )
@@ -864,7 +863,7 @@ fun SendaToolbar(
                                 if (!isHomeTab) {
                                     if (prefs?.showReaderButton != false) {
                                         IconButton(
-                                            onClick = { activeTab?.toggleReaderMode() },
+                                            onClick = { activeTab.toggleReaderMode() },
                                             modifier = Modifier
                                                 .size((btnSize.value - 8).coerceAtLeast(24f).dp)
                                                 .clip(RoundedCornerShape(6.dp))
@@ -872,7 +871,7 @@ fun SendaToolbar(
                                             Icon(
                                                 imageVector = Icons.AutoMirrored.Filled.MenuBook,
                                                 contentDescription = strings.tb_reader_mode,
-                                                tint = if (activeTab?.isReaderMode == true) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                tint = if (activeTab.isReaderMode == true) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                                 modifier = Modifier.size((iconSize.value - 2).coerceAtLeast(16f).dp)
                                             )
                                         }
@@ -881,7 +880,7 @@ fun SendaToolbar(
                                     if (prefs?.showReloadButton != false) {
                                         if (isLoading) {
                                             IconButton(
-                                                onClick = { activeTab?.stop() },
+                                                onClick = { activeTab.stop() },
                                                 modifier = Modifier
                                                     .size((btnSize.value - 8).coerceAtLeast(24f).dp)
                                                     .clip(RoundedCornerShape(6.dp))
@@ -934,7 +933,7 @@ fun SendaToolbar(
                         if (prefs?.showShareButton == true && !isHomeTab) {
                             IconButton(
                                 onClick = {
-                                    val currentUrl = activeTab?.url ?: ""
+                                    val currentUrl = activeTab.url
                                     if (currentUrl.isNotBlank()) {
                                         val sendIntent = Intent().apply {
                                             action = Intent.ACTION_SEND
@@ -1221,7 +1220,7 @@ fun SendaToolbar(
                                     IconButton(
                                         onClick = {
                                             showMenu = false
-                                            if (isLoading) activeTab?.stop() else onRefresh()
+                                            if (isLoading) activeTab.stop() else onRefresh()
                                         },
                                         modifier = Modifier.size(36.dp)
                                     ) {
@@ -1378,8 +1377,8 @@ fun SendaToolbar(
                                         onClick = {
                                             showMenu = false
                                             val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                                putExtra(Intent.EXTRA_TEXT, activeTab?.url ?: "")
-                                                putExtra(Intent.EXTRA_SUBJECT, activeTab?.title ?: "Senda Browser")
+                                                putExtra(Intent.EXTRA_TEXT, activeTab.url)
+                                                putExtra(Intent.EXTRA_SUBJECT, activeTab.title)
                                                 type = "text/plain"
                                                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
                                             }
@@ -1403,7 +1402,7 @@ fun SendaToolbar(
                                         onClick = {
                                             showMenu = false
                                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                            clipboard.setPrimaryClip(ClipData.newPlainText("URL", activeTab?.url ?: ""))
+                                            clipboard.setPrimaryClip(ClipData.newPlainText("URL", activeTab.url))
                                             Toast.makeText(context, strings.general_copied, Toast.LENGTH_SHORT).show()
                                         }
                                     )
@@ -1430,8 +1429,8 @@ fun SendaToolbar(
                                         text = {
                                             Text(
                                                 when {
-                                                    activeTab?.isTranslating == true -> strings.translate_in_progress
-                                                    activeTab?.translatedTo != null -> strings.translate_menu_translated
+                                                    activeTab.isTranslating == true -> strings.translate_in_progress
+                                                    activeTab.translatedTo != null -> strings.translate_menu_translated
                                                     else -> strings.translate_menu
                                                 }
                                             )
@@ -1440,7 +1439,7 @@ fun SendaToolbar(
                                             Icon(
                                                 imageVector = Icons.Default.Translate,
                                                 contentDescription = null,
-                                                tint = if (activeTab?.translatedTo != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                                tint = if (activeTab.translatedTo != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                                                 modifier = Modifier.size(20.dp)
                                             )
                                         },
@@ -1463,7 +1462,7 @@ fun SendaToolbar(
                                         },
                                         onClick = {
                                             showMenu = false
-                                            activeTab?.printPage()
+                                            activeTab.printPage()
                                         }
                                     )
 
@@ -1499,7 +1498,7 @@ fun SendaToolbar(
                                         },
                                         onClick = {
                                             showMenu = false
-                                            activeTab?.let { tab ->
+                                            activeTab.let { tab ->
                                                 org.senda.browser.core.SendaPageActions.addToHomeScreen(context, tab.url, tab.title, null)
                                             }
                                         }
@@ -1584,7 +1583,7 @@ fun SendaToolbar(
             // Built-in smooth loading progress bar
             if (isLoading) {
                     LinearProgressIndicator(
-                        progress = { ((activeTab?.progress ?: 0) / 100f).coerceIn(0.05f, 1f) },
+                        progress = { (activeTab.progress / 100f).coerceIn(0.05f, 1f) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(2.5.dp)

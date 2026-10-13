@@ -622,7 +622,7 @@ private fun SendaFilePromptHandler(tab: BrowserTab?) {
 
     LaunchedEffect(filePrompt) {
         val p = filePrompt ?: return@LaunchedEffect
-        val t = tab ?: return@LaunchedEffect
+        val t = tab
         val id = System.identityHashCode(p)
         if (launchedFor == id) return@LaunchedEffect
         launchedFor = id

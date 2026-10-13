@@ -270,7 +270,7 @@ private fun LoginSelectDialog(request: SendaPrompt.LoginSelect, onDismiss: () ->
                         Spacer(Modifier.width(12.dp))
                         Column {
                             Text(
-                                option.value.username ?: "",
+                                option.value.username,
                                 style = MaterialTheme.typography.bodyLarge,
                                 maxLines = 1, overflow = TextOverflow.Ellipsis
                             )
@@ -306,7 +306,7 @@ private fun LoginSaveBar(request: SendaPrompt.LoginSave, onDismiss: () -> Unit) 
     val host = remember(entry) { try { java.net.URI(entry.origin).host } catch (_: Exception) { null } ?: entry.origin }
     // Some sites ask for the username and password on separate screens: GeckoView only sees the password
     // and the account was left without a username. It can be typed or corrected here before saving
-    var username by remember(entry) { mutableStateOf(entry.username ?: "") }
+    var username by remember(entry) { mutableStateOf(entry.username) }
 
     fun save() {
         fun store() {

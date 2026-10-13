@@ -331,8 +331,8 @@ fun ExtensionsManagerDialog(
                     ) {
                         items(installedList, key = { it.id }) { ext ->
                             val meta = ext.metaData
-                            val name = meta?.name?.ifBlank { ext.id } ?: ext.id
-                            var isEnabled by remember(ext.id) { mutableStateOf(meta?.enabled ?: true) }
+                            val name = meta.name?.ifBlank { ext.id } ?: ext.id
+                            var isEnabled by remember(ext.id) { mutableStateOf(meta.enabled) }
 
                             Surface(
                                 modifier = Modifier.fillMaxWidth(),
@@ -355,7 +355,7 @@ fun ExtensionsManagerDialog(
                                                 overflow = TextOverflow.Ellipsis
                                             )
                                             Text(
-                                                text = "v${meta?.version?.ifBlank { "1.0" } ?: "1.0"} • ${ext.id}",
+                                                text = "v${meta.version.ifBlank { "1.0" }} • ${ext.id}",
                                                 fontSize = 10.sp,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 maxLines = 1,
@@ -373,7 +373,7 @@ fun ExtensionsManagerDialog(
                                         )
                                     }
 
-                                    val desc = meta?.description
+                                    val desc = meta.description
                                     if (!desc.isNullOrBlank()) {
                                         Spacer(modifier = Modifier.height(4.dp))
                                         Text(
