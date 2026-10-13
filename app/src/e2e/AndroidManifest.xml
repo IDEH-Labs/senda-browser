@@ -4,8 +4,11 @@
 
     <application>
         <!-- No icon in the launcher: the tests open it directly, and a person must not mistake it for their Senda
-             (on 2026-10-12 it was used to browse during a network audit) -->
-        <activity android:name="org.senda.browser.MainActivity">
+             (on 2026-10-12 it was used to browse during a network audit, also from the recent apps list) -->
+        <activity
+            android:name="org.senda.browser.MainActivity"
+            android:excludeFromRecents="true"
+            tools:replace="android:excludeFromRecents">
             <intent-filter tools:node="remove">
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
