@@ -9,8 +9,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.FitScreen
-import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.Healing
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
@@ -20,10 +18,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -47,7 +41,6 @@ import org.senda.browser.ui.components.SendaToolbar
 import org.senda.browser.ui.components.TabsOverview
 import org.senda.browser.ui.model.BrowserTab
 import org.senda.browser.ui.model.SendaPrompt
-import org.senda.browser.ui.theme.SendaColors
 
 @Composable
 fun BrowserScreen(

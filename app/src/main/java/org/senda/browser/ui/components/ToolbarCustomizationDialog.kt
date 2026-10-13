@@ -28,7 +28,6 @@ import org.senda.browser.core.LocalSendaStrings
 import org.senda.browser.core.PreferencesManager
 import org.senda.browser.core.ToolbarPosition
 import org.senda.browser.core.ToolbarWidgetSize
-import org.senda.browser.ui.theme.SendaColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

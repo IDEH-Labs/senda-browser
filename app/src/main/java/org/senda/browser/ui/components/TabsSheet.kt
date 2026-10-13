@@ -2,7 +2,6 @@ package org.senda.browser.ui.components
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -33,9 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.senda.browser.core.LocalSendaStrings
 import org.senda.browser.core.PreferencesManager
-import org.senda.browser.core.ZenHomeLayout
 import org.senda.browser.ui.model.BrowserTab
-import org.senda.browser.ui.theme.SendaColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

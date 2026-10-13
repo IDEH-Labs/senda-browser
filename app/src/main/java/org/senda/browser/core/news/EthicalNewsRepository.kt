@@ -9,7 +9,6 @@ import kotlinx.coroutines.withContext
 import org.xmlpull.v1.XmlPullParser
 import java.io.InputStream
 import java.net.HttpURLConnection
-import java.net.URL
 
 data class EthicalNewsItem(
     val title: String,
