@@ -138,7 +138,7 @@ object SendaTvPlayer {
         if (userExit || positionSeconds == null) skippedKey = current.key
         val tab = current.tab
         if (positionSeconds == null) {
-            Log.w(TAG, "La TV no pudo reproducir ${current.key}: vuelve a la pestaña")
+            Log.w(TAG, "La TV no pudo reproducir el video: vuelve a la pestaña")
             tab.resumeMedia()
             return
         }

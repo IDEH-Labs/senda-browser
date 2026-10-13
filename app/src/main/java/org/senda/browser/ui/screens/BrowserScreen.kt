@@ -153,7 +153,7 @@ fun BrowserScreen(
         }
         backTrapAt = now
         if (backTrapCount >= 3) {
-            android.util.Log.w("SendaBack", "Atrás atrapado en ${tab.url}: Senda pasa a segundo plano")
+            android.util.Log.w("SendaBack", "Atrás atrapado en la pestaña ${tab.id}: Senda pasa a segundo plano")
             backTrapTabId = null
             backTrapCount = 0
             generateSequence(context) { (it as? android.content.ContextWrapper)?.baseContext }

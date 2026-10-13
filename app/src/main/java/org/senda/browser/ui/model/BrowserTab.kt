@@ -668,12 +668,12 @@ class BrowserTab(
             }
 
             override fun onCrash(session: GeckoSession) {
-                android.util.Log.e("Senda", "GeckoSession onCrash detectado en pestaña: $id (url: $url)")
+                android.util.Log.e("Senda", "GeckoSession onCrash detectado en pestaña: $id")
                 handleTabCrashed()
             }
 
             override fun onKill(session: GeckoSession) {
-                android.util.Log.w("Senda", "GeckoSession onKill (LMK memoria) detectado en pestaña: $id (url: $url)")
+                android.util.Log.w("Senda", "GeckoSession onKill (LMK memoria) detectado en pestaña: $id")
                 handleTabCrashed()
             }
 
