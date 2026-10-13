@@ -10,7 +10,9 @@ APP=org.senda.browser.e2e; HERE=$(dirname "$0")
 free() {
   c=$(adb shell dumpsys telephony.registry | grep -c 'mCallState=[12]')
   top=$(adb shell dumpsys activity activities | grep -m1 topResumedActivity)
-  [ "$c" = 0 ] && echo "$top" | grep -qE "$(adb shell cmd package query-activities --brief -a android.intent.action.MAIN -c android.intent.category.HOME | grep / | cut -d/ -f1 | paste -sd'|')|$APP/"
+  # Outside the pipe: adb would read the line meant for grep. The names come indented, and with \r
+  homes=$(adb shell cmd package query-activities --brief -a android.intent.action.MAIN -c android.intent.category.HOME | grep / | cut -d/ -f1 | tr -d ' \r' | paste -sd'|')
+  [ "$c" = 0 ] && echo "$top" | grep -qE "$homes|$APP/"
 }
 waitfree() { n=0; until free; do sleep 15; n=$((n+1)); [ $n -gt 240 ] && { echo "$(date +%T) phone busy for an hour, stopped" >> "$OUT/run.txt"; exit 3; }; done; }
 echo "$(date +%T) start, mode $MODE" > "$OUT/run.txt"
