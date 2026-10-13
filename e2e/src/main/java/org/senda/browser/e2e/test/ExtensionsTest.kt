@@ -70,4 +70,16 @@ class ExtensionsTest : E2eTest() {
             E2e.has(By.desc(Es.notSecure), 2000)
         )
     }
+
+    /** H8b — found on 2026-10-12: the browser's own about: pages must not say "connection not secure" either. */
+    @Test
+    fun h8b_noNotSecureOnInternalPage() {
+        E2e.launch()
+        E2e.typeAddress("about:config")
+        assertTrue(E2e.has(By.textContains("about:config"), 8000))
+        assertFalse(
+            "The bar says \"connection not secure\" on about:config. Screen: ${E2e.screenTexts()}",
+            E2e.has(By.desc(Es.notSecure), 2000)
+        )
+    }
 }

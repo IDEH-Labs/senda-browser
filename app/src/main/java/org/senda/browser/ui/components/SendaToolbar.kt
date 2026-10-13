@@ -818,10 +818,10 @@ fun SendaToolbar(
                                             // The padlock only appears if Gecko validated the page's certificate. An extension's own
                                             // page comes from the phone itself: no connection, neither secure nor insecure
                                             val secure = activeTab.displaySecure
-                                            if (activeTab.isExtensionPage) {
+                                            if (activeTab.isExtensionPage || activeTab.isInternalPage) {
                                                 Icon(
-                                                    imageVector = Icons.Default.Extension,
-                                                    contentDescription = strings.sec_extension_page,
+                                                    imageVector = if (activeTab.isExtensionPage) Icons.Default.Extension else Icons.Default.Info,
+                                                    contentDescription = if (activeTab.isExtensionPage) strings.sec_extension_page else strings.sec_internal_page,
                                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                                     modifier = Modifier.size((iconSize.value - 4).coerceAtLeast(14f).dp)
                                                 )
@@ -1637,6 +1637,7 @@ fun SendaToolbar(
                         Text(
                             text = when {
                                 activeTab.isExtensionPage -> strings.sec_extension_page
+                                activeTab.isInternalPage -> strings.sec_internal_page
                                 activeTab.displaySecure -> strings.sec_encrypted
                                 else -> strings.sec_unencrypted
                             },

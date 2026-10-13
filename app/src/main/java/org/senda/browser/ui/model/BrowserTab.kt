@@ -53,6 +53,10 @@ class BrowserTab(
     val isExtensionPage: Boolean
         get() = displayUrl.startsWith("moz-extension://")
 
+    /** A page of the browser itself (about:config, about:support…): no server and no connection. */
+    val isInternalPage: Boolean
+        get() = displayUrl.startsWith("about:") && displayUrl != "about:blank"
+
     /** Padlock state: in reader mode, that of the original page. */
     val displaySecure: Boolean
         get() = if (isReaderMode) readerSourceSecure else isSecure
