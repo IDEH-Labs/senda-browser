@@ -812,9 +812,17 @@ fun SendaToolbar(
                                                 .size((btnSize.value - 10).coerceAtLeast(22f).dp)
                                                 .clip(RoundedCornerShape(4.dp))
                                         ) {
-                                            // The padlock only appears if Gecko validated the page's certificate
+                                            // The padlock only appears if Gecko validated the page's certificate. An extension's own
+                                            // page comes from the phone itself: no connection, neither secure nor insecure
                                             val secure = activeTab.displaySecure
-                                            Icon(
+                                            if (activeTab.isExtensionPage) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Extension,
+                                                    contentDescription = strings.sec_extension_page,
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    modifier = Modifier.size((iconSize.value - 4).coerceAtLeast(14f).dp)
+                                                )
+                                            } else Icon(
                                                 imageVector = if (secure) Icons.Default.Lock else Icons.Default.LockOpen,
                                                 contentDescription = if (secure) strings.tb_encrypted_conn else strings.sec_not_secure,
                                                 tint = if (secure) MaterialTheme.colorScheme.primary.copy(alpha = 0.9f) else MaterialTheme.colorScheme.error,
@@ -1544,7 +1552,11 @@ fun SendaToolbar(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = if (activeTab.displaySecure) strings.sec_encrypted else strings.sec_unencrypted,
+                            text = when {
+                                activeTab.isExtensionPage -> strings.sec_extension_page
+                                activeTab.displaySecure -> strings.sec_encrypted
+                                else -> strings.sec_unencrypted
+                            },
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }

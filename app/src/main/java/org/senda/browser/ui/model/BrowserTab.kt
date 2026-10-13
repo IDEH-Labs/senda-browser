@@ -49,6 +49,10 @@ class BrowserTab(
     val displayUrl: String
         get() = if (isReaderMode) originalArticleUrl ?: url else url
 
+    /** A page of an extension (uBlock's dashboard, LibreJS's settings): it comes from the phone, not from a server. */
+    val isExtensionPage: Boolean
+        get() = displayUrl.startsWith("moz-extension://")
+
     /** Padlock state: in reader mode, that of the original page. */
     val displaySecure: Boolean
         get() = if (isReaderMode) readerSourceSecure else isSecure

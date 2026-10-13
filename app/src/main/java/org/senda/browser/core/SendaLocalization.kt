@@ -540,6 +540,7 @@ interface SendaStringPack {
     val sec_site_title: String
     val sec_encrypted: String
     val sec_unencrypted: String
+    val sec_extension_page: String
     val sec_trackers_count_suffix: String
     val sec_cookies_isolated: String
     val ublock_menu_sub: String
@@ -1263,6 +1264,7 @@ object SendaStringsDe : SendaStringPack {
     override val sec_site_title = "Websitesicherheit"
     override val sec_encrypted = "Verschlüsselte Verbindung (TLS/HTTPS)"
     override val sec_unencrypted = "Unverschlüsselte Verbindung (HTTP)"
+    override val sec_extension_page = "Seite einer Erweiterung (auf dem Gerät, ohne Verbindung)"
     override val sec_trackers_count_suffix = "Tracker blockiert"
     override val sec_cookies_isolated = "Strikte Cookie-Isolation aktiv"
     override val ublock_menu_sub = "Regionale Filter (DE, CH, AT...) und Schutz"
@@ -1985,6 +1987,7 @@ object SendaStringsEn : SendaStringPack {
     override val sec_site_title = "Site Security"
     override val sec_encrypted = "Encrypted connection (TLS/HTTPS)"
     override val sec_unencrypted = "Unencrypted connection (HTTP)"
+    override val sec_extension_page = "Extension page (on the device, no connection)"
     override val sec_trackers_count_suffix = "trackers blocked"
     override val sec_cookies_isolated = "Strict cookie isolation active"
     override val ublock_menu_sub = "Regional filters (US, UK, FR...) and shield"
@@ -2707,6 +2710,7 @@ object SendaStringsEs : SendaStringPack {
     override val sec_site_title = "Seguridad del Sitio"
     override val sec_encrypted = "Conexión cifrada (TLS/HTTPS)"
     override val sec_unencrypted = "Conexión no cifrada (HTTP)"
+    override val sec_extension_page = "Página de una extensión (en el teléfono, sin conexión)"
     override val sec_trackers_count_suffix = "rastreadores bloqueados"
     override val sec_cookies_isolated = "Aislamiento estricto de cookies activo"
     override val ublock_menu_sub = "Filtros regionales (AR, CO, FR...) y escudo"
@@ -3429,6 +3433,7 @@ object SendaStringsFr : SendaStringPack {
     override val sec_site_title = "Sécurité du site"
     override val sec_encrypted = "Connexion chiffrée (TLS/HTTPS)"
     override val sec_unencrypted = "Connexion non chiffrée (HTTP)"
+    override val sec_extension_page = "Page d’une extension (sur l’appareil, sans connexion)"
     override val sec_trackers_count_suffix = "pisteurs bloqués"
     override val sec_cookies_isolated = "Isolation stricte des cookies active"
     override val ublock_menu_sub = "Filtres régionaux (FR, BE...) et bouclier"
@@ -4151,6 +4156,7 @@ object SendaStringsPt : SendaStringPack {
     override val sec_site_title = "Segurança do site"
     override val sec_encrypted = "Conexão criptografada (TLS/HTTPS)"
     override val sec_unencrypted = "Conexão não criptografada (HTTP)"
+    override val sec_extension_page = "Página de uma extensão (no dispositivo, sem conexão)"
     override val sec_trackers_count_suffix = "rastreadores bloqueados"
     override val sec_cookies_isolated = "Isolamento estrito de cookies ativo"
     override val ublock_menu_sub = "Filtros regionais (BR, PT...) e escudo"
@@ -4873,6 +4879,7 @@ object SendaStringsIt : SendaStringPack {
     override val sec_site_title = "Sicurezza del sito"
     override val sec_encrypted = "Connessione cifrata (TLS/HTTPS)"
     override val sec_unencrypted = "Connessione non cifrata (HTTP)"
+    override val sec_extension_page = "Pagina di un’estensione (sul dispositivo, senza connessione)"
     override val sec_trackers_count_suffix = "tracker bloccati"
     override val sec_cookies_isolated = "Isolamento rigoroso dei cookie attivo"
     override val ublock_menu_sub = "Filtri regionali (IT, CH...) e protezione"
@@ -5595,6 +5602,7 @@ object SendaStringsJa : SendaStringPack {
     override val sec_site_title = "サイトのセキュリティ"
     override val sec_encrypted = "暗号化された安全な接続 (TLS/HTTPS)"
     override val sec_unencrypted = "暗号化されていない接続 (HTTP)"
+    override val sec_extension_page = "拡張機能のページ（端末内、接続なし）"
     override val sec_trackers_count_suffix = "件のトラッカーをブロック"
     override val sec_cookies_isolated = "厳格な Cookie 隔離が有効"
     override val ublock_menu_sub = "地域別フィルターと保護シールド"
@@ -6317,6 +6325,7 @@ object SendaStringsZh : SendaStringPack {
     override val sec_site_title = "网站安全连接"
     override val sec_encrypted = "已加密的安全连接 (TLS/HTTPS)"
     override val sec_unencrypted = "未加密的不安全连接 (HTTP)"
+    override val sec_extension_page = "扩展程序页面（在设备上，无网络连接）"
     override val sec_trackers_count_suffix = "个跟踪器已被拦截"
     override val sec_cookies_isolated = "已启用严格的 Cookie 隔离保护"
     override val ublock_menu_sub = "区域广告规则与移动防护盾"
