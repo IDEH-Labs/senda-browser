@@ -50,3 +50,4 @@ Set Senda's connection back to what it was, `adb reverse --remove tcp:8899`, sto
 | Date | Senda / GeckoView | Duration | Google hosts | Bypasses | Notes |
 |---|---|---|---|---|---|
 | 2026-10-11 | 0.2.0-beta.8 + Safe Browsing removed (commit 5e78ca9) / GeckoView 157.0.1, moto g34 | 75 min (35 idle, 4 pages, 34 idle) + 2 min with Tor | 0 | 0 | 30 connections, all to the four pages opened; `about:url-classifier` lists only the `mozilla` provider; with Tor, 3 connections, all Tor relays |
+| 2026-10-13 | 0.2.0-beta.13 candidate (commit 66d3e74, e2e app) / GeckoView 158, moto g34 | 75 min (35 idle, 4 pages, 34 idle) | 0 | 0 | 54 connections: the four pages, home news (MuyLinux, EFF), uBlock Origin's lists at startup, and Mozilla's remote settings once at startup (28 collections, including experiment and study ones; none enrolled, Pending Pings empty). Tor not measured |
