@@ -416,6 +416,12 @@ object SendaGeckoEngine {
                 // real IP; nor may anything bypass the proxy (the same as Tor Browser)
                 "  network.proxy.failover_direct: false\n" +
                 "  network.proxy.allow_bypass: false\n" +
+                // No Mozilla experiments, studies or health report, as in LibreWolf and arkenfox. GeckoView 158 does
+                // not start them, yet it downloads their collections (nimbus-*, normandy-*): off in case it ever does
+                "  app.shield.optoutstudies.enabled: false\n" +
+                "  nimbus.rollouts.enabled: false\n" +
+                "  datareporting.healthreport.uploadEnabled: false\n" +
+                "  app.normandy.enabled: false\n" +
                 googleSafeBrowsingOffPrefs() +
                 av1Prefs() +
                 startupProxyPrefs(prefs)

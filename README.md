@@ -62,7 +62,10 @@ The interface is available in 8 languages: Spanish, English, German, French, Por
 So you know exactly what leaves your phone without you asking:
 
 - **DNS over HTTPS**: page addresses are looked up through Quad9 by default (another provider or none can be chosen in Settings).
-- **Tracking protection lists**: Mozilla's lists of trackers, updated every few hours, as in Firefox.
+- **Mozilla's remote settings**, at startup and then once a day, as in Firefox: revoked certificates,
+  blocked dangerous extensions, tracking protection lists, URL tracking parameters, DNS over HTTPS providers and
+  translation models. The same download also brings Mozilla's experiment and study collections; Senda turns those
+  systems off (measured on 2026-10-13: none enrolled).
 - **uBlock Origin**: periodically updates its filter lists from each list's servers.
 - **GNU LibreJS**, only with JavaScript set to "free only": it makes no connections of its own; when a site links its
   own license page (JavaScript Web Labels), LibreJS reads that page from the site.
