@@ -21,7 +21,7 @@ def releaseSigningConfigured = [releaseKeystorePath, releaseKeyAlias, releaseSto
 android {
     namespace 'org.senda.browser'
     compileSdk = 37
-    compileSdkMinor = 1
+    compileSdkMinor = 2
 
     defaultConfig {
         applicationId 'org.senda.browser'
@@ -154,7 +154,7 @@ configurations.all {
 
 dependencies {
     // GeckoView - Mozilla's free web engine
-    implementation 'org.mozilla.geckoview:geckoview:157.0.20261005135250'
+    implementation 'org.mozilla.geckoview:geckoview:158.0.20261007201254'
 
     // AndroidX & Kotlin
     implementation 'androidx.core:core-ktx:1.15.0'

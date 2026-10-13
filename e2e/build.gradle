@@ -7,7 +7,7 @@ plugins {
 android {
     namespace 'org.senda.browser.e2e.test'
     compileSdk = 37
-    compileSdkMinor = 1
+    compileSdkMinor = 2
 
     defaultConfig {
         minSdk 26

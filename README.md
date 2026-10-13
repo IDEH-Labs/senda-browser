@@ -22,7 +22,7 @@ The interface is available in 8 languages: Spanish, English, German, French, Por
 ## Features
 
 **Browsing**
-- GeckoView 157 engine (Mozilla), independent of Chromium.
+- GeckoView 158 engine (Mozilla), independent of Chromium.
 - Separate normal and private tabs, in grid or list view. On launch: a clean home page, resume where you left off, or start fresh.
 - Bookmarks, history and downloads; find in page; desktop site; print or save as PDF; shortcut on the Android home screen.
 - Reader mode in 8 languages, with "key sentences" and search within the text. It works offline and only shows literal sentences from the article.
