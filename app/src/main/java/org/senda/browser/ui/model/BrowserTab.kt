@@ -686,12 +686,16 @@ class BrowserTab(
                         }
                     }
                 }
+                // No DRM, also if a Gecko update turns EME back on: Senda never approves a DRM module
+                if (perm.permission == GeckoSession.PermissionDelegate.PERMISSION_MEDIA_KEY_SYSTEM_ACCESS) {
+                    return GeckoResult.fromValue(GeckoSession.PermissionDelegate.ContentPermission.VALUE_DENY)
+                }
                 val (kind, policy) = when (perm.permission) {
                     GeckoSession.PermissionDelegate.PERMISSION_GEOLOCATION ->
                         PermissionKind.LOCATION to (prefs?.sitePermissionLocation ?: "ASK")
                     GeckoSession.PermissionDelegate.PERMISSION_DESKTOP_NOTIFICATION ->
                         PermissionKind.NOTIFICATIONS to (prefs?.sitePermissionNotifications ?: "BLOCK")
-                    // Everything else (persistent storage, DRM, autoplay…): Gecko decides with its defaults
+                    // Everything else (persistent storage, autoplay…): Gecko decides with its defaults
                     else -> return GeckoResult.fromValue(GeckoSession.PermissionDelegate.ContentPermission.VALUE_PROMPT)
                 }
                 val allow = GeckoSession.PermissionDelegate.ContentPermission.VALUE_ALLOW

@@ -113,6 +113,7 @@ engine and code, no personal data). Only host names and ports are recorded.
 | Id | What it checks |
 |---|---|
 | G1 | `scripts/check_geckoview.py` (run on the computer): Senda's GeckoView against the latest one and Mozilla's security advisories |
+| G2 | No DRM: a page asking for Widevine, as a streaming site does, is refused by Gecko itself (EME off), not only because Senda does not approve it |
 
 ### H. User interface (priority 1)
 

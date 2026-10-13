@@ -35,6 +35,15 @@ object LocalWeb {
                 "$SCRIPT\n// @license-end\n</script>"
         ),
         "/external.html" to page("external", "<p id=\"r\">NOJS</p><script src=\"ext.js\"></script>"),
+        // Asks for Widevine the way a streaming site does; GNU's guidelines rule out browsers that load DRM modules
+        "/drm.html" to page(
+            "drm",
+            "<p id=\"r\">DRM-WAIT</p><script>function show(t){document.getElementById(\"r\").textContent=t;}" +
+                "if(!navigator.requestMediaKeySystemAccess){show(\"DRM-BLOCKED\");}else{" +
+                "navigator.requestMediaKeySystemAccess(\"com.widevine.alpha\",[{initDataTypes:[\"cenc\"]," +
+                "videoCapabilities:[{contentType:'video/mp4; codecs=\"avc1.42E01E\"'}]}])" +
+                ".then(function(){show(\"DRM-AVAILABLE\");},function(e){show(\"DRM-BLOCKED \"+e.message);});}</script>"
+        ),
         "/a.html" to page("e2e-a", "<p>Page A</p>"),
         "/b.html" to page("e2e-b", "<p>Page B</p>"),
         "/c.html" to page("e2e-c", "<p>Page C</p>"),

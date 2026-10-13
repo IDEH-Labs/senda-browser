@@ -44,6 +44,8 @@ The interface is available in 8 languages: Spanish, English, German, French, Por
 - Passkeys and security keys (WebAuthn) through Android's Credential Manager (Android 14 and later), with the password
   manager you use, such as Bitwarden. Google Password Manager does not accept Senda yet: Google only serves browsers it
   has approved.
+- No DRM: EME, the browser feature that loads DRM modules such as Android's Widevine, is turned off, as in GNU
+  IceCat. Streaming sites that require DRM (Netflix, Disney+, Prime Video…) do not play video in Senda; their apps do.
 - No proprietary code: the Google Play Services client library that GeckoView depends on is replaced with microG's free
   one.
 - Optional app lock with fingerprint, and optional screenshot protection.

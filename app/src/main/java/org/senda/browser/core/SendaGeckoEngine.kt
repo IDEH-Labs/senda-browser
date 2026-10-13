@@ -397,6 +397,11 @@ object SendaGeckoEngine {
                 "  media.peerconnection.ice.proxy_only_if_behind_proxy: true\n" +
                 // PDFs do not run scripts
                 "  pdfjs.enableScripting: false\n" +
+                // No DRM: EME, the browser feature that loads DRM modules (here Android's Widevine), is off, as in
+                // GNU IceCat. GNU's free system distribution guidelines rule out browsers that implement it
+                "  media.eme.enabled: false\n" +
+                "  media.mediadrm-widevinecdm.visible: false\n" +
+                "  media.eme.require-app-approval: true\n" +
                 // Passwords: nothing is filled in on page load; the account is chosen when tapping the field
                 "  signon.autofillForms: false\n" +
                 // Security: restricts autofill to the exact origin, not to any subdomain
