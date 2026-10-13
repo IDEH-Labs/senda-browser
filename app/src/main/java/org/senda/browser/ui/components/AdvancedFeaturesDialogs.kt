@@ -254,6 +254,9 @@ fun DownloadsManagerDialog(
 // 2. VISUAL SUPPORT FOR ADD-ONS (EXTENSIONS)
 // =========================================================================
 
+// GeckoView marks WebExtension.metaData and its version non-null, yet Gecko can leave them empty: the safe calls do
+// check for null at run time, so the warning is wrong here
+@Suppress("UNNECESSARY_SAFE_CALL")
 @Composable
 fun ExtensionsManagerDialog(
     onDismiss: () -> Unit
@@ -331,8 +334,8 @@ fun ExtensionsManagerDialog(
                     ) {
                         items(installedList, key = { it.id }) { ext ->
                             val meta = ext.metaData
-                            val name = meta.name?.ifBlank { ext.id } ?: ext.id
-                            var isEnabled by remember(ext.id) { mutableStateOf(meta.enabled) }
+                            val name = meta?.name?.ifBlank { ext.id } ?: ext.id
+                            var isEnabled by remember(ext.id) { mutableStateOf(meta?.enabled ?: true) }
 
                             Surface(
                                 modifier = Modifier.fillMaxWidth(),
@@ -355,7 +358,7 @@ fun ExtensionsManagerDialog(
                                                 overflow = TextOverflow.Ellipsis
                                             )
                                             Text(
-                                                text = "v${meta.version.ifBlank { "1.0" }} • ${ext.id}",
+                                                text = "v${meta?.version?.ifBlank { "1.0" } ?: "1.0"} • ${ext.id}",
                                                 fontSize = 10.sp,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 maxLines = 1,
@@ -373,7 +376,7 @@ fun ExtensionsManagerDialog(
                                         )
                                     }
 
-                                    val desc = meta.description
+                                    val desc = meta?.description
                                     if (!desc.isNullOrBlank()) {
                                         Spacer(modifier = Modifier.height(4.dp))
                                         Text(
