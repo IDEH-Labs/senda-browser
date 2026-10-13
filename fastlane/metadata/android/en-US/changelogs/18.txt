@@ -1,0 +1,1 @@
+GeckoView 158. "Free JavaScript only" now always blocks nonfree scripts after a cold start. No DRM. Links from other apps keep their new tab, Enter in the address bar opens the page, menu in groups with a bookmark star. No IP country lookup and no link prefetching, and visited addresses no longer go to the system log.
