@@ -306,6 +306,8 @@ object SendaGeckoEngine {
             .lowMemoryDetection(true)
             // 7. JavaScript off if the user chose it, and with "free only" until LibreJS is filtering (applyJavaScriptMode)
             .javaScriptEnabled(prefs?.javascriptMode == null || prefs.javascriptMode == "NORMAL")
+            // Language of the engine: extensions (uBlock's panel was in English) and websites follow Senda's language
+            .locales(geckoLocales(prefs))
             .build()
 
         runtime = GeckoRuntime.create(context.applicationContext, settings)
@@ -443,6 +445,8 @@ object SendaGeckoEngine {
         val rt = runtime ?: return
         val s = rt.settings
 
+        geckoLocales(prefs).let { if (!it.contentEquals(s.locales)) s.setLocales(it) }
+
         // JavaScript: only when it changes (FREE checks the LibreJS install)
         if (prefs.javascriptMode != appliedJavaScriptMode) applyJavaScriptMode(prefs.javascriptMode)
 
@@ -552,6 +556,13 @@ object SendaGeckoEngine {
         val request = pendingExtensionInstall ?: return
         pendingExtensionInstall = null
         request.onDecision(accept)
+    }
+
+    /** Senda's language for Gecko: the one chosen in Settings, or the phone's languages with "system default". */
+    private fun geckoLocales(prefs: PreferencesManager?): Array<String> {
+        val chosen = prefs?.appLanguage?.takeIf { it != "SYSTEM" }?.lowercase()
+        return if (chosen != null) arrayOf(chosen)
+        else android.os.LocaleList.getDefault().toLanguageTags().split(',').filter { it.isNotBlank() }.toTypedArray()
     }
 
     /**

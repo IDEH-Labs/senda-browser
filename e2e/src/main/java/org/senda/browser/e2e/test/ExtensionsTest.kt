@@ -24,6 +24,8 @@ class ExtensionsTest : E2eTest() {
         assertTrue("The panel is not about the page in front. Screen: ${E2e.screenTexts()}", title)
         assertFalse(E2e.has(By.textContains("about:blank"), 500))
         assertFalse(E2e.has(By.textContains("moz-extension"), 500))
+        // Found on 2026-10-12: Senda did not give Gecko its language, so the panel was in English
+        assertTrue("uBlock's panel is not in Spanish. Screen: ${E2e.screenTexts()}", E2e.has(By.text("Bloqueado en esta página"), 3000))
     }
 
     /** D2 + D3 — guards b4695a8. uBlock's dashboard opens in a normal tab whose bar names the extension. */
