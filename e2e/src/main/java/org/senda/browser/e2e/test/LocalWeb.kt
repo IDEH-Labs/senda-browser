@@ -144,6 +144,10 @@ object LocalWeb {
         (if (viaProxy) proxiedRequests else directRequests).incrementAndGet()
         val out = socket.getOutputStream()
         when {
+            path == "/headers" -> respond(
+                out, "text/html",
+                page("e2e-headers", "<p>accept-language=${req.headers["accept-language"] ?: "none"}</p>")
+            )
             path == "/whoami" -> respond(out, "text/html", page("whoami", "<p>${if (viaProxy) "proxy" else "direct"}</p>"))
             path == "/ext.js" -> respond(out, "application/javascript", SCRIPT)
             path == "/slow.html" -> {

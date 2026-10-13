@@ -131,4 +131,14 @@ class TabsTest : E2eTest() {
             E2e.normalTabAddresses().contains(shown("/slow.html"))
         )
     }
+
+    /** A6 — pending since 2026-10-05: shared text "host:port/path" opens as an address instead of being rejected. */
+    @Test
+    fun a6_sharedAddressWithPort() {
+        E2e.launch()
+        // A host that starts with a letter: "127.0.0.1:…" was never mistaken for a scheme, "localhost:…" was
+        val text = "localhost:${LocalWeb.port}/a.html"
+        E2e.sh("am start -W -n ${E2e.APP}/org.senda.browser.MainActivity -a android.intent.action.VIEW --es android.intent.extra.TEXT $text")
+        assertTrue("Shared \"$text\" did not open. Screen: ${E2e.screenTexts()}", E2e.pageShows("e2e-a"))
+    }
 }

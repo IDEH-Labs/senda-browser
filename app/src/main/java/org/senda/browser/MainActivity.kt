@@ -575,6 +575,9 @@ class MainActivity : FragmentActivity() {
     private fun externalUrlFrom(intent: Intent?): String? {
         val raw = (intent?.dataString ?: intent?.getStringExtra("url") ?: intent?.getStringExtra(Intent.EXTRA_TEXT))
             ?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        // "localhost:8080" or "example.com:8443/page" is an address with a port, not a scheme. Only localhost or a
+        // name with a dot counts: "javascript:1" or "data:…" never do
+        if (Regex("^(localhost|[a-zA-Z0-9-]+(\\.[a-zA-Z0-9-]+)+):\\d{1,5}([/?#].*)?$").matches(raw)) return raw
         val scheme = Regex("^([a-zA-Z][a-zA-Z0-9+.-]*):").find(raw)?.groupValues?.get(1)?.lowercase()
             ?: return raw // Shared text without a scheme: the address bar treats it as an address or a search
         return when (scheme) {
