@@ -357,6 +357,16 @@ fun SendaToolbar(
                                         .padding(end = 4.dp)
                                 )
 
+                                fun go() {
+                                    focusManager.clearFocus()
+                                    keyboardController?.hide()
+                                    setEditing(false)
+                                    val target = textFieldValue.text.trim()
+                                    if (target.isNotBlank()) {
+                                        onNavigate(target)
+                                    }
+                                }
+
                                 BasicTextField(
                                     value = textFieldValue,
                                     onValueChange = { textFieldValue = it },
@@ -372,20 +382,11 @@ fun SendaToolbar(
                                         keyboardType = KeyboardType.Uri,
                                         imeAction = ImeAction.Go
                                     ),
-                                    keyboardActions = KeyboardActions(
-                                        onGo = {
-                                            focusManager.clearFocus()
-                                            keyboardController?.hide()
-                                            setEditing(false)
-                                            val target = textFieldValue.text.trim()
-                                            if (target.isNotBlank()) {
-                                                onNavigate(target)
-                                            }
-                                        }
-                                    ),
+                                    keyboardActions = KeyboardActions(onGo = { go() }),
                                     modifier = Modifier
                                         .weight(1f)
                                         .focusRequester(focusRequester)
+                                        .searchOnEnterRelease { go() }
                                 )
 
                                 if (textFieldValue.text.isNotEmpty()) {

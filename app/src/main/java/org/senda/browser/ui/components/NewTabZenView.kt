@@ -49,11 +49,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
 import org.senda.browser.core.AppThemeMode
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -1570,18 +1565,3 @@ fun CustomToggleRow(title: String, checked: Boolean, onCheckedChange: (Boolean) 
 private val wallpaperLabelStyle = androidx.compose.ui.text.TextStyle(
     shadow = androidx.compose.ui.graphics.Shadow(color = Color.Black.copy(alpha = 0.8f), blurRadius = 6f)
 )
-
-/**
- * Enter on a physical keyboard: the search runs when the key is RELEASED and the field takes both events. When it searched
- * on press, the home page disappeared, focus moved to the bar and releasing Enter triggered the Home button, which
- * went back to the blank page (measured: it failed 5 of 11 startups). The on-screen keyboard's "Search" button does not
- * send keys and still uses keyboardActions.
- */
-private fun Modifier.searchOnEnterRelease(onEnter: () -> Unit): Modifier = onPreviewKeyEvent { event ->
-    if (event.key == Key.Enter || event.key == Key.NumPadEnter) {
-        if (event.type == KeyEventType.KeyUp) onEnter()
-        true
-    } else {
-        false
-    }
-}
