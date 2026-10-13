@@ -544,8 +544,9 @@ fun ToolbarCustomizationDialog(
                         prefs.showShareButton = false
                         showBookmarks = false
                         prefs.showBookmarksButton = false
-                        showCast = false
-                        prefs.showCastButton = false
+                        // Same as the factory value (PreferencesManager.showCastButton)
+                        showCast = true
+                        prefs.showCastButton = true
                         showDevTools = false
                         prefs.showDevToolsButton = false
                         showReader = true
