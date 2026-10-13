@@ -174,7 +174,7 @@ object E2e {
 
     fun openSettings() {
         openMenu()
-        tapText(Es.settings)
+        tapTextInList(Es.settings)
         need(By.desc(Es.searchSettings), "Settings", TIMEOUT)
     }
 
@@ -279,7 +279,7 @@ object E2e {
         tapText(label)
         // The first time "free only" is chosen, LibreJS is installed: give it a moment
         Thread.sleep(if (label == Es.jsFree) 3000 else 500)
-        tapText(Es.ok)
+        tapText(Es.done)
     }
 
     fun leaveSettings() {
@@ -290,7 +290,7 @@ object E2e {
     /** Menu > Tor and proxy, the same dialog as in Settings. */
     fun openProxyDialog() {
         openMenu()
-        tapText(Es.menuTorProxy)
+        tapTextInList(Es.menuTorProxy)
         need(By.text(Es.torTitle), "the proxy dialog")
     }
 

@@ -7,6 +7,14 @@ Browsing "global cache" kept downloading a Google list with Safe Browsing turned
 Only host names and ports are recorded, never content. Do not browse with Senda while the proxy is set: your own
 browsing would be recorded too.
 
+## On the e2e app (preferred)
+
+`scripts/network-audit/audit_e2e.sh <folder> [free]` runs the whole measurement on the separate e2e app of
+[automated-tests.md](automated-tests.md): same engine and code, none of the person's data, and nobody browses with it
+(it has no launcher icon). It clears the app, sets the recording proxy, waits for the phone to be free before opening
+each page, checks that the bypass watch does see the app's sockets, and cleans up at the end. The steps below do the
+same by hand on any Senda.
+
 ## Setup
 
 1. On the computer: `python3 -I scripts/network-audit/hostname_proxy.py hosts.log` (listens on `127.0.0.1:8899`).

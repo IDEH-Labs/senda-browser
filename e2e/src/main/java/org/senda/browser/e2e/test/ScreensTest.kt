@@ -87,4 +87,50 @@ class ScreensTest : E2eTest() {
         }
         assertEquals("The phone's text size was not put back", scale, E2e.sh("settings get system font_scale").trim())
     }
+
+    /**
+     * Every Settings entry and the main menu with its bookmarks submenu, for a person to review that the whole interface
+     * looks finished. Only the e2e app is captured: an entry that opens one of Android's own screens is not.
+     */
+    @Test
+    fun h9_everyDialog() {
+        E2e.reset(testProxyPrefs() + mapOf("user_bookmarks" to
+            "[{\"id\":\"e2e1\",\"title\":\"e2e-bookmark-one\",\"url\":\"${LocalWeb.url("/a.html")}\",\"timestamp\":1}]"))
+        E2e.openLink(LocalWeb.url("/a.html"))
+        E2e.pageShows("e2e-a")
+        E2e.openMenu()
+        capture("h9-00-menu")
+        E2e.tapText(Es.bookmarks)
+        capture("h9-01-menu-bookmarks")
+        E2e.device.pressBack()
+        Thread.sleep(500)
+        E2e.openSettings()
+        val seen = mutableListOf<String>()
+        var index = 2
+        var quiet = 0
+        while (quiet < 2) {
+            val rows = E2e.device.findObjects(androidx.test.uiautomator.By.pkg(E2e.APP).clickable(true)).mapNotNull { n ->
+                runCatching { n.findObjects(androidx.test.uiautomator.By.textContains("")).firstOrNull { !it.text.isNullOrBlank() }?.text }.getOrNull()
+            }.filter { it !in seen }
+            if (rows.isEmpty()) quiet++ else quiet = 0
+            for (row in rows) {
+                seen += row
+                val node = E2e.device.findObjects(androidx.test.uiautomator.By.pkg(E2e.APP).clickable(true))
+                    .firstOrNull { n -> runCatching { n.hasObject(androidx.test.uiautomator.By.text(row)) }.getOrDefault(false) } ?: continue
+                if (runCatching { node.click() }.isFailure) continue
+                Thread.sleep(1200)
+                if (E2e.device.currentPackageName == E2e.APP) {
+                    capture("h9-%02d-%s".format(index++, row.take(30).replace(Regex("[^\\p{L}\\p{N}]+"), "_")))
+                }
+                repeat(3) {
+                    if (E2e.device.currentPackageName != E2e.APP || !E2e.has(androidx.test.uiautomator.By.desc(Es.searchSettings), 500)) {
+                        E2e.device.pressBack(); Thread.sleep(600)
+                    }
+                }
+            }
+            E2e.find(androidx.test.uiautomator.By.pkg(E2e.APP).scrollable(true), 1000)?.scroll(androidx.test.uiautomator.Direction.DOWN, 0.7f)
+            Thread.sleep(400)
+        }
+        assertTrue("Few entries captured: $seen", index > 20)
+    }
 }

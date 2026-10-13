@@ -1,6 +1,6 @@
 # Automated end-to-end tests: design
 
-Status: **design**, not implemented yet. Written on October 11, 2026, after a day in which manual testing on one
+Status: **implemented** on October 12, 2026 (groups A-E, H, I, J; F with its own procedure). Designed on October 11, 2026, after a day in which manual testing on one
 phone found four old bugs that no test had caught: Tor was not started again after Android stopped it, switching to a
 direct connection did not take effect, restored tabs could be lost, and uBlock Origin's quick panel never showed the
 site in front. Senda's 36 automated tests are JVM tests of internal logic; none of them drives the browser.
@@ -152,20 +152,38 @@ the session uses their fingerprint, with made-up accounts on a local page in the
 | K2 | Export always asks for the fingerprint; cancelling exports nothing |
 | K3 | App lock asks for the fingerprint after more than 30 s in the background |
 
-## Running it (planned)
+## Running it
 
 ```bash
 ./gradlew :app:assembleE2e :e2e:assembleE2e
 adb install -r app/build/outputs/apk/e2e/app-e2e.apk
 adb install -r e2e/build/outputs/apk/e2e/e2e-e2e.apk
-# Offline suite (A, B1-B4, C, D, E); F and G follow their own procedures
+# Everything automated (about 25 minutes); one class with -e class org.senda.browser.e2e.test.TabsTest
 adb shell am instrument -w org.senda.browser.e2e.test/androidx.test.runner.AndroidJUnitRunner
-# With the real Tor network (B5): contacts Tor relays and check.torproject.org
-adb shell am instrument -w -e network 1 org.senda.browser.e2e.test/androidx.test.runner.AndroidJUnitRunner
+# Screenshots of H2/H5 and the numbers of I1/I2 are left in the test app's folder:
+adb pull /sdcard/Android/data/org.senda.browser.e2e.test/files/
 adb uninstall org.senda.browser.e2e.test; adb uninstall org.senda.browser.e2e
 ```
 
-Every release candidate runs priority 1 three times in a row; the release notes say how many runs passed.
+Never `connectedAndroidTest`: it uninstalls apps when it ends. Every release candidate runs priority 1 three times in a
+row; the release notes say how many runs passed.
+
+How the suite keeps its rules:
+
+- Every test clears the e2e app (`pm clear`) and saves its starting settings with `run-as` (the e2e build is
+  debuggable): the test proxy, plus what the test needs. Nothing of the person's Senda is read or written.
+- The e2e app's proxy is the test proxy, which answers only for the test pages and refuses anything else. Gecko never
+  sends `127.0.0.1` through a proxy, so the network mode tests (B) serve the pages on the phone's own Wi-Fi address;
+  those connections stay inside the phone and the pages answer only connections from the phone itself. B2 and B3 leave
+  the e2e app in direct mode for a few seconds.
+- J1 does not use Android's `monkey`: its random touches can reach the status bar and the phone's quick settings. It
+  taps only elements of the e2e app, never Settings, proxy, share, print, cast or home screen shortcut entries, and
+  stops if another app comes to the front.
+- H6 and H5 change the phone's rotation and text size: their values are written down first and put back exactly.
+- Crashes are read from Android's record of the app's own exits (`dumpsys activity exit-info`), not from the system log.
+- Not automated: E2 (Android's file picker), K (fingerprint), B5 and F3 (the real Tor network). Senda's built-in Tor
+  always uses port 9050: while the person's Senda has Tor on, the e2e app would go through that Tor, so B5 and F3 need
+  it off.
 
 ## Limits
 
@@ -173,3 +191,8 @@ Every release candidate runs priority 1 three times in a row; the release notes 
 - UI Automator reads the screen through accessibility. If a text cannot be read that way, the test says so instead of
   guessing; it does not fall back to screen coordinates.
 - Tor tests depend on the Tor network: a single failure is retried by hand once and reported as such, never hidden.
+- GeckoView tells accessibility services the page's elements about 190 px higher than they are on screen (found on
+  2026-10-12, test H3b); the same happens in extension panels. Tests that would have to tap inside a page or a panel by
+  position (C5, LibreJS's "Settings...") fail for that reason until it is fixed.
+- The e2e app is debuggable, so its start time and memory (I1, I2) are higher than a release's and only show large
+  changes between runs of the suite itself.
