@@ -132,8 +132,8 @@ engine and code, no personal data). Only host names and ports are recorded.
 
 | Id | What it checks |
 |---|---|
-| I1 | Cold start, 10 times (`am start -W`); reference on 2026-10-09 (0.2.0-beta.1): 361–406 ms |
-| I2 | Memory at rest after 3 local pages (`dumpsys meminfo`); reference: 281 MB main process |
+| I1 | Cold start, 10 times (`am start -W`); reference: the e2e app on 2026-10-12/13, median 1302–1552 ms (a release, 0.2.0-beta.1: 361–406 ms) |
+| I2 | Memory at rest after 3 local pages (`dumpsys meminfo`); reference: the e2e app, 405–431 MB main process (a release: 281 MB) |
 | I3 | Release APK size, below Codeberg's 100 MB limit |
 
 ### J. Stability (priority 2)
