@@ -1,0 +1,39 @@
+# Every change to Senda: JVM tests and lint (docs/release-checklist.md, step 2). The phone tests of
+# docs/automated-tests.md need a real phone and are run by hand before each release.
+image: eclipse-temurin:21-jdk
+
+variables:
+  ANDROID_HOME: "$CI_PROJECT_DIR/.android-sdk"
+  GRADLE_USER_HOME: "$CI_PROJECT_DIR/.gradle-home"
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false"
+
+cache:
+  key: android-sdk-37.2
+  paths:
+    - .android-sdk/
+    - .gradle-home/caches/
+
+before_script:
+  - apt-get update -qq && apt-get install -y -qq unzip curl > /dev/null
+  - |
+    if [ ! -d "$ANDROID_HOME/cmdline-tools/latest" ]; then
+      mkdir -p "$ANDROID_HOME/cmdline-tools"
+      curl -sSfL -o /tmp/tools.zip https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip
+      unzip -q /tmp/tools.zip -d "$ANDROID_HOME/cmdline-tools" && mv "$ANDROID_HOME/cmdline-tools/cmdline-tools" "$ANDROID_HOME/cmdline-tools/latest"
+    fi
+  - yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
+  - '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.2" "build-tools;37.0.0" "ndk;26.1.10909125" > /dev/null'
+  - echo "sdk.dir=$ANDROID_HOME" > local.properties
+
+check:
+  stage: test
+  script:
+    - ./gradlew :app:testDebugUnitTest :app:lintRelease
+  artifacts:
+    when: always
+    paths:
+      - app/build/reports/
+    expire_in: 2 weeks
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH
