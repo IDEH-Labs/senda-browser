@@ -180,12 +180,17 @@ object E2e {
 
     /** Opens the tab list from the counter button (it has no description, only the number of tabs). */
     fun openTabs() {
+        tapTabCounter()
+        need(By.textStartsWith(Es.tabsNormal + " ("), "the tab list")
+    }
+
+    /** The tab counter button, in any language. */
+    fun tapTabCounter() {
         val counter = device.findObjects(By.pkg(APP).text(Pattern.compile("\\d{1,2}|∞")).clickable(false))
             .plus(device.findObjects(By.pkg(APP).text(Pattern.compile("\\d{1,2}|∞"))))
             .firstOrNull() ?: fail("No tab counter on screen").let { error("unreachable") }
         // The number is inside the button: tap the button around it
         (counter.parent?.takeIf { it.isClickable } ?: counter.parent?.parent?.takeIf { it.isClickable } ?: counter).click()
-        need(By.textStartsWith(Es.tabsNormal + " ("), "the tab list")
     }
 
     /** Addresses of the normal tabs, as the tab list shows them. */
