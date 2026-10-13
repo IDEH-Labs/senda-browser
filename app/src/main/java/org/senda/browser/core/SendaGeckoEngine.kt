@@ -378,6 +378,23 @@ object SendaGeckoEngine {
             "prefs:\n" +
                 "  network.captive-portal-service.enabled: false\n" +
                 "  network.connectivity-service.enabled: false\n" +
+                // GeckoView defaults that LibreWolf, arkenfox and GNU IceCat also turn off (compared on 2026-10-12):
+                // no country lookup from the IP address at location.services.mozilla.com (seen in Senda's traffic)
+                "  browser.region.network.url: \"\"\n" +
+                "  browser.region.update.enabled: false\n" +
+                // the bundled extensions do not need their metadata from addons.mozilla.org, which got the list of
+                // installed extensions (services.addons.mozilla.org, seen in Senda's traffic at startup)
+                "  extensions.getAddons.cache.enabled: false\n" +
+                // no connections to links and servers the person has not opened
+                "  network.prefetch-next: false\n" +
+                "  network.dns.disablePrefetch: true\n" +
+                "  network.predictor.enabled: false\n" +
+                "  network.http.speculative-parallel-limit: 0\n" +
+                // WebRTC: no local addresses; through the proxy when there is one (the proxy extension also does it)
+                "  media.peerconnection.ice.default_address_only: true\n" +
+                "  media.peerconnection.ice.proxy_only_if_behind_proxy: true\n" +
+                // PDFs do not run scripts
+                "  pdfjs.enableScripting: false\n" +
                 // Passwords: nothing is filled in on page load; the account is chosen when tapping the field
                 "  signon.autofillForms: false\n" +
                 // Security: restricts autofill to the exact origin, not to any subdomain
