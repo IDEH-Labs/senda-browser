@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The test app shows a different name, so it is never mistaken for the real Senda -->
+    <string name="app_name">Senda e2e</string>
+</resources>

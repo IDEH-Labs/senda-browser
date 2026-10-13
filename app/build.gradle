@@ -73,6 +73,15 @@ android {
         debug {
             debuggable true
         }
+        // End-to-end tests (docs/automated-tests.md): a separate app with its own data, never the real Senda.
+        // Shrunk like the release, so problems that only show up after R8 show up here too
+        e2e {
+            initWith release
+            applicationIdSuffix '.e2e'
+            signingConfig signingConfigs.debug
+            debuggable true
+            matchingFallbacks = ['release']
+        }
     }
 
     compileOptions {

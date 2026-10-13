@@ -1,0 +1,47 @@
+plugins {
+    id 'com.android.test'
+}
+
+// End-to-end tests (docs/automated-tests.md). They drive the separate e2e app (org.senda.browser.e2e) from their
+// own process, so a test can stop and restart the app. They never touch the real Senda
+android {
+    namespace 'org.senda.browser.e2e.test'
+    compileSdk = 37
+    compileSdkMinor = 1
+
+    defaultConfig {
+        minSdk 26
+        targetSdk 36
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    targetProjectPath = ':app'
+
+    buildTypes {
+        e2e {
+            debuggable true
+            signingConfig signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    experimentalProperties["android.experimental.self-instrumenting"] = true
+}
+
+// Only the e2e app is tested: no variant against the debug or release builds
+androidComponents {
+    beforeVariants(selector().all()) { variant ->
+        variant.enable = variant.buildType == 'e2e'
+    }
+}
+
+dependencies {
+    implementation 'androidx.test.ext:junit:1.2.1'
+    implementation 'androidx.test:runner:1.6.2'
+    implementation 'androidx.test:core:1.6.1'
+    implementation 'androidx.test.uiautomator:uiautomator:2.3.0'
+}
