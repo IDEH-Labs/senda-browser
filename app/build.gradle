@@ -127,11 +127,14 @@ android {
 
 apply from: 'bundled-assets.gradle'
 
-configurations.all {
+configurations.configureEach { configuration ->
     resolutionStrategy {
-        force 'org.jetbrains.kotlin:kotlin-stdlib:2.2.10'
-        force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.2.10'
-        force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.2.10'
+        // Not for the lint tool: it runs on its own Kotlin, and a newer stdlib next to its kotlin-reflect breaks it
+        if (configuration.name != 'androidLintTool') {
+            force 'org.jetbrains.kotlin:kotlin-stdlib:2.4.21'
+            force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.4.21'
+            force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.4.21'
+        }
 
         // GeckoView's WebAuthn code pulls in Google's proprietary Play Services client libraries. microG's
         // client libraries (Apache 2.0) provide the same API, so the APK carries no proprietary code

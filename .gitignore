@@ -24,3 +24,4 @@ keystore.properties
 
 # Store metadata images (F-Droid / fastlane)
 !fastlane/**/*.png
+.kotlin/
