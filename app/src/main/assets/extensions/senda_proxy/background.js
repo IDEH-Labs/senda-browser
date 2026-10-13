@@ -69,10 +69,37 @@ function waitForTor() {
     });
 }
 
+// A Tor circuit per site, as in Tor Browser: Tor gives each SOCKS username its own circuit (IsolateSOCKSAuth, on by
+// default), so the exit relay of one site never sees the others. The site is the page in the tab, not the server of
+// each image or script. The password changes on every start of Senda, so each session gets new circuits
+const circuitSession = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('');
+
+function hostOf(url) {
+    try { return new URL(url).host || url; } catch (e) { return ''; }
+}
+
+function firstPartyOf(requestInfo) {
+    if (requestInfo.type === 'main_frame') return hostOf(requestInfo.url);
+    const ancestors = requestInfo.frameAncestors;
+    if (ancestors && ancestors.length) return hostOf(ancestors[ancestors.length - 1].url);
+    return hostOf(requestInfo.documentUrl || requestInfo.originUrl || '') || '--unknown--';
+}
+
+function circuitFor(requestInfo) {
+    // A SOCKS username has at most 255 bytes (RFC 1929); host names are ASCII (punycode)
+    return ((requestInfo.incognito ? 'private:' : 'normal:') + firstPartyOf(requestInfo)).slice(0, 255);
+}
+
 async function handleProxyRequest(requestInfo) {
     if (!currentConfig) await configReady;
     if (torStarting(currentConfig)) await waitForTor();
-    return proxyFor(currentConfig);
+    const proxy = proxyFor(currentConfig);
+    // Only Senda's own Tor: another SOCKS proxy could refuse a username and leave the person with no connection
+    if (currentConfig.mode === 'TOR_ORBOT') {
+        proxy.username = circuitFor(requestInfo);
+        proxy.password = circuitSession;
+    }
+    return proxy;
 }
 
 // 1. Register the active proxy listener for all URLs
