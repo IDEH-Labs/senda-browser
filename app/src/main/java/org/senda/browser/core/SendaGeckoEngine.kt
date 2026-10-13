@@ -61,14 +61,18 @@ object SendaGeckoEngine {
      * Applies the JavaScript setting: OFF turns it off in Gecko; FREE runs GNU LibreJS, which blocks nonfree
      * nontrivial scripts. LibreJS is installed the first time FREE is chosen and only disabled afterwards, so its
      * lists of allowed and blocked sites stay.
+     *
+     * With FREE, scripts stay off until LibreJS is filtering ([holdScriptsForLibreJs]): its background script starts
+     * after Gecko's own startup and only adds its filters after reading its storage, and pages loaded in between ran
+     * nonfree scripts (measured on 2026-10-12: 9 of 10 cold starts).
      */
     fun applyJavaScriptMode(mode: String) {
         val rt = runtime ?: return
         appliedJavaScriptMode = mode
-        rt.settings.setJavaScriptEnabled(mode != "OFF")
         val controller = rt.webExtensionController
         val installed = installedExtensions.firstOrNull { it.id == LIBREJS_ID }
         if (mode == "FREE") {
+            if (!libreJsFiltering) holdScriptsForLibreJs() else rt.settings.setJavaScriptEnabled(true)
             installBuiltInFolder(LIBREJS_URI, LIBREJS_ID) { ext ->
                 if (ext.metaData.enabled) {
                     setupExtensionPanel(ext)
@@ -79,17 +83,98 @@ object SendaGeckoEngine {
                     )
                 }
             }
-        } else if (installed != null && installed.metaData.enabled) {
-            extensionActions.remove(LIBREJS_ID)
-            closeExtensionPopup()
-            controller.disable(installed, org.mozilla.geckoview.WebExtensionController.EnableSource.APP).accept(
-                { disabled -> disabled?.let { replaceInstalled(it) } },
-                { e -> android.util.Log.e("Senda", "No se pudo desactivar LibreJS: ${e?.message}") }
-            )
+        } else {
+            releaseHeldScripts(reload = false)
+            rt.settings.setJavaScriptEnabled(mode != "OFF")
+            if (installed != null && installed.metaData.enabled) {
+                // Enabled again later, its background starts again: it is not filtering until it says so
+                libreJsFiltering = false
+                extensionActions.remove(LIBREJS_ID)
+                closeExtensionPopup()
+                controller.disable(installed, org.mozilla.geckoview.WebExtensionController.EnableSource.APP).accept(
+                    { disabled -> disabled?.let { replaceInstalled(it) } },
+                    { e -> android.util.Log.e("Senda", "No se pudo desactivar LibreJS: ${e?.message}") }
+                )
+            }
+        }
+    }
+
+    /** true once LibreJS has shown it is filtering in this process (it updated its button for a tab). */
+    private var libreJsFiltering = false
+
+    /** true while scripts are off waiting for LibreJS (only with JavaScript set to "free only"). */
+    var scriptsHeldForLibreJs = false
+        private set
+
+    // Pages that started loading while scripts were held: loaded again once LibreJS filters, so they work
+    private val sessionsLoadedWhileHeld = java.util.WeakHashMap<GeckoSession, Unit>()
+    private var activeExtensionTab: java.lang.ref.WeakReference<GeckoSession>? = null
+    private val mainHandler by lazy { android.os.Handler(android.os.Looper.getMainLooper()) }
+
+    private fun holdScriptsForLibreJs() {
+        runtime?.settings?.setJavaScriptEnabled(false)
+        if (scriptsHeldForLibreJs) return
+        scriptsHeldForLibreJs = true
+        pokeLibreJs(attempt = 0)
+    }
+
+    /**
+     * LibreJS updates its button for the tab in front when a tab is activated, and its tab listeners are added in the
+     * same step as its filters: telling it the tab in front again until it answers is how Senda knows it is filtering.
+     * If it never answers, scripts stay off, as "free only" promises.
+     */
+    private fun pokeLibreJs(attempt: Int) {
+        if (!scriptsHeldForLibreJs) return
+        activeExtensionTab?.get()?.let { session ->
+            listenToLibreJsOn(session)
+            runtime?.webExtensionController?.let { controller ->
+                controller.setTabActive(session, false)
+                controller.setTabActive(session, true)
+            }
+        }
+        mainHandler.postDelayed({ pokeLibreJs(attempt + 1) }, if (attempt < 60) 500L else 2000L)
+    }
+
+    private fun onLibreJsFiltering() {
+        libreJsFiltering = true
+        if (scriptsHeldForLibreJs && appliedJavaScriptMode == "FREE") {
+            runtime?.settings?.setJavaScriptEnabled(true)
+            releaseHeldScripts(reload = true)
+        }
+    }
+
+    private fun releaseHeldScripts(reload: Boolean) {
+        scriptsHeldForLibreJs = false
+        val loaded = sessionsLoadedWhileHeld.keys.toList()
+        sessionsLoadedWhileHeld.clear()
+        if (reload) loaded.filter { it.isOpen }.forEach { it.reload() }
+    }
+
+    /** A tab started loading a page: if scripts are held, it is loaded again once LibreJS filters. */
+    fun notePageStart(session: GeckoSession) {
+        if (scriptsHeldForLibreJs) sessionsLoadedWhileHeld[session] = Unit
+    }
+
+    // LibreJS's button for a tab only reaches a delegate set on that tab's session
+    private val libreJsTabDelegate = object : WebExtension.ActionDelegate {
+        override fun onBrowserAction(extension: WebExtension, session: GeckoSession?, action: WebExtension.Action) {
+            if (extension.id !in extensionActions) extensionActions[extension.id] = action
+            onLibreJsFiltering()
+        }
+    }
+
+    private fun listenToLibreJsOn(session: GeckoSession) {
+        val libreJs = installedExtensions.firstOrNull { it.id == LIBREJS_ID && it.metaData.enabled } ?: return
+        if (session.webExtensionController.getActionDelegate(libreJs) !== libreJsTabDelegate) {
+            session.webExtensionController.setActionDelegate(libreJs, libreJsTabDelegate)
         }
     }
 
     fun setExtensionTabActive(session: GeckoSession, active: Boolean) {
+        if (active) {
+            activeExtensionTab = java.lang.ref.WeakReference(session)
+            if (appliedJavaScriptMode == "FREE") listenToLibreJsOn(session)
+        }
         runtime?.webExtensionController?.setTabActive(session, active)
     }
 
@@ -100,8 +185,10 @@ object SendaGeckoEngine {
 
     private val panelDelegate = object : WebExtension.ActionDelegate {
         override fun onBrowserAction(extension: WebExtension, session: GeckoSession?, action: WebExtension.Action) {
-            // The default button (session null); clicking it opens the panel for the tab in front
-            if (session == null) extensionActions[extension.id] = action
+            // The default button (session null); clicking it opens the panel for the tab in front. After a cold
+            // start LibreJS's default button did not always arrive (2026-10-12), so its button for a tab also counts
+            if (session == null || extension.id !in extensionActions) extensionActions[extension.id] = action
+            if (extension.id == LIBREJS_ID && session != null) onLibreJsFiltering()
         }
 
         override fun onOpenPopup(extension: WebExtension, action: WebExtension.Action) = showExtensionPopup()
@@ -221,8 +308,8 @@ object SendaGeckoEngine {
             .globalPrivacyControlEnabled(true)
             // 6. Proactive low-memory detection to purge caches before the OS kills the process
             .lowMemoryDetection(true)
-            // 7. JavaScript off only if the user chose it
-            .javaScriptEnabled(prefs?.javascriptMode != "OFF")
+            // 7. JavaScript off if the user chose it, and with "free only" until LibreJS is filtering (applyJavaScriptMode)
+            .javaScriptEnabled(prefs?.javascriptMode == null || prefs.javascriptMode == "NORMAL")
             .build()
 
         runtime = GeckoRuntime.create(context.applicationContext, settings)

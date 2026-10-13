@@ -517,6 +517,7 @@ class BrowserTab(
 
         session.progressDelegate = object : GeckoSession.ProgressDelegate {
             override fun onPageStart(session: GeckoSession, newUrl: String) {
+                SendaGeckoEngine.notePageStart(session)
                 isLoading = true
                 pageLanguage = null
                 translatedTo = null
