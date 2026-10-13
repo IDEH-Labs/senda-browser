@@ -31,9 +31,19 @@ class BackupTest : E2eTest() {
     private fun inPicker(selector: androidx.test.uiautomator.BySelector, what: String): UiObject2 =
         E2e.find(selector, E2e.TIMEOUT) ?: fail("File picker: $what not found").let { error("unreachable") }
 
+    /** Taps in the picker, again if it was still moving (its drawer animates). */
+    private fun pickerTap(selector: androidx.test.uiautomator.BySelector, what: String) {
+        repeat(5) {
+            if (runCatching { inPicker(selector, what).click() }.isSuccess) return
+            Thread.sleep(500)
+        }
+        fail("File picker: could not tap $what")
+    }
+
     private fun pickerToDownloads() {
-        inPicker(By.desc(Pattern.compile("(Mostrar raíces|Show roots)")), "the folders button").click()
-        inPicker(By.text(Pattern.compile("(Descargas|Downloads)")), "Downloads").click()
+        pickerTap(By.desc(Pattern.compile("(Mostrar raíces|Show roots)")), "the folders button")
+        Thread.sleep(800)
+        pickerTap(By.text(Pattern.compile("(Descargas|Downloads)")), "Downloads")
         Thread.sleep(1000)
     }
 
@@ -43,9 +53,28 @@ class BackupTest : E2eTest() {
         E2e.need(By.text(Es.backupCreate), "the backup dialog")
     }
 
-    private fun fieldLabelled(label: String): UiObject2 =
-        E2e.device.findObjects(By.clazz("android.widget.EditText")).firstOrNull { it.hasObject(By.text(label)) }
-            ?: fail("No field \"$label\"").let { error("unreachable") }
+    /** Types [value] in the field labelled [label], again if the screen changed meanwhile. */
+    private fun fill(label: String, value: String) {
+        repeat(5) {
+            val ok = runCatching {
+                val field = E2e.device.findObjects(By.clazz("android.widget.EditText")).firstOrNull { it.hasObject(By.text(label)) }
+                field?.text = value
+                field != null
+            }.getOrDefault(false)
+            if (ok) return
+            Thread.sleep(500)
+        }
+        fail("No field \"$label\"")
+    }
+
+    /** Taps the last element with [text] (the dialog's button, not the title), again if the screen changed. */
+    private fun tapLast(text: String) {
+        repeat(5) {
+            if (runCatching { E2e.device.findObjects(By.text(text)).last().click() }.isSuccess) return
+            Thread.sleep(500)
+        }
+        fail("No \"$text\" to tap")
+    }
 
     private fun deleteTestFile() {
         val path = "/storage/emulated/0/Download/$fileName"
@@ -61,13 +90,13 @@ class BackupTest : E2eTest() {
             E2e.launch()
             openBackupDialog()
             E2e.tapText(Es.backupCreate)
-            fieldLabelled(Es.backupPassLabel).text = passphrase
-            fieldLabelled(Es.backupPassConfirm).text = passphrase
+            fill(Es.backupPassLabel, passphrase)
+            fill(Es.backupPassConfirm, passphrase)
             E2e.tapText(Es.backupSave)
             val name = inPicker(By.clazz("android.widget.EditText"), "the file name field")
             pickerToDownloads()
             (E2e.find(By.clazz("android.widget.EditText"), 3000) ?: name).text = fileName
-            inPicker(By.text(Pattern.compile("(?i)(guardar|save)")).clickable(true), "the save button").click()
+            pickerTap(By.text(Pattern.compile("(?i)(guardar|save)")).clickable(true), "the save button")
             assertTrue("The backup was not saved", E2e.has(By.textContains(Es.backupLastPrefix), 15_000))
             assertTrue("The file is not in Downloads", E2e.sh("ls /storage/emulated/0/Download/$fileName").contains(fileName))
 
@@ -77,13 +106,13 @@ class BackupTest : E2eTest() {
             openBackupDialog()
             E2e.tapText(Es.backupRestore)
             pickerToDownloads()
-            inPicker(By.text(fileName), "the test file").click()
+            pickerTap(By.text(fileName), "the test file")
             E2e.need(By.text(Es.backupOpenTitle), "the passphrase dialog")
-            fieldLabelled(Es.backupPassLabel).text = "a wrong passphrase here"
-            E2e.device.findObjects(By.text(Es.backupRestore)).last().click()
+            fill(Es.backupPassLabel, "a wrong passphrase here")
+            tapLast(Es.backupRestore)
             assertTrue("A wrong passphrase was not rejected", E2e.has(By.text(Es.backupWrongPass), 30_000))
-            fieldLabelled(Es.backupPassLabel).text = passphrase
-            E2e.device.findObjects(By.text(Es.backupRestore)).last().click()
+            fill(Es.backupPassLabel, passphrase)
+            tapLast(Es.backupRestore)
             E2e.need(By.text(Es.backupRestoreConfirm), "the restore preview", 30_000).click()
             Thread.sleep(2000)
             E2e.device.pressBack()
