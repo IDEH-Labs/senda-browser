@@ -404,8 +404,11 @@ object SendaGeckoEngine {
                 "  media.eme.require-app-approval: true\n" +
                 // Passwords: nothing is filled in on page load; the account is chosen when tapping the field
                 "  signon.autofillForms: false\n" +
-                // Security: restricts autofill to the exact origin, not to any subdomain
-                "  signon.includeOtherSubdomainsInLookup: false\n" +
+                // Accounts of the same site (registrable domain, Mozilla's Public Suffix List) are offered on its other
+                // addresses too, as in Firefox: sign-in often lives on another one (my.fsf.org → cas.fsf.org). Nothing
+                // is filled in by itself, the selector names each account's address, and the password needs the
+                // fingerprint or PIN
+                "  signon.includeOtherSubdomainsInLookup: true\n" +
                 // Media control (MediaSession): without it Senda does not know when a video is playing and cannot pause it
                 // when sending it to the TV (it could be heard on the phone and the TV at the same time)
                 "  media.hardwaremediakeys.enabled: true\n" +
