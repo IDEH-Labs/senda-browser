@@ -255,14 +255,11 @@ fun TabsOverview(
                         val isSelected = tab.id == activeTabId
                         // Swiping sideways closes the tab (the ✕ button is still available)
                         val dismissState = rememberSwipeToDismissBoxState(
-                            confirmValueChange = { value ->
-                                if (value != SwipeToDismissBoxValue.Settled) {
-                                    onCloseTab(tab)
-                                    true
-                                } else false
-                            },
                             positionalThreshold = { distance -> distance * 0.4f }
                         )
+                        LaunchedEffect(dismissState.currentValue) {
+                            if (dismissState.currentValue != SwipeToDismissBoxValue.Settled) onCloseTab(tab)
+                        }
                         SwipeToDismissBox(
                             state = dismissState,
                             modifier = Modifier.animateItem(),
