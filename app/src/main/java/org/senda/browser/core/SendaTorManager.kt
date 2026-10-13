@@ -30,9 +30,6 @@ object SendaTorManager {
     var state by mutableStateOf(TorState.STOPPED)
         private set
 
-    var statusMessage by mutableStateOf("Tor apagado")
-        private set
-
     private const val TOR_SOCKS_PORT = 9050
 
     var socksPort by mutableIntStateOf(TOR_SOCKS_PORT)
@@ -75,13 +72,6 @@ object SendaTorManager {
 
     private fun changeState(newState: TorState) {
         state = newState
-        statusMessage = when (newState) {
-            TorState.STOPPED -> "Tor apagado"
-            TorState.STARTING -> "Construyendo circuito Tor..."
-            TorState.CONNECTED -> "Conectado a la Red Tor (127.0.0.1:$socksPort)"
-            TorState.STOPPING -> "Deteniendo Tor..."
-            TorState.ERROR -> "Tor no pudo conectarse"
-        }
         // While Tor is not ready, pages wait for it (never a direct connection) or fail with ERROR
         onStateChanged?.invoke()
     }

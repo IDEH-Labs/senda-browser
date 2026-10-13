@@ -408,7 +408,7 @@ fun SettingsLanguageDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text(strings.general_close)
+                Text(strings.general_done)
             }
         }
     )

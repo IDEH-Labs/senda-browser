@@ -211,8 +211,6 @@ fun BackupDialog(prefs: PreferencesManager, onDismiss: () -> Unit) {
                         OutlinedButton(onClick = { htmlImportLauncher.launch(arrayOf("text/html", "*/*")) },
                             modifier = Modifier.weight(1f), shape = RoundedCornerShape(10.dp)) { Text(strings.bk_html_import, fontSize = 12.sp) }
                     }
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), thickness = 0.5.dp)
-                    Text(strings.bk_sync_future, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
                     // What to include
                     listOf(

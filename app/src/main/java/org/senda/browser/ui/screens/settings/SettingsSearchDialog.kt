@@ -144,7 +144,7 @@ fun SettingsSearchDialog(
                     onDismiss()
                 }
             ) {
-                Text(strings.general_ok)
+                Text(strings.general_done)
             }
         }
     )

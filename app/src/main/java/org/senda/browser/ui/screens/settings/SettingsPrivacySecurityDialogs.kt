@@ -70,7 +70,7 @@ fun SettingsAutofillDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text(strings.general_ok)
+                Text(strings.general_close)
             }
         }
     )
@@ -403,7 +403,7 @@ fun SettingsHttpsOnlyDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text(strings.general_ok)
+                Text(strings.general_done)
             }
         }
     )
@@ -462,7 +462,7 @@ fun SettingsJavaScriptDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text(strings.general_ok)
+                Text(strings.general_done)
             }
         }
     )

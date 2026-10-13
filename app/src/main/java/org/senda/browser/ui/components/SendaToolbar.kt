@@ -30,6 +30,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.AddToHomeScreen
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.*
@@ -206,6 +207,9 @@ fun SendaToolbar(
     }
     var showProxyDialog by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
+    // Page of the main menu: "main", or "bookmarks" for its bookmarks submenu
+    var menuPage by remember { mutableStateOf("main") }
+    LaunchedEffect(showMenu) { if (!showMenu) menuPage = "main" }
     var showBackHistoryMenu by remember { mutableStateOf(false) }
     var showTabQuickMenu by remember { mutableStateOf(false) }
 
@@ -1135,266 +1139,243 @@ fun SendaToolbar(
                                 onDismissRequest = { showMenu = false },
                                 modifier = Modifier.width(260.dp)
                             ) {
-                            // Quick top navigation row in GNOME Web style inside the menu (no duplicates)
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                IconButton(
-                                    onClick = {
-                                        showMenu = false
-                                        if (canGoBack) onBack() else if (!isHomeTab) onGoHome?.invoke()
-                                    },
-                                    enabled = canGoBack || !isHomeTab,
-                                    modifier = Modifier.size(36.dp)
+                            if (menuPage == "bookmarks") {
+                                // Bookmarks submenu: open one in the tab in front, or manage them
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                        contentDescription = strings.back,
-                                        tint = if (canGoBack || !isHomeTab) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
-                                        modifier = Modifier.size(20.dp)
+                                    IconButton(onClick = { menuPage = "main" }, modifier = Modifier.size(40.dp)) {
+                                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.back, modifier = Modifier.size(20.dp))
+                                    }
+                                    Text(strings.tb_bookmarks, fontWeight = FontWeight.SemiBold)
+                                }
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                                val bookmarks = remember(showMenu) { prefs?.getBookmarks().orEmpty() }
+                                if (bookmarks.isEmpty()) {
+                                    Text(
+                                        strings.bookmarks_empty,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                                     )
                                 }
-
-                                IconButton(
-                                    onClick = {
-                                        showMenu = false
-                                        onForward()
-                                    },
-                                    enabled = canGoForward,
-                                    modifier = Modifier.size(36.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                                        contentDescription = strings.forward,
-                                        tint = if (canGoForward) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-
-                                // Same as the bar button: "Stop" while loading (the bar no longer has it by
-                                // default, to leave room for the domain)
-                                IconButton(
-                                    onClick = {
-                                        showMenu = false
-                                        if (isLoading) activeTab?.stop() else onRefresh()
-                                    },
-                                    modifier = Modifier.size(36.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = if (isLoading) Icons.Default.Close else Icons.Default.Refresh,
-                                        contentDescription = if (isLoading) strings.tb_stop_loading else strings.tb_reload,
-                                        tint = MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-
-                                IconButton(
-                                    onClick = {
-                                        showMenu = false
-                                        onGoHome?.invoke()
-                                    },
-                                    enabled = !isHomeTab,
-                                    modifier = Modifier.size(36.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Home,
-                                        contentDescription = strings.tb_homepage,
-                                        tint = if (!isHomeTab) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                            }
-
-                            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-
-                            // Tor network and proxy
-                            DropdownMenuItem(
-                                text = {
-                                    Column {
-                                        Text(strings.tb_tor_proxy, fontWeight = FontWeight.SemiBold)
-                                        val proxySub = when (activeTab?.prefs?.proxyMode) {
-                                             "TOR_ORBOT" -> "🧅 Tor"
-                                             "CUSTOM_SOCKS5" -> "🛡️ SOCKS5"
-                                             "CUSTOM_HTTP" -> "🌐 HTTP"
-                                             else -> strings.dlg_proxy_off
-                                        }
-                                        Text(proxySub, fontSize = 11.sp, color = if (activeTab?.prefs?.proxyMode != "OFF") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
-                                },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Default.VpnKey,
-                                        contentDescription = null,
-                                        tint = if (activeTab?.prefs?.proxyMode != "OFF") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                },
-                                onClick = {
-                                    showMenu = false
-                                    showProxyDialog = true
-                                }
-                            )
-
-                            // Cast (available here only if the user hid the navigation bar button, avoiding unnecessary duplicates)
-                            if (!showCastButton && !org.senda.browser.core.cast.SendaTvMode.tvConnected) {
-                                DropdownMenuItem(
-                                    text = { Text(strings.st_chromecast_title) },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Default.Cast,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.onSurface,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                    },
-                                    onClick = {
-                                        showMenu = false
-                                        onOpenCast()
-                                    }
-                                )
-                            }
-
-                            // Desktop site
-                            DropdownMenuItem(
-                                text = { Text(strings.tb_desktop_site) },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Default.DesktopWindows,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                },
-                                // The whole entry is the checkbox for screen readers (the box alone had no name)
-                                trailingIcon = {
-                                    Checkbox(checked = activeTab?.isDesktopMode == true, onCheckedChange = null)
-                                },
-                                onClick = {
-                                    showMenu = false
-                                    activeTab?.toggleDesktopMode()
-                                },
-                                modifier = Modifier.semantics {
-                                    role = Role.Checkbox
-                                    toggleableState = ToggleableState(activeTab?.isDesktopMode == true)
-                                }
-                            )
-
-                            // Share, copy and other page actions: the home tab has no page
-                            if (!isHomeTab) {
-                                // Share
-                                DropdownMenuItem(
-                                    text = { Text("${strings.tb_share}...") },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Default.Share,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.onSurface,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                    },
-                                    onClick = {
-                                        showMenu = false
-                                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                            putExtra(Intent.EXTRA_TEXT, activeTab?.url ?: "")
-                                            putExtra(Intent.EXTRA_SUBJECT, activeTab?.title ?: "Senda Browser")
-                                            type = "text/plain"
-                                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                                        }
-                                        context.startActivity(Intent.createChooser(shareIntent, "${strings.tb_share}...").apply {
-                                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                                        })
-                                    }
-                                )
-
-                                // Copy link
-                                DropdownMenuItem(
-                                    text = { Text(strings.ctx_copy_link) },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Default.ContentCopy,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.onSurface,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                    },
-                                    onClick = {
-                                        showMenu = false
-                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                        clipboard.setPrimaryClip(ClipData.newPlainText("URL", activeTab?.url ?: ""))
-                                        Toast.makeText(context, strings.general_copied, Toast.LENGTH_SHORT).show()
-                                    }
-                                )
-
-                                // Find in page
-                                DropdownMenuItem(
-                                    text = { Text(strings.find_in_page) },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Default.FindInPage,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.onSurface,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                    },
-                                    onClick = {
-                                        showMenu = false
-                                        onFindInPage()
-                                    }
-                                )
-
-                                // Translate on the phone (or go back to the original)
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            when {
-                                                activeTab?.isTranslating == true -> strings.translate_in_progress
-                                                activeTab?.translatedTo != null -> strings.translate_menu_translated
-                                                else -> strings.translate_menu
-                                            }
-                                        )
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Default.Translate,
-                                            contentDescription = null,
-                                            tint = if (activeTab?.translatedTo != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                    },
-                                    onClick = {
-                                        showMenu = false
-                                        showTranslateDialog = true
-                                    }
-                                )
-
-                                // Print or save as PDF (Android's dialog offers both)
-                                DropdownMenuItem(
-                                    text = { Text(strings.page_print) },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Default.Print,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.onSurface,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                    },
-                                    onClick = {
-                                        showMenu = false
-                                        activeTab?.printPage()
-                                    }
-                                )
-
-                                // GNU LibreJS panel: scripts blocked on this page and its exceptions
-                                if (SendaGeckoEngine.hasExtensionPanel(SendaGeckoEngine.LIBREJS_ID)) {
+                                bookmarks.forEach { bookmark ->
                                     DropdownMenuItem(
-                                        text = { Text("LibreJS") },
+                                        text = { Text(bookmark.title.ifBlank { bookmark.url }, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                        leadingIcon = {
+                                            Icon(Icons.Default.Bookmark, contentDescription = null, modifier = Modifier.size(20.dp))
+                                        },
+                                        onClick = {
+                                            showMenu = false
+                                            onNavigate(bookmark.url)
+                                        }
+                                    )
+                                }
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                                DropdownMenuItem(
+                                    text = { Text(strings.bm_manage) },
+                                    leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                                    onClick = {
+                                        showMenu = false
+                                        onOpenBookmarks()
+                                    }
+                                )
+                            } else {
+                                // Quick top navigation row in GNOME Web style inside the menu (no duplicates)
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    IconButton(
+                                        onClick = {
+                                            showMenu = false
+                                            if (canGoBack) onBack() else if (!isHomeTab) onGoHome?.invoke()
+                                        },
+                                        enabled = canGoBack || !isHomeTab,
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                            contentDescription = strings.back,
+                                            tint = if (canGoBack || !isHomeTab) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+
+                                    IconButton(
+                                        onClick = {
+                                            showMenu = false
+                                            onForward()
+                                        },
+                                        enabled = canGoForward,
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                            contentDescription = strings.forward,
+                                            tint = if (canGoForward) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+
+                                    // Same as the bar button: "Stop" while loading (the bar no longer has it by
+                                    // default, to leave room for the domain)
+                                    IconButton(
+                                        onClick = {
+                                            showMenu = false
+                                            if (isLoading) activeTab?.stop() else onRefresh()
+                                        },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isLoading) Icons.Default.Close else Icons.Default.Refresh,
+                                            contentDescription = if (isLoading) strings.tb_stop_loading else strings.tb_reload,
+                                            tint = MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+
+                                    // Bookmark the page in front (the home page has none)
+                                    val pageUrl = activeTab?.url?.takeIf { !isHomeTab && it.isNotBlank() && it != "about:blank" }
+                                    val bookmarked = pageUrl != null && prefs?.isBookmarked(pageUrl) == true
+                                    IconButton(
+                                        onClick = {
+                                            showMenu = false
+                                            if (pageUrl != null && prefs != null) {
+                                                val added = prefs.toggleBookmark(activeTab.title.ifBlank { pageUrl }, pageUrl)
+                                                Toast.makeText(context, if (added) strings.bm_added else strings.bm_removed, Toast.LENGTH_SHORT).show()
+                                            }
+                                        },
+                                        enabled = pageUrl != null,
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = if (bookmarked) Icons.Default.Star else Icons.Default.StarBorder,
+                                            contentDescription = if (bookmarked) strings.bm_remove_current else strings.bm_save_current,
+                                            tint = when {
+                                                pageUrl == null -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+                                                bookmarked -> MaterialTheme.colorScheme.primary
+                                                else -> MaterialTheme.colorScheme.onSurface
+                                            },
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+
+                                    IconButton(
+                                        onClick = {
+                                            showMenu = false
+                                            onGoHome?.invoke()
+                                        },
+                                        enabled = !isHomeTab,
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Home,
+                                            contentDescription = strings.tb_homepage,
+                                            tint = if (!isHomeTab) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+                                // Library
+                                // Bookmarks
+                                DropdownMenuItem(
+                                    text = { Text(strings.tb_bookmarks) },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.Bookmark,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    },
+                                    trailingIcon = {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    },
+                                    onClick = { menuPage = "bookmarks" }
+                                )
+
+                                // Browsing history
+                                DropdownMenuItem(
+                                    text = { Text(strings.tb_history) },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.History,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    },
+                                    onClick = {
+                                        showMenu = false
+                                        onOpenHistory()
+                                    }
+                                )
+
+                                // Downloads
+                                DropdownMenuItem(
+                                    text = { Text(strings.tb_downloads) },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.Download,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    },
+                                    onClick = {
+                                        showMenu = false
+                                        onOpenDownloads()
+                                    }
+                                )
+
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+                                // This page
+                                // Desktop site
+                                DropdownMenuItem(
+                                    text = { Text(strings.tb_desktop_site) },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.DesktopWindows,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    },
+                                    // The whole entry is the checkbox for screen readers (the box alone had no name)
+                                    trailingIcon = {
+                                        Checkbox(checked = activeTab?.isDesktopMode == true, onCheckedChange = null)
+                                    },
+                                    onClick = {
+                                        showMenu = false
+                                        activeTab?.toggleDesktopMode()
+                                    },
+                                    modifier = Modifier.semantics {
+                                        role = Role.Checkbox
+                                        toggleableState = ToggleableState(activeTab?.isDesktopMode == true)
+                                    }
+                                )
+
+                                // Share, copy and other page actions: the home tab has no page
+                                if (!isHomeTab) {
+                                    // Share
+                                    DropdownMenuItem(
+                                        text = { Text("${strings.tb_share}…") },
                                         leadingIcon = {
                                             Icon(
-                                                imageVector = Icons.Default.Code,
+                                                imageVector = Icons.Default.Share,
                                                 contentDescription = null,
                                                 tint = MaterialTheme.colorScheme.onSurface,
                                                 modifier = Modifier.size(20.dp)
@@ -1402,17 +1383,193 @@ fun SendaToolbar(
                                         },
                                         onClick = {
                                             showMenu = false
-                                            SendaGeckoEngine.openExtensionPanel(SendaGeckoEngine.LIBREJS_ID)
+                                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                                putExtra(Intent.EXTRA_TEXT, activeTab?.url ?: "")
+                                                putExtra(Intent.EXTRA_SUBJECT, activeTab?.title ?: "Senda Browser")
+                                                type = "text/plain"
+                                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                            }
+                                            context.startActivity(Intent.createChooser(shareIntent, "${strings.tb_share}…").apply {
+                                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                            })
+                                        }
+                                    )
+
+                                    // Copy link
+                                    DropdownMenuItem(
+                                        text = { Text(strings.ctx_copy_link) },
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = Icons.Default.ContentCopy,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onSurface,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        },
+                                        onClick = {
+                                            showMenu = false
+                                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                            clipboard.setPrimaryClip(ClipData.newPlainText("URL", activeTab?.url ?: ""))
+                                            Toast.makeText(context, strings.general_copied, Toast.LENGTH_SHORT).show()
+                                        }
+                                    )
+
+                                    // Find in page
+                                    DropdownMenuItem(
+                                        text = { Text(strings.find_in_page) },
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = Icons.Default.FindInPage,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onSurface,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        },
+                                        onClick = {
+                                            showMenu = false
+                                            onFindInPage()
+                                        }
+                                    )
+
+                                    // Translate on the phone (or go back to the original)
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                when {
+                                                    activeTab?.isTranslating == true -> strings.translate_in_progress
+                                                    activeTab?.translatedTo != null -> strings.translate_menu_translated
+                                                    else -> strings.translate_menu
+                                                }
+                                            )
+                                        },
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = Icons.Default.Translate,
+                                                contentDescription = null,
+                                                tint = if (activeTab?.translatedTo != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        },
+                                        onClick = {
+                                            showMenu = false
+                                            showTranslateDialog = true
+                                        }
+                                    )
+
+                                    // Print or save as PDF (Android's dialog offers both)
+                                    DropdownMenuItem(
+                                        text = { Text(strings.page_print) },
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = Icons.Default.Print,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onSurface,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        },
+                                        onClick = {
+                                            showMenu = false
+                                            activeTab?.printPage()
+                                        }
+                                    )
+
+                                    // GNU LibreJS panel: scripts blocked on this page and its exceptions
+                                    if (SendaGeckoEngine.hasExtensionPanel(SendaGeckoEngine.LIBREJS_ID)) {
+                                        DropdownMenuItem(
+                                            text = { Text("LibreJS") },
+                                            leadingIcon = {
+                                                Icon(
+                                                    imageVector = Icons.Default.Code,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.onSurface,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            },
+                                            onClick = {
+                                                showMenu = false
+                                                SendaGeckoEngine.openExtensionPanel(SendaGeckoEngine.LIBREJS_ID)
+                                            }
+                                        )
+                                    }
+
+                                    // Home screen shortcut
+                                    DropdownMenuItem(
+                                        text = { Text(strings.page_add_to_home) },
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = Icons.AutoMirrored.Filled.AddToHomeScreen,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onSurface,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        },
+                                        onClick = {
+                                            showMenu = false
+                                            activeTab?.let { tab ->
+                                                org.senda.browser.core.SendaPageActions.addToHomeScreen(context, tab.url, tab.title, null)
+                                            }
                                         }
                                     )
                                 }
 
-                                // Home screen shortcut
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+                                // Connection
+                                // Tor network and proxy
                                 DropdownMenuItem(
-                                    text = { Text(strings.page_add_to_home) },
+                                    text = {
+                                        Column {
+                                            Text(strings.tb_tor_proxy, fontWeight = FontWeight.SemiBold)
+                                            val proxySub = when (activeTab?.prefs?.proxyMode) {
+                                                 "TOR_ORBOT" -> "🧅 Tor"
+                                                 "CUSTOM_SOCKS5" -> "🛡️ SOCKS5"
+                                                 "CUSTOM_HTTP" -> "🌐 HTTP"
+                                                 else -> strings.dlg_proxy_off
+                                            }
+                                            Text(proxySub, fontSize = 11.sp, color = if (activeTab?.prefs?.proxyMode != "OFF") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                    },
                                     leadingIcon = {
                                         Icon(
-                                            imageVector = Icons.AutoMirrored.Filled.AddToHomeScreen,
+                                            imageVector = Icons.Default.VpnKey,
+                                            contentDescription = null,
+                                            tint = if (activeTab?.prefs?.proxyMode != "OFF") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    },
+                                    onClick = {
+                                        showMenu = false
+                                        showProxyDialog = true
+                                    }
+                                )
+
+                                // Cast (available here only if the user hid the navigation bar button, avoiding unnecessary duplicates)
+                                if (!showCastButton && !org.senda.browser.core.cast.SendaTvMode.tvConnected) {
+                                    DropdownMenuItem(
+                                        text = { Text(strings.st_chromecast_title) },
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = Icons.Default.Cast,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onSurface,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        },
+                                        onClick = {
+                                            showMenu = false
+                                            onOpenCast()
+                                        }
+                                    )
+                                }
+
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+                                // Settings
+                                DropdownMenuItem(
+                                    text = { Text(strings.tb_settings) },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.Settings,
                                             contentDescription = null,
                                             tint = MaterialTheme.colorScheme.onSurface,
                                             modifier = Modifier.size(20.dp)
@@ -1420,82 +1577,10 @@ fun SendaToolbar(
                                     },
                                     onClick = {
                                         showMenu = false
-                                        activeTab?.let { tab ->
-                                            org.senda.browser.core.SendaPageActions.addToHomeScreen(context, tab.url, tab.title, null)
-                                        }
+                                        onOpenSettings()
                                     }
                                 )
                             }
-
-                            // Bookmarks
-                            DropdownMenuItem(
-                                text = { Text(strings.tb_bookmarks) },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Default.Bookmark,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                },
-                                onClick = {
-                                    showMenu = false
-                                    onOpenBookmarks()
-                                }
-                            )
-
-                            // Browsing history
-                            DropdownMenuItem(
-                                text = { Text(strings.tb_history) },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Default.History,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                },
-                                onClick = {
-                                    showMenu = false
-                                    onOpenHistory()
-                                }
-                            )
-
-                            // Downloads
-                            DropdownMenuItem(
-                                text = { Text(strings.tb_downloads) },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Default.Download,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                },
-                                onClick = {
-                                    showMenu = false
-                                    onOpenDownloads()
-                                }
-                            )
-
-                            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-
-                            // Settings
-                            DropdownMenuItem(
-                                text = { Text(strings.tb_settings) },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Default.Settings,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                },
-                                onClick = {
-                                    showMenu = false
-                                    onOpenSettings()
-                                }
-                            )
                         }
                     }
                 }
