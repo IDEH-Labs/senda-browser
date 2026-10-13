@@ -269,30 +269,6 @@ class BrowserTab(
         if (!launch() && fallback != null) loadUri(fallback)
     }
 
-    /**
-     * Readable text of the page (the same extractor as reader mode), so the AI can read it.
-     * If Gecko does not answer within 4 s or the page has no text, returns null.
-     */
-    @OptIn(org.mozilla.geckoview.ExperimentalGeckoViewApi::class)
-    suspend fun extractPageText(): String? {
-        if (url.isBlank() || url == "about:blank") return null
-        val html = kotlinx.coroutines.withTimeoutOrNull(4_000L) {
-            kotlinx.coroutines.suspendCancellableCoroutine<String?> { cont ->
-                try {
-                    session.sessionPageExtractor
-                        .getPageContent(PageExtractionController.ContentParams(true, false))
-                        .accept({ cont.resume(it) {} }, { cont.resume(null) {} })
-                } catch (_: Exception) {
-                    cont.resume(null) {}
-                }
-            }
-        } ?: return null
-        val text = android.text.Html.fromHtml(html, android.text.Html.FROM_HTML_MODE_COMPACT).toString()
-            .replace(Regex("[\\uFFFC\\s]+"), " ")
-            .trim()
-        return text.takeIf { it.length > 20 }
-    }
-
     /** Opens [uri] in another tab (long-press menu). */
     fun openInNewTab(uri: String, private: Boolean = isPrivate) {
         val tab = BrowserTab(

@@ -345,18 +345,6 @@ object SendaVaultManager {
         return resultChars
     }
 
-    /** Encrypts bytes with AES-256-GCM using a keystore key; returns (ciphertext, IV). Does not wipe the input. */
-    @Synchronized
-    fun encryptBytes(plain: ByteArray, alias: String): Pair<ByteArray, ByteArray> {
-        val cipher = cipherFor(Cipher.ENCRYPT_MODE, alias)
-        return Pair(cipher.doFinal(plain), cipher.iv)
-    }
-
-    /** Decrypts what [encryptBytes] produced with the same keystore key. */
-    @Synchronized
-    fun decryptBytes(encrypted: ByteArray, iv: ByteArray, alias: String): ByteArray =
-        cipherFor(Cipher.DECRYPT_MODE, alias, iv).doFinal(encrypted)
-
     /**
      * Memory hygiene: actively wipes confidential characters.
      */

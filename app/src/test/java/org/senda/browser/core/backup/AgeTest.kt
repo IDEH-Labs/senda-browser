@@ -40,7 +40,7 @@ class AgeTest {
 
     private fun hex(s: String) = ByteArray(s.length / 2) { s.substring(it * 2, it * 2 + 2).toInt(16).toByte() }
 
-    private val vectors = File(javaClass.classLoader!!.getResource("age-testkit/scrypt")!!.toURI()).parentFile
+    private val vectors = File(javaClass.classLoader!!.getResource("age-testkit/scrypt")!!.toURI()).parentFile!!
         .listFiles()!!.filter { it.name != "README.md" }.sortedBy { it.name }.map(::load)
 
     private fun kindFor(expect: String) = when (expect) {

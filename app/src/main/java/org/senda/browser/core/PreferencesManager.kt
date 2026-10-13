@@ -208,10 +208,6 @@ class PreferencesManager(context: Context) {
         saveZenShortcuts(current)
     }
 
-    fun resetZenShortcuts() {
-        prefs.edit().remove("zen_custom_shortcuts").apply()
-    }
-
     // --- APPEARANCE & INTERFACE ---
     var toolbarPosition: ToolbarPosition
         get() {
