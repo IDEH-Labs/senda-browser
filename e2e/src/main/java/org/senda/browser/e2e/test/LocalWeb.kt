@@ -37,7 +37,12 @@ object LocalWeb {
         "/external.html" to page("external", "<p id=\"r\">NOJS</p><script src=\"ext.js\"></script>"),
         "/a.html" to page("e2e-a", "<p>Page A</p>"),
         "/b.html" to page("e2e-b", "<p>Page B</p>"),
-        "/c.html" to page("e2e-c", "<p>Page C</p>")
+        "/c.html" to page("e2e-c", "<p>Page C</p>"),
+        "/button.html" to page(
+            "e2e-button",
+            "<p style=\"height:300px\">Space above</p><button id=\"b\" style=\"font-size:24px\" " +
+                "onclick=\"this.textContent='PRESSED'\">PRESS-ME</button>"
+        )
     )
 
     /** Requests the test pages received, and how each one arrived. */

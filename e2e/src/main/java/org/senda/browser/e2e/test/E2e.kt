@@ -79,6 +79,19 @@ object E2e {
         assertTrue("Settings were not written", appScript("cat shared_prefs/senda_preferences.xml").contains("<map>"))
     }
 
+    /** Installs the e2e app over itself, as an update does: its data must stay. Only the e2e app's own APK. */
+    fun updateInPlace() {
+        val apk = sh("pm path $APP").lineSequence().map { it.trim().removePrefix("package:") }
+            .firstOrNull { it.endsWith("/base.apk") } ?: fail("No APK for $APP").let { error("unreachable") }
+        val copy = "/data/local/tmp/senda-e2e-update.apk"
+        sh("cp $apk $copy")
+        try {
+            assertTrue("The update did not install", sh("pm install -r -t $copy").contains("Success"))
+        } finally {
+            sh("rm -f $copy")
+        }
+    }
+
     /** Opens the e2e app from its icon. */
     fun launch() {
         sh("am start -W -n $APP/$ACTIVITY -a android.intent.action.MAIN -c android.intent.category.LAUNCHER")
