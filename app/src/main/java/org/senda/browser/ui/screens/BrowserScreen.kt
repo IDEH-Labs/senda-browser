@@ -592,7 +592,7 @@ private fun SendaFilePromptHandler(tab: BrowserTab?) {
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val filePrompt = tab?.activePrompt as? SendaPrompt.File
     // Avoids opening the picker twice for the same prompt (e.g. when rotating the screen)
-    var launchedFor by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(0) }
+    var launchedFor by androidx.compose.runtime.saveable.rememberSaveable { mutableIntStateOf(0) }
 
     fun deliver(uris: List<android.net.Uri>) {
         val t = tab ?: return

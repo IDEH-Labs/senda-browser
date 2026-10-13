@@ -600,8 +600,8 @@ private fun decodeToFill(open: () -> java.io.InputStream, width: Int, height: In
 @Composable
 fun FreeWallpaperBackground(
     wallpaper: FreeWallpaper,
-    dimPercent: Int = 0,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    dimPercent: Int = 0
 ) {
     val context = LocalContext.current
     androidx.compose.foundation.layout.BoxWithConstraints(modifier = modifier.fillMaxSize()) {

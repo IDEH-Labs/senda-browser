@@ -22,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -42,8 +43,8 @@ fun FindInPageBar(tab: BrowserTab, onClose: () -> Unit, modifier: Modifier = Mod
     val strings = LocalSendaStrings.current
     val finder = tab.session.finder
     var query by remember { mutableStateOf("") }
-    var current by remember { mutableStateOf(0) }
-    var total by remember { mutableStateOf(0) }
+    var current by remember { mutableIntStateOf(0) }
+    var total by remember { mutableIntStateOf(0) }
     val focus = remember { FocusRequester() }
 
     fun search(backwards: Boolean = false) {

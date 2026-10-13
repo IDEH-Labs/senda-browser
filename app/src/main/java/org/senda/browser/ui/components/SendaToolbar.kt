@@ -80,6 +80,7 @@ fun SendaToolbar(
     tabsCount: Int,
     position: ToolbarPosition,
     showDevToolsButton: Boolean,
+    modifier: Modifier = Modifier,
     showCastButton: Boolean = true,
     isFullWidth: Boolean = true,
     prefs: PreferencesManager? = null,
@@ -103,8 +104,7 @@ fun SendaToolbar(
     onCloseCurrentTab: (() -> Unit)? = null,
     onCloseAllTabs: (() -> Unit)? = null,
     isEditing: Boolean = false,
-    onEditingChange: ((Boolean) -> Unit)? = null,
-    modifier: Modifier = Modifier
+    onEditingChange: ((Boolean) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
