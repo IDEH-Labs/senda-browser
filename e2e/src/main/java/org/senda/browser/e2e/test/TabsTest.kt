@@ -114,8 +114,10 @@ class TabsTest : E2eTest() {
     @Test
     fun a5_newTabFromLinkWhileLoading() {
         E2e.launch()
-        val opened = System.currentTimeMillis()
+        // Counted from the moment Android has handed the link to Senda (am start -W returns), as A2 counts from the
+        // window in front
         E2e.openLink(LocalWeb.url("/slow.html"))
+        val opened = System.currentTimeMillis()
         val shownAfter = E2e.msUntilAddress(shown("/slow.html"), opened)
         assertTrue(
             "The new slow tab showed its address after ${shownAfter ?: "more than 20000"} ms (limit 1000). Screen: ${E2e.screenTexts()}",
