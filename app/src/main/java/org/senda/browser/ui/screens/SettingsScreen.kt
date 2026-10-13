@@ -13,6 +13,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -35,6 +36,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -602,10 +604,16 @@ fun SettingsScreen(
 
 @Composable
 private fun SettingRow(item: SettingItemData) {
+    // A row with a switch is one switch for screen readers, named by its title (the switch alone had no name)
+    val action = if (item.isToggle) {
+        Modifier.toggleable(value = item.isChecked, role = Role.Switch, onValueChange = { item.onToggleChange?.invoke(it) })
+    } else {
+        Modifier.clickable(onClick = item.onClick)
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = item.onClick)
+            .then(action)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
@@ -632,12 +640,7 @@ private fun SettingRow(item: SettingItemData) {
         }
         if (item.isToggle) {
             Spacer(modifier = Modifier.width(8.dp))
-            Switch(
-                checked = item.isChecked,
-                onCheckedChange = { isChecked ->
-                    item.onToggleChange?.invoke(isChecked)
-                }
-            )
+            Switch(checked = item.isChecked, onCheckedChange = null)
         }
     }
 }

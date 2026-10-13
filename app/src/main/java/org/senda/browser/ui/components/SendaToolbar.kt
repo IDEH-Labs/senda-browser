@@ -35,6 +35,11 @@ import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.rememberTextMeasurer
 import org.senda.browser.core.LocalSendaStrings
 import androidx.compose.ui.Alignment
@@ -1264,18 +1269,17 @@ fun SendaToolbar(
                                         modifier = Modifier.size(20.dp)
                                     )
                                 },
+                                // The whole entry is the checkbox for screen readers (the box alone had no name)
                                 trailingIcon = {
-                                    Checkbox(
-                                        checked = activeTab?.isDesktopMode == true,
-                                        onCheckedChange = {
-                                            showMenu = false
-                                            activeTab?.toggleDesktopMode()
-                                        }
-                                    )
+                                    Checkbox(checked = activeTab?.isDesktopMode == true, onCheckedChange = null)
                                 },
                                 onClick = {
                                     showMenu = false
                                     activeTab?.toggleDesktopMode()
+                                },
+                                modifier = Modifier.semantics {
+                                    role = Role.Checkbox
+                                    toggleableState = ToggleableState(activeTab?.isDesktopMode == true)
                                 }
                             )
 
