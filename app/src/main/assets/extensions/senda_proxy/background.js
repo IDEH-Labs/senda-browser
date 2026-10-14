@@ -5,16 +5,23 @@ let currentConfig = null;
 let markReady;
 const configReady = new Promise((resolve) => { markReady = resolve; });
 
+// Senda's own Tor listens on a socket file only Senda can open, as in Tor Browser for Android: Gecko takes it as a
+// file: URL in the host (nsSOCKSIOLayer.cpp). The port is not used for a socket, but the API wants one from 1 to 65535
+function torSocket(config) {
+    return typeof config.socket === 'string' && config.socket.startsWith('file:///') ? config.socket : null;
+}
+
 function proxyFor(config) {
     if (!config || config.mode === 'OFF') {
         return { type: 'direct' };
     }
 
     if (config.mode === 'TOR_ORBOT') {
+        // Without the socket (it should not happen), a host that cannot connect: never a direct connection
         return {
             type: 'socks',
-            host: '127.0.0.1',
-            port: 9050,
+            host: torSocket(config) || 'file:///senda-tor-socket-unknown',
+            port: 1,
             proxyDNS: true
         };
     }
@@ -141,14 +148,9 @@ function applyProxy(config) {
             if (config.mode === 'OFF') {
                 browser.proxy.settings.set({ value: { proxyType: 'none' } }).catch(() => {});
             } else if (config.mode === 'TOR_ORBOT') {
-                browser.proxy.settings.set({
-                    value: {
-                        proxyType: 'manual',
-                        socks: '127.0.0.1:9050',
-                        socksVersion: 5,
-                        proxyDNS: true
-                    }
-                }).catch(() => {});
+                // proxy.settings cannot hold a socket (ext-proxy.js rejects a file: URL): Gecko's own setting, which
+                // Senda sets to Tor's socket when it starts with Tor, is left as it is
+                browser.proxy.settings.clear({}).catch(() => {});
             } else if (config.mode === 'CUSTOM_SOCKS5') {
                 const host = config.host || '127.0.0.1';
                 const port = parseInt(config.port, 10) || 9050;

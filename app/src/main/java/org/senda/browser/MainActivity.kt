@@ -123,6 +123,12 @@ class MainActivity : FragmentActivity() {
             val tabs = remember { mutableStateListOf<BrowserTab>() }
             var activeTabId by remember { mutableStateOf("") }
 
+            LaunchedEffect(org.senda.browser.core.SendaTorManager.state) {
+                if (org.senda.browser.core.SendaTorManager.state == org.senda.browser.core.TorState.CONNECTED) {
+                    tabs.forEach { it.retryAfterTor() }
+                }
+            }
+
             // Initialize with the first tab
             LaunchedEffect(Unit) {
                 if (tabs.isEmpty()) {

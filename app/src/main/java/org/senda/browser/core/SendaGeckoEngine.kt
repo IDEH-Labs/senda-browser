@@ -333,7 +333,10 @@ object SendaGeckoEngine {
         val host = prefs.proxyHost.filter { it.isLetterOrDigit() || it in ".:-[]" }.ifBlank { "127.0.0.1" }
         val port = prefs.proxyPort.coerceIn(1, 65535)
         return when (mode) {
-            "TOR_ORBOT" -> socksPrefs("127.0.0.1", 9050, remoteDns = true)
+            // Tor's socket, as Tor Browser sets it (TorLauncherUtil.setProxyConfiguration: a file: URL, port 0). Known
+            // before Tor starts: a request made before the proxy extension is ready already goes to Senda's Tor, and
+            // fails while Tor has not opened the socket
+            "TOR_ORBOT" -> socksPrefs(appContext?.let { SendaTorManager.socksSocketUrl(it) } ?: "file:///", 0, remoteDns = true)
             "CUSTOM_SOCKS5" -> socksPrefs(host, port, prefs.proxyDnsRemote)
             "CUSTOM_HTTP" -> "  network.proxy.type: 1\n" +
                 "  network.proxy.http: \"$host\"\n  network.proxy.http_port: $port\n" +
@@ -647,7 +650,10 @@ object SendaGeckoEngine {
                 } else {
                     list?.firstOrNull { it.id == UBLOCK_ID }?.let { setupExtensionPanel(it) }
                     // Except Senda Labs: the user's own CSS and script must never run in private tabs
-                    list?.filter { it.id != "labs@senda.org" }?.forEach { ext ->
+                    // Only the ones not allowed yet: changing it reloads the extension, and doing so on every start
+                    // destroyed the proxy extension half a second after it started, aborting the first page's
+                    // requests while they waited for Tor (2026-10-13)
+                    list?.filter { it.id != "labs@senda.org" && !it.metaData.allowedInPrivateBrowsing }?.forEach { ext ->
                         controller.setAllowedInPrivateBrowsing(ext, true)
                     }
                 }
@@ -688,15 +694,24 @@ object SendaGeckoEngine {
             val rt = runtime ?: return
             val controller = rt.webExtensionController
             val uri = if (resourceUri.endsWith("/")) resourceUri else "$resourceUri/"
+            fun ready(ext: WebExtension) {
+                installedExtensions.removeAll { it.id == ext.id }
+                installedExtensions.add(ext)
+                // Only when it differs: changing it reloads the extension
+                if (ext.metaData.allowedInPrivateBrowsing != allowPrivate) controller.setAllowedInPrivateBrowsing(ext, allowPrivate)
+                onInstalled(ext)
+            }
+            // Already installed in the version this APK carries: used as it is. ensureBuiltIn restarted it on every
+            // start, and Gecko then dropped the proxy listener it keeps from the last session so the first requests
+            // wait for the extension ("listener not re-registered"): those requests went to Gecko's default proxy
+            // without the site's circuit, and failed once that default became Tor's closed port (2026-10-13)
+            val bundled = bundledVersion(uri)
+            installedExtensions.firstOrNull { it.id == id }?.takeIf { bundled != null && it.metaData.version == bundled }?.let {
+                ready(it)
+                return
+            }
             controller.ensureBuiltIn(uri, id).accept(
-                { ext ->
-                    if (ext != null) {
-                        installedExtensions.removeAll { it.id == ext.id }
-                        installedExtensions.add(ext)
-                        controller.setAllowedInPrivateBrowsing(ext, allowPrivate)
-                        onInstalled(ext)
-                    }
-                },
+                { ext -> if (ext != null) ready(ext) },
                 { err ->
                     android.util.Log.e("Senda", "Error al instalar builtin $uri: ${err?.message}")
                 }
@@ -704,6 +719,15 @@ object SendaGeckoEngine {
         } catch (e: Exception) {
             android.util.Log.e("Senda", "Excepción al instalar builtin $resourceUri: ${e.message}")
         }
+    }
+
+    /** The version in the manifest of a built-in extension inside the APK (resource://android/assets/...). */
+    private fun bundledVersion(resourceUri: String): String? = try {
+        val path = resourceUri.removePrefix("resource://android/assets/") + "manifest.json"
+        appContext?.assets?.open(path)?.use { org.json.JSONObject(it.readBytes().decodeToString()).optString("version") }
+            ?.ifBlank { null }
+    } catch (e: Exception) {
+        null
     }
 
     private fun installSignedXpi(context: Context, assetName: String, onInstalled: (WebExtension) -> Unit) {
@@ -793,6 +817,8 @@ object SendaGeckoEngine {
         put("mode", prefs?.proxyMode ?: "OFF")
         put("host", prefs?.proxyHost ?: "127.0.0.1")
         put("port", prefs?.proxyPort ?: 9050)
+        // With Tor, its socket ([SendaTorManager.socksSocket])
+        appContext?.let { put("socket", SendaTorManager.socksSocketUrl(it)) }
         put("proxyDNS", prefs?.proxyDnsRemote ?: true)
         put("torState", when (SendaTorManager.state) {
             TorState.CONNECTED -> "ready"

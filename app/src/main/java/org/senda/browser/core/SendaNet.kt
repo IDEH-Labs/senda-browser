@@ -39,7 +39,7 @@ object SendaNet {
         if (host == null || isLocal(host)) return Proxy.NO_PROXY
         return when (prefs.proxyMode) {
             // Unresolved address: the proxy resolves the name (remote DNS, no leaks)
-            "TOR_ORBOT" -> Proxy(Proxy.Type.SOCKS, InetSocketAddress.createUnresolved("127.0.0.1", 9050))
+            "TOR_ORBOT" -> Proxy(Proxy.Type.SOCKS, InetSocketAddress.createUnresolved("127.0.0.1", SendaTorManager.socksPort))
             "CUSTOM_SOCKS5" -> Proxy(Proxy.Type.SOCKS, InetSocketAddress.createUnresolved(prefs.proxyHost, prefs.proxyPort))
             "CUSTOM_HTTP" -> Proxy(Proxy.Type.HTTP, InetSocketAddress.createUnresolved(prefs.proxyHost, prefs.proxyPort))
             else -> Proxy.NO_PROXY

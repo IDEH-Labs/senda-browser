@@ -11,10 +11,10 @@ import org.junit.runner.RunWith
 
 /**
  * B5, B6 — the real Tor network (only with `-e network 1`): they contact Tor relays, check.torproject.org and
- * ifconfig.co (B6, a second site that shows the address it sees). Both are HTML: GeckoView does not offer the text
+ * ipv4.myip.wtf (B6, a second site that shows the address it sees). Both are HTML: GeckoView does not offer the text
  * of a plain-text page to accessibility services, so an address in one could not be read.
- * Senda's built-in Tor always uses port 9050: if the person's Senda is running or the port is taken, the e2e app would
- * go through that other Tor, so the test does not run and says why.
+ * Senda's Tor picks its own SOCKS port on each start and Senda asks it of its own TorService, so the person's Senda
+ * (or Orbot) running at the same time does not matter. B7 checks that an app holding 9050 gets nothing.
  */
 @RunWith(AndroidJUnit4::class)
 class TorTest : E2eTest() {
@@ -25,16 +25,12 @@ class TorTest : E2eTest() {
     fun onlyWithNetworkAndFreePort() {
         assumeTrue("Not run: needs -e network 1 (it uses the real Tor network)",
             InstrumentationRegistry.getArguments().getString("network") == "1")
-        assumeTrue("Not run: the person's Senda is running (its Tor would be shared)", E2e.sh("pidof org.senda.browser").isBlank())
-        // 9050 is 235A in /proc/net/tcp; state 0A = listening
-        val listening = E2e.sh("cat /proc/net/tcp /proc/net/tcp6").lines().any { it.contains(":235A ") && it.trim().split(Regex("\\s+")).getOrNull(3) == "0A" }
-        assumeTrue("Not run: port 9050 is already in use", !listening)
     }
 
     private fun usesTor(what: String) {
         E2e.openLink("https://check.torproject.org/")
         assertTrue("check.torproject.org did not say it uses Tor ($what). Screen: ${E2e.screenTexts()}",
-            E2e.has(By.textContains("Congratulations"), 90_000))
+            E2e.has(By.textContains("Congratulations"), TOR_FIRST_START_MS))
     }
 
     /** B5 — guards de65914. Cold start with Tor; after 90 s in the background, Tor works again on return. */
@@ -47,7 +43,7 @@ class TorTest : E2eTest() {
         Thread.sleep(90_000)
         E2e.launch()
         usesTor("after 90 s in the background")
-        assertTrue("Tor took $ready s at the cold start", ready < 120)
+        assertTrue("Tor took $ready s at the cold start", ready < TOR_FIRST_START_MS / 1000)
     }
 
     /** The Tor exit address [url] shows, read from the screen. */
@@ -55,7 +51,7 @@ class TorTest : E2eTest() {
         E2e.openLink(url)
         // Only once the new site is in front, so the address read is never the previous page's. [site] is the end
         // of the host: the address bar cuts long ones from the start ("…roject.org")
-        E2e.waitForAddress(site, site, 90_000)
+        E2e.waitForAddress(site, site, TOR_FIRST_START_MS)
         var address: String? = null
         E2e.waitFor("an address from $url", 90_000) {
             address = IP.find(E2e.screenTexts())?.value
@@ -85,14 +81,51 @@ class TorTest : E2eTest() {
             first = next
         }
         assertTrue("Tor never kept one exit for check.torproject.org (last $first)", settled)
-        val other = exitAddress("https://ifconfig.co/", "ifconfig.co")
+        // Both sites only have IPv4 addresses. Senda's Tor lets exits use IPv6, as Tor Browser does (PreferIPv6), so a
+        // site with IPv6 shows another address even through the same exit: ifconfig.co did (2026-10-14). ip4.me
+        // answers Tor exits with 403 Forbidden (measured the same day)
+        val other = exitAddress("https://ipv4.myip.wtf/", "myip.wtf")
         val again = exitAddress("https://check.torproject.org/", "roject.org")
         assertTrue("Two sites left through the same exit $first: no circuit per site?", first != other)
         assertTrue("The same site changed exit ($first, then $again): its circuit was not kept", first == again)
     }
 
     private companion object {
-        // IPv4 only: Tor exits answered both sites over IPv4 (2026-10-13), and an IPv6 pattern would also match times such as 12:34:56
+        // Every test starts with no Tor data, so Tor first downloads the network's directory: measured from 22 s to
+        // more than 90 s over mobile data on a moto g34 (2026-10-14)
+        const val TOR_FIRST_START_MS = 180_000L
+
+        // IPv4 only: both sites have only IPv4 addresses, and an IPv6 pattern would also match times such as 12:34:56
         val IP = Regex("""\b(?:\d{1,3}\.){3}\d{1,3}\b""")
+    }
+
+    /**
+     * B7 — guards the port fix of 2026-10-13. Another app listens on 9050, Tor's usual port, before Senda starts: here
+     * the test process itself, as any app could. Before the fix Tor could not start and Senda sent its SOCKS requests
+     * to that app. Now Tor picks another port: the page loads through Tor and the listener receives no connection.
+     */
+    @Test
+    fun b7_anAppOn9050GetsNothing() {
+        E2e.stop()
+        val received = java.util.concurrent.atomic.AtomicInteger()
+        val squatter = java.net.ServerSocket()
+        squatter.reuseAddress = true
+        squatter.bind(java.net.InetSocketAddress("127.0.0.1", 9050))
+        val accepting = Thread {
+            while (!squatter.isClosed) {
+                try {
+                    squatter.accept().close()
+                    received.incrementAndGet()
+                } catch (_: java.io.IOException) {
+                }
+            }
+        }.apply { isDaemon = true; start() }
+        try {
+            usesTor("with another app on 9050")
+            assertTrue("The app on 9050 received ${received.get()} connections from Senda", received.get() == 0)
+        } finally {
+            squatter.close()
+            accepting.join(2000)
+        }
     }
 }

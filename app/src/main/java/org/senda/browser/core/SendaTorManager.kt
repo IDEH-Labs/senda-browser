@@ -29,10 +29,31 @@ object SendaTorManager {
     var state by mutableStateOf(TorState.STOPPED)
         private set
 
-    private const val TOR_SOCKS_PORT = 9050
+    /**
+     * Where Tor and the proxy point while Tor is not connected: below 1024, where no app can listen on Android, so a
+     * request fails on the phone. With a fixed 9050 any app that took the port first received Senda's requests
+     * (measured on 2026-10-13: a fake listener on 9050 got Senda's SOCKS greetings, and Tor could not start).
+     */
+    const val CLOSED_PORT = 1
 
-    var socksPort by mutableIntStateOf(TOR_SOCKS_PORT)
+    /**
+     * The TCP SOCKS port of Senda's own Tor, chosen by Tor on each start (SocksPort auto); [CLOSED_PORT] until then.
+     * Only for Senda's own Java connections (news, the TV relay): Java cannot speak SOCKS over a Unix socket. Pages
+     * go through [socksSocket].
+     */
+    var socksPort by mutableIntStateOf(CLOSED_PORT)
         private set
+
+    /**
+     * Tor's SOCKS socket for pages, a file in a folder only Senda can open, as in Tor Browser for Android
+     * (TorAndroidIntegration.java: SocksPort unix:…/tor-private/socks-ipc). Its path is known before Tor starts, so
+     * Gecko points to it from the first request, and no other app can take its place or connect to it. Kept in
+     * files/, not in the cache: Android may delete cache files while Tor is running.
+     */
+    fun socksSocket(context: Context) = File(File(context.applicationContext.filesDir, "tor-ipc"), "socks")
+
+    /** [socksSocket] as Gecko takes it: a file: URL as the SOCKS host (nsSOCKSIOLayer.cpp, IsHostLocalTarget). */
+    fun socksSocketUrl(context: Context) = "file://" + socksSocket(context).absolutePath
 
     /** Called on the main thread whenever [state] changes: the proxy extension needs to know when Tor is ready. */
     var onStateChanged: (() -> Unit)? = null
@@ -58,11 +79,8 @@ object SendaTorManager {
                 return
             }
             changeState(result.state)
-            if (result.state == TorState.CONNECTED) {
-                // tor-android 0.4.9 no longer exposes the port as a static field: it is the one set in ensureTorrc()
-                socksPort = TOR_SOCKS_PORT
-                Log.i(TAG, "Tor conectado exitosamente en puerto $socksPort")
-            }
+            // Pages use the socket; the TCP port for Senda's own connections is asked of Tor once it is ready
+            if (result.state == TorState.CONNECTED) appContext?.let { askSocksPort(it) }
             // Android stops Tor when Senda stays in the background: before, the OFF often arrived just after Senda
             // came back to the front, nothing started Tor again and every page failed against the empty port
             if (result.restart) appContext?.let { start(it) }
@@ -71,6 +89,7 @@ object SendaTorManager {
 
     private fun changeState(newState: TorState) {
         state = newState
+        if (newState != TorState.CONNECTED) socksPort = CLOSED_PORT
         // While Tor is not ready, pages wait for it (never a direct connection) or fail with ERROR
         onStateChanged?.invoke()
     }
@@ -126,15 +145,13 @@ object SendaTorManager {
             // A Tor that Android just stopped is still closing: tor-android frees its lock before that, so a new
             // Tor would run beside it in the same process and could not open the port
             waitForOldTor()
-            withContext(Dispatchers.IO) { waitForFreePort() }
             if (launchService(app)) {
-                // The receiver switches to CONNECTED with STATUS_ON. Without it in time, pages stop waiting and show
-                // the connection error (never a direct connection); if Tor connects later, it is used from then on
-                delay(60_000)
-                if (state == TorState.STARTING) {
-                    Log.w(TAG, "Tor no conectó en 60 s")
-                    changeState(TorState.ERROR)
-                }
+                // The receiver switches to CONNECTED with STATUS_ON. Tor's first start downloads the network's
+                // directory, measured from 22 to more than 90 s over mobile data on a moto g34 (2026-10-14), and it
+                // once stayed at 51 % for over a minute before going on: a time limit failed pages while Tor was still
+                // working. As in Tor Browser, there is no time limit: pages show the connection error (never a direct
+                // connection) only when Tor itself reports that it cannot connect. If it connects later, it is used from then on
+                watchBootstrap(app)
             }
         }
     }
@@ -165,17 +182,63 @@ object SendaTorManager {
         oldTorClosing = false
     }
 
-    /** Waits (up to 10 s) until nothing answers on Tor's port. */
-    private fun waitForFreePort() {
-        repeat(40) {
-            try {
-                java.net.Socket().use { it.connect(java.net.InetSocketAddress("127.0.0.1", TOR_SOCKS_PORT), 200) }
-            } catch (e: java.io.IOException) {
-                return
+    /**
+     * While Tor starts, reads its bootstrap status (GETINFO status/bootstrap-phase, control-spec) and marks Tor failed
+     * when Tor reports that it cannot connect: the same rule as Tor Browser (TorProvider.sys.mjs, a WARN bootstrap
+     * event whose RECOMMENDATION is not "ignore").
+     */
+    private suspend fun watchBootstrap(app: Context) {
+        var service: TorService? = null
+        val connection = object : android.content.ServiceConnection {
+            override fun onServiceConnected(name: android.content.ComponentName?, binder: android.os.IBinder?) {
+                service = (binder as? TorService.LocalBinder)?.service
             }
-            Thread.sleep(250)
+
+            override fun onServiceDisconnected(name: android.content.ComponentName?) {
+                service = null
+            }
         }
-        Log.w(TAG, "El puerto $TOR_SOCKS_PORT sigue ocupado")
+        // Flags 0: only bind to the TorService already running, never start a new one here
+        val bound = try { app.bindService(Intent(app, TorService::class.java), connection, 0) } catch (e: Exception) { false }
+        try {
+            while (state == TorState.STARTING) {
+                delay(2_000)
+                val status = withContext(Dispatchers.IO) { service?.getInfo("status/bootstrap-phase") }
+                if (state == TorState.STARTING && TorStatusRules.bootstrapFailed(status)) {
+                    Log.w(TAG, "Tor no puede conectar (progreso ${TorStatusRules.bootstrapProgress(status)} %)")
+                    changeState(TorState.ERROR)
+                }
+            }
+        } finally {
+            if (bound) try { app.unbindService(connection) } catch (_: Exception) {}
+        }
+    }
+
+    /**
+     * Asks the running TorService (Senda's own, in this process) which TCP SOCKS port its Tor opened. Asked of Tor itself through tor-android's private ControlSocket (GETINFO net/listeners/socks) once Tor
+     * says it is ready: TorService.getSocksPort() is read as soon as the control connection opens, possibly before Tor
+     * opened its SOCKS port, and then it is 0 (seen on 2026-10-13: Tor listening, Senda given no port).
+     */
+    private fun askSocksPort(context: Context) {
+        val app = context.applicationContext
+        val connection = object : android.content.ServiceConnection {
+            override fun onServiceConnected(name: android.content.ComponentName?, binder: android.os.IBinder?) {
+                val service = (binder as? TorService.LocalBinder)?.service
+                val self = this
+                scope.launch {
+                    val port = withContext(Dispatchers.IO) {
+                        TorStatusRules.socksPortFrom(service?.getInfo("net/listeners/socks"))
+                    }
+                    try { app.unbindService(self) } catch (_: Exception) {}
+                    if (state != TorState.CONNECTED) return@launch
+                    if (port != null) socksPort = port else Log.e(TAG, "Tor no dio su puerto SOCKS")
+                }
+            }
+
+            override fun onServiceDisconnected(name: android.content.ComponentName?) {}
+        }
+        // Flags 0: only bind to the TorService already running, never start a new one here
+        if (!app.bindService(Intent(app, TorService::class.java), connection, 0)) Log.e(TAG, "No se pudo consultar el TorService")
     }
 
     private fun ensureTorrc(context: Context) {
@@ -185,13 +248,27 @@ object SendaTorManager {
             // Left empty by versions up to 0.2.0-beta.13: tor-android sets its own DataDirectory on the command line
             File(context.filesDir, "tor_data").delete()
 
-            // Only Senda's SOCKS port on 127.0.0.1. No ControlPort: tor-android starts Tor with CookieAuthentication 0
-            // and talks to it through its private ControlSocket, so a TCP control port let any app on the phone
-            // control Tor and read its circuits and streams without a password (measured 2026-10-13). No
-            // HTTPTunnelPort: tor-android's torrc-defaults opens 8118, a second proxy Senda does not use.
+            // Tor checks that the socket's folder is private before it creates the socket (check_location_for_unix_socket
+            // in connection.c): readable only by Senda, as Tor Browser does with its tor-private folder. Tor itself
+            // removes a socket left by an earlier Tor before it listens (connection_listener_new), so Senda never does:
+            // that could pull the socket from under a Tor still running
+            val socket = socksSocket(context)
+            val folder = socket.parentFile!!
+            folder.mkdirs()
+            android.system.Os.chmod(folder.path, "700".toInt(8))
+
+            // Two SOCKS listeners, with the flags Tor Browser for Android uses: the socket for pages, and a TCP port Tor
+            // picks on each start for Senda's own Java connections, asked of its own TorService ([askSocksPort]). No
+            // fixed port: an app holding 9050 received Senda's requests (measured 2026-10-13). No ControlPort:
+            // tor-android starts Tor with CookieAuthentication 0 and talks to it through its private ControlSocket, so
+            // a TCP control port let any app on the phone control Tor and read its circuits and streams without a
+            // password (measured 2026-10-13). No HTTPTunnelPort: tor-android's torrc-defaults opens 8118, a second
+            // proxy Senda does not use. These SocksPort lines replace the one in tor-android's torrc-defaults.
             // DataDirectory and CacheDirectory are set by tor-android (TorService.java, 0.4.9.13)
+            val flags = "IPv6Traffic PreferIPv6 KeepAliveIsolateSOCKSAuth"
             val content = """
-                SocksPort 127.0.0.1:$TOR_SOCKS_PORT
+                SocksPort unix:"${socket.absolutePath}" $flags
+                SocksPort auto $flags
                 HTTPTunnelPort 0
                 ClientOnly 1
                 SafeLogging 1

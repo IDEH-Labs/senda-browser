@@ -470,6 +470,8 @@ class BrowserTab(
                 if (error.code == org.mozilla.geckoview.WebRequestError.ERROR_CONTENT_CRASHED) return null
                 pendingErrorUrl = failed
                 isLoading = false
+                failedBeforeTor = error.category == org.mozilla.geckoview.WebRequestError.ERROR_CATEGORY_PROXY &&
+                    org.senda.browser.core.SendaTorManager.state != org.senda.browser.core.TorState.CONNECTED
                 return GeckoResult.fromValue(buildErrorPage(failed, error))
             }
 
@@ -1075,6 +1077,19 @@ class BrowserTab(
 
     // Address that failed, while Gecko loads the error page that replaces it
     private var pendingErrorUrl: String? = null
+    // The page failed at Tor's port while Tor was not connected yet (see retryAfterTor)
+    private var failedBeforeTor = false
+
+    /**
+     * Tor just connected: a page that failed only because Tor was not ready is loaded again by itself. It happens on
+     * the first start after an update, while Gecko registers the built-in extensions again (2026-10-13).
+     */
+    fun retryAfterTor() {
+        if (showingError && failedBeforeTor) {
+            failedBeforeTor = false
+            loadUri(url)
+        }
+    }
     var showingError by mutableStateOf(false)
         private set
 

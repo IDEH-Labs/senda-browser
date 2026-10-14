@@ -37,7 +37,11 @@ The interface is available in 8 languages: Spanish, English, German, French, Por
   mode; a site can be allowed from LibreJS's panel in the menu.
 - HTTPS-only mode and DNS over HTTPS, both on by default.
 - Built-in Tor network (optional), or your own SOCKS5/HTTP proxy. It applies from the very first connection: pages wait
-  while Tor connects, and a connection that fails through Tor or the proxy fails instead of going out directly.
+  while Tor connects, and a connection that fails through Tor or the proxy fails instead of going out directly. As in
+  Tor Browser for Android, pages reach Senda's Tor through a socket file only Senda can open, so no other app can take
+  its place or see that traffic, and each site gets its own Tor circuit. Senda's own connections (news, the TV) use a
+  port Tor picks at random on each start, never a fixed one. Senda is not Tor Browser: it does not hide among Tor
+  Browser's users.
 - Password vault encrypted with AES-256-GCM. The key is generated and used only inside the phone's secure hardware (StrongBox or TEE); on phones without secure hardware the vault stays disabled. It requires a fingerprint or PIN, and it fills in and saves accounts on web pages. It offers an account only on the site where it was saved, on any of that site's addresses (an account saved on my.fsf.org is offered on cas.fsf.org, where the FSF's sign-in is), and shows each account's address; sites are told apart with Mozilla's Public Suffix List, so ana.github.io and pedro.github.io count as different sites. Checked on 2026-10-13 on the FSF's sign-in pages with made-up accounts; not yet across other sites.
 - Import passwords from the CSV exported by Chrome, Brave, Edge, Firefox, Bitwarden or KeePassXC, and export them (after fingerprint or PIN).
 - Encrypted backup of bookmarks, settings, history and passwords, with a passphrase only you know, in the open [age](https://age-encryption.org) format: save it wherever you want (Syncthing, Nextcloud, a USB drive) and open it with `age -d` on any system. Format: [docs/backup-format.md](docs/backup-format.md).

@@ -97,4 +97,37 @@ class TorStatusRulesTest {
         tor.receive(ON)
         assertEquals(TorState.CONNECTED, tor.state)
     }
+
+    @Test
+    fun theSocksPortComesFromTorsOwnAnswer() {
+        assertEquals(38451, TorStatusRules.socksPortFrom("\"127.0.0.1:38451\""))
+        assertEquals(41000, TorStatusRules.socksPortFrom("\"[::1]:41000\" \"127.0.0.1:42000\""))
+        // Senda's Tor also lists its socket for pages: only the TCP port is taken
+        assertEquals(38451, TorStatusRules.socksPortFrom("\"unix:/data/user/0/org.senda.browser/files/tor-ipc/socks\" \"127.0.0.1:38451\""))
+        // No SOCKS port, a missing answer, another address or a reserved port: no port, so requests fail on the phone
+        assertNull(TorStatusRules.socksPortFrom(""))
+        assertNull(TorStatusRules.socksPortFrom(null))
+        assertNull(TorStatusRules.socksPortFrom("\"0.0.0.0:9050\""))
+        assertNull(TorStatusRules.socksPortFrom("\"127.0.0.1:80\""))
+    }
+
+    @Test
+    fun bootstrapProgressComesFromTorsLastEvent() {
+        assertEquals(50, TorStatusRules.bootstrapProgress("NOTICE BOOTSTRAP PROGRESS=50 TAG=loading_descriptors SUMMARY=\"Loading relay descriptors\""))
+        assertEquals(10, TorStatusRules.bootstrapProgress("WARN BOOTSTRAP PROGRESS=10 TAG=conn_done SUMMARY=\"Connected to a relay\" WARNING=\"Connection refused\" REASON=CONNECTREFUSED COUNT=3 RECOMMENDATION=ignore"))
+        assertEquals(100, TorStatusRules.bootstrapProgress("NOTICE BOOTSTRAP PROGRESS=100 TAG=done SUMMARY=\"Done\""))
+        // No answer yet, or not a bootstrap event: no progress
+        assertNull(TorStatusRules.bootstrapProgress(null))
+        assertNull(TorStatusRules.bootstrapProgress(""))
+        assertNull(TorStatusRules.bootstrapProgress("NOTICE CIRCUIT_ESTABLISHED"))
+    }
+
+    @Test
+    fun torFailsOnlyWhenTorSaysSo() {
+        assertTrue(TorStatusRules.bootstrapFailed("WARN BOOTSTRAP PROGRESS=10 TAG=conn_done SUMMARY=\"Connected to a relay\" WARNING=\"No route to host\" REASON=NOROUTE COUNT=5 RECOMMENDATION=warn"))
+        // Tor expects to recover, still making progress, or no answer yet: keep waiting
+        assertFalse(TorStatusRules.bootstrapFailed("WARN BOOTSTRAP PROGRESS=10 TAG=conn_done SUMMARY=\"Connected to a relay\" WARNING=\"Connection refused\" REASON=CONNECTREFUSED COUNT=1 RECOMMENDATION=ignore"))
+        assertFalse(TorStatusRules.bootstrapFailed("NOTICE BOOTSTRAP PROGRESS=51 TAG=loading_descriptors SUMMARY=\"Loading relay descriptors\""))
+        assertFalse(TorStatusRules.bootstrapFailed(null))
+    }
 }

@@ -214,7 +214,7 @@ class SendaFullSystemMasterTest {
     fun test06_TorAndProxyConfigurationState() {
         // Check the proxy configuration state
         assertEquals("Tor debe iniciar en estado STOPPED", TorState.STOPPED, SendaTorManager.state)
-        assertEquals("El puerto local por defecto de SOCKS5 Tor debe ser 9050", 9050, SendaTorManager.socksPort)
+        assertEquals("Sin Tor conectado, el puerto TCP es el cerrado", SendaTorManager.CLOSED_PORT, SendaTorManager.socksPort)
         println("[PASS 6/8] Enrutamiento Seguro: SendaTorManager listo para sockets SOCKS5.")
     }
 

@@ -68,7 +68,8 @@ Priority 1 are regressions of bugs fixed in October 2026; they must pass before 
 | B3 | Switching from direct to the proxy works without a restart | — |
 | B4 | With the proxy on and the proxy stopped, a page fails instead of going out directly | — |
 | B5 (`network`) | Tor: started cold, check.torproject.org reports Tor; after Senda spends 90 s in the background, Tor works again on return | `de65914` |
-| B6 (`network`) | Tor: a circuit per site. check.torproject.org and ifconfig.co show different exits; check.torproject.org again shows its first exit. It measures once check.torproject.org gives the same exit twice in a row: Tor replaces its first circuits for a while after it starts, even for one SOCKS username. Two circuits can end at the same exit (about 1-2 % of runs): retried once by hand | `ab8d5d1` |
+| B6 (`network`) | Tor: a circuit per site. check.torproject.org and ipv4.myip.wtf (both IPv4 only: Tor exits may use IPv6, as in Tor Browser) show different exits; check.torproject.org again shows its first exit. It measures once check.torproject.org gives the same exit twice in a row: Tor replaces its first circuits for a while after it starts, even for one SOCKS username. Two circuits can end at the same exit (about 1-2 % of runs): retried once by hand | `ab8d5d1` |
+| B7 (`network`) | Another app listens on 9050 before Senda starts Tor: the page loads through Tor and that app receives no connection (pages go through Tor's socket file in a folder only Senda can open, as in Tor Browser for Android) | port fix, 2026-10-13 |
 
 ### C. JavaScript setting and GNU LibreJS (priority 1)
 
@@ -183,9 +184,8 @@ How the suite keeps its rules:
   stops if another app comes to the front.
 - H6 and H5 change the phone's rotation and text size: their values are written down first and put back exactly.
 - Crashes are read from Android's record of the app's own exits (`dumpsys activity exit-info`), not from the system log.
-- Not automated: E2 (Android's file picker), K (fingerprint), B5, B6 and F3 (the real Tor network). Senda's built-in Tor
-  always uses port 9050: while the person's Senda has Tor on, the e2e app would go through that Tor, so B5, B6 and F3
-  need it off.
+- Not automated: E2 (Android's file picker), K (fingerprint), B5, B6, B7 and F3 (the real Tor network). Each Senda's Tor has its
+  own socket file and lets Tor pick its TCP port, so the person's Senda can stay open while they run.
 
 ## Limits
 

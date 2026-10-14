@@ -27,6 +27,37 @@ internal object TorStatusRules {
         val oldTorFinished: Boolean = false
     )
 
+    /**
+     * The SOCKS port in Tor's answer to GETINFO net/listeners/socks: quoted addresses separated by spaces, such as
+     * "127.0.0.1:38451". Only a port on the phone itself (127.0.0.1 or ::1) and outside the reserved range; null
+     * otherwise, so Senda never points its requests elsewhere.
+     */
+    fun socksPortFrom(info: String?): Int? {
+        if (info == null) return null
+        for (listener in info.split(' ').map { it.trim().trim('"') }) {
+            val host = listener.substringBeforeLast(':', "")
+            val port = listener.substringAfterLast(':').toIntOrNull() ?: continue
+            if ((host == "127.0.0.1" || host == "[::1]") && port in 1024..65535) return port
+        }
+        return null
+    }
+
+    /**
+     * Tor's bootstrap progress, 0 to 100, from its answer to GETINFO status/bootstrap-phase: its last bootstrap event,
+     * such as `NOTICE BOOTSTRAP PROGRESS=50 TAG=loading_descriptors SUMMARY="Loading relay descriptors"`
+     * (control-spec). Null when there is no answer yet.
+     */
+    fun bootstrapProgress(info: String?): Int? =
+        info?.let { Regex("""\bBOOTSTRAP\b.*?\bPROGRESS=(\d{1,3})\b""").find(it) }?.groupValues?.get(1)?.toIntOrNull()?.takeIf { it in 0..100 }
+
+    /**
+     * Whether Tor reports that it cannot connect: a WARN bootstrap event whose RECOMMENDATION is "warn" (control-spec:
+     * "ignore" means Tor expects to recover by itself). Tor Browser shows its connection error on the same events.
+     */
+    fun bootstrapFailed(info: String?): Boolean =
+        info != null && Regex("""^\s*WARN\s+BOOTSTRAP\b""").containsMatchIn(info) &&
+            Regex("""\bRECOMMENDATION=(\w+)""").find(info)?.groupValues?.get(1)?.equals("ignore", ignoreCase = true) == false
+
     /** Returns null when the broadcast changes nothing (repeated or late). */
     fun onStatus(current: TorState, status: String, wanted: Boolean, oldTorClosing: Boolean): Result? = when (status) {
         STARTING -> if (current == TorState.STARTING) null else Result(TorState.STARTING)
