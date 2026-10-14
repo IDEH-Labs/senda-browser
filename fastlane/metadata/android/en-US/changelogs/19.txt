@@ -1,0 +1,1 @@
+Security: Tor no longer opens a control port that any app could use, and pages reach Senda's Tor through a socket file only Senda can open, as in Tor Browser, so no app can take its place on port 9050. Each site gets its own Tor circuit. Tor gets as long as it needs to connect the first time. Videos go to the TV in original quality.
