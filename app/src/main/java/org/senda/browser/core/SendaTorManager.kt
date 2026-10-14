@@ -180,14 +180,19 @@ object SendaTorManager {
 
     private fun ensureTorrc(context: Context) {
         try {
-            val torDir = File(context.filesDir, "tor_data").apply { mkdirs() }
             val torrc = TorService.getTorrc(context)
             torrc.parentFile?.mkdirs()
+            // Left empty by versions up to 0.2.0-beta.13: tor-android sets its own DataDirectory on the command line
+            File(context.filesDir, "tor_data").delete()
 
+            // Only Senda's SOCKS port on 127.0.0.1. No ControlPort: tor-android starts Tor with CookieAuthentication 0
+            // and talks to it through its private ControlSocket, so a TCP control port let any app on the phone
+            // control Tor and read its circuits and streams without a password (measured 2026-10-13). No
+            // HTTPTunnelPort: tor-android's torrc-defaults opens 8118, a second proxy Senda does not use.
+            // DataDirectory and CacheDirectory are set by tor-android (TorService.java, 0.4.9.13)
             val content = """
-                DataDirectory ${torDir.absolutePath}
                 SocksPort 127.0.0.1:$TOR_SOCKS_PORT
-                ControlPort auto
+                HTTPTunnelPort 0
                 ClientOnly 1
                 SafeLogging 1
                 DNSPort 0
