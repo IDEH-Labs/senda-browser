@@ -673,6 +673,7 @@ interface SendaStringPack {
     val ext_install_no_perms: String
     val ext_install_confirm: String
     val sec_not_secure: String
+    val sec_checking: String
     val dl_started: String
     val tb_share_link: String
     val tb_protected: String
@@ -1418,6 +1419,7 @@ object SendaStringsDe : SendaStringPack {
     override val ext_install_no_perms = "Sie fordert keine besonderen Berechtigungen an."
     override val ext_install_confirm = "Installieren"
     override val sec_not_secure = "Nicht sicher"
+    override val sec_checking = "Verbindung wird geprüft…"
     override val dl_started = "„%s“ wird heruntergeladen…"
     override val tb_share_link = "Link teilen"
     override val tb_protected = "Geschützt"
@@ -2162,6 +2164,7 @@ object SendaStringsEn : SendaStringPack {
     override val ext_install_no_perms = "It requests no special permissions."
     override val ext_install_confirm = "Install"
     override val sec_not_secure = "Not secure"
+    override val sec_checking = "Checking the connection…"
     override val dl_started = "Downloading “%s”…"
     override val tb_share_link = "Share link"
     override val tb_protected = "Protected"
@@ -2906,6 +2909,7 @@ object SendaStringsEs : SendaStringPack {
     override val ext_install_no_perms = "No solicita permisos especiales."
     override val ext_install_confirm = "Instalar"
     override val sec_not_secure = "Conexión no segura"
+    override val sec_checking = "Comprobando la conexión…"
     override val dl_started = "Descargando «%s»…"
     override val tb_share_link = "Compartir enlace"
     override val tb_protected = "Protegido"
@@ -3650,6 +3654,7 @@ object SendaStringsFr : SendaStringPack {
     override val ext_install_no_perms = "Elle ne demande aucune autorisation particulière."
     override val ext_install_confirm = "Installer"
     override val sec_not_secure = "Non sécurisé"
+    override val sec_checking = "Vérification de la connexion…"
     override val dl_started = "Téléchargement de « %s »…"
     override val tb_share_link = "Partager le lien"
     override val tb_protected = "Protégé"
@@ -4394,6 +4399,7 @@ object SendaStringsPt : SendaStringPack {
     override val ext_install_no_perms = "Não solicita permissões especiais."
     override val ext_install_confirm = "Instalar"
     override val sec_not_secure = "Não seguro"
+    override val sec_checking = "Verificando a conexão…"
     override val dl_started = "Baixando “%s”…"
     override val tb_share_link = "Compartilhar link"
     override val tb_protected = "Protegido"
@@ -5138,6 +5144,7 @@ object SendaStringsIt : SendaStringPack {
     override val ext_install_no_perms = "Non richiede autorizzazioni speciali."
     override val ext_install_confirm = "Installa"
     override val sec_not_secure = "Non sicuro"
+    override val sec_checking = "Verifica della connessione…"
     override val dl_started = "Download di «%s»…"
     override val tb_share_link = "Condividi link"
     override val tb_protected = "Protetto"
@@ -5882,6 +5889,7 @@ object SendaStringsJa : SendaStringPack {
     override val ext_install_no_perms = "特別な権限は要求しません。"
     override val ext_install_confirm = "インストール"
     override val sec_not_secure = "保護されていない通信"
+    override val sec_checking = "接続を確認しています…"
     override val dl_started = "「%s」をダウンロード中…"
     override val tb_share_link = "リンクを共有"
     override val tb_protected = "保護中"
@@ -6626,6 +6634,7 @@ object SendaStringsZh : SendaStringPack {
     override val ext_install_no_perms = "不请求特殊权限。"
     override val ext_install_confirm = "安装"
     override val sec_not_secure = "不安全"
+    override val sec_checking = "正在检查连接…"
     override val dl_started = "正在下载“%s”…"
     override val tb_share_link = "分享链接"
     override val tb_protected = "已受保护"

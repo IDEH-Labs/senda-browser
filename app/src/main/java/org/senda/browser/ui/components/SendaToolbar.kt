@@ -824,7 +824,12 @@ fun SendaToolbar(
                                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                                     modifier = Modifier.size((iconSize.value - 4).coerceAtLeast(14f).dp)
                                                 )
-                                            } else Icon(
+                                            } else if (activeTab.securityPending) Icon(
+                                                imageVector = Icons.Default.Public,
+                                                contentDescription = strings.sec_checking,
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size((iconSize.value - 4).coerceAtLeast(14f).dp)
+                                            ) else Icon(
                                                 imageVector = if (secure) Icons.Default.Lock else Icons.Default.LockOpen,
                                                 contentDescription = if (secure) strings.tb_encrypted_conn else strings.sec_not_secure,
                                                 tint = if (secure) MaterialTheme.colorScheme.primary.copy(alpha = 0.9f) else MaterialTheme.colorScheme.error,
@@ -1626,10 +1631,19 @@ fun SendaToolbar(
                     )
                     HorizontalDivider()
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        val pending = activeTab.securityPending
                         Icon(
-                            imageVector = if (activeTab.displaySecure) Icons.Default.Lock else Icons.Default.LockOpen,
+                            imageVector = when {
+                                pending -> Icons.Default.Public
+                                activeTab.displaySecure -> Icons.Default.Lock
+                                else -> Icons.Default.LockOpen
+                            },
                             contentDescription = null,
-                            tint = if (activeTab.displaySecure) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                            tint = when {
+                                pending -> MaterialTheme.colorScheme.onSurfaceVariant
+                                activeTab.displaySecure -> MaterialTheme.colorScheme.primary
+                                else -> MaterialTheme.colorScheme.error
+                            },
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
@@ -1637,6 +1651,7 @@ fun SendaToolbar(
                             text = when {
                                 activeTab.isExtensionPage -> strings.sec_extension_page
                                 activeTab.isInternalPage -> strings.sec_internal_page
+                                pending -> strings.sec_checking
                                 activeTab.displaySecure -> strings.sec_encrypted
                                 else -> strings.sec_unencrypted
                             },

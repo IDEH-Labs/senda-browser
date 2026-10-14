@@ -40,6 +40,8 @@ class BrowserTab(
     var url by mutableStateOf(initialUrl)
     // Reported by Gecko after validating the certificate; not inferred from the URL text
     var isSecure by mutableStateOf(false)
+    // Whether Gecko already said how this page's connection is (onSecurityChange)
+    private var securityKnown by mutableStateOf(false)
         private set
     // Security of the original page while it is shown in reader mode (the reader is a local data: page)
     var readerSourceSecure by mutableStateOf(false)
@@ -60,6 +62,13 @@ class BrowserTab(
     /** Padlock state: in reader mode, that of the original page. */
     val displaySecure: Boolean
         get() = if (isReaderMode) readerSourceSecure else isSecure
+
+    /**
+     * The page is loading and Gecko has not checked its connection yet (with Tor it can take seconds): neither secure
+     * nor "not secure", which an https page showed in red until then. Once loaded without an answer, it is not secure.
+     */
+    val securityPending: Boolean
+        get() = !isReaderMode && isLoading && !securityKnown
     // Tab it was opened from (target=_blank link, window.open or menu): Back returns to it
     var parentTabId: String? = null
     var title by mutableStateOf("Nueva pestaña")
@@ -510,12 +519,14 @@ class BrowserTab(
                 isTranslating = false
                 progress = 10
                 isSecure = false
+                securityKnown = false
             }
 
             override fun onSecurityChange(session: GeckoSession, securityInfo: GeckoSession.ProgressDelegate.SecurityInformation) {
                 // Secure only with a valid certificate, no manual exception and no active mixed content loaded
                 isSecure = securityInfo.isSecure && !securityInfo.isException &&
                     securityInfo.mixedModeActive != GeckoSession.ProgressDelegate.SecurityInformation.CONTENT_LOADED
+                securityKnown = true
             }
 
             override fun onPageStop(session: GeckoSession, success: Boolean) {
