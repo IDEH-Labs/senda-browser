@@ -193,8 +193,15 @@ object SendaTorManager {
                 DNSPort 0
             """.trimIndent()
 
-            if (!torrc.exists() || torrc.length() == 0L) {
-                torrc.writeText(content)
+            // torrc is Senda's own (there is no way to edit it): rewritten whenever Senda's configuration changes,
+            // or installations from an older version would keep the old one forever
+            if (!torrc.exists() || torrc.readText() != content) {
+                val partial = File(torrc.path + ".new")
+                partial.writeText(content)
+                if (!partial.renameTo(torrc)) {
+                    partial.delete()
+                    throw java.io.IOException("Could not replace ${torrc.path}")
+                }
             }
         } catch (e: Exception) {
             Log.w(TAG, "No se pudo preparar torrc personalizado: ${e.message}")
