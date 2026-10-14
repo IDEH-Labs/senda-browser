@@ -9,8 +9,8 @@ import org.mozilla.geckoview.WebExtension
 
 /**
  * Videos each page downloaded (MP4, WebM, HLS), according to the built-in media@senda.org extension, which only
- * watches the network. It is what is shown on the TV while mirroring ([SendaTvPlayer]): it needs the address
- * of the video file, not of the page.
+ * watches the network. It is what is shown on the TV while mirroring ([SendaTvPlayer]) or sent to it in original
+ * quality ([SendaDlnaCast]): both need the address of the video file, not of the page.
  *
  * Videos the site assembles in chunks inside the browser (blob:, MSE: YouTube, Netflix and most platforms)
  * do not show up here because there is no file to play (YouTube uses its official player).
@@ -22,18 +22,36 @@ object SendaMediaCatalog {
         val mime: String,
         val length: Long,
         val referer: String?,
-        val foundAt: Long
+        val foundAt: Long,
+        /** A live broadcast's entry playlist, which redirects to a new session on every request. */
+        val isEntry: Boolean = false
     ) {
         val isHls: Boolean
             get() = mime.contains("mpegurl", ignoreCase = true) ||
                 url.substringBefore('?').endsWith(".m3u8", ignoreCase = true)
 
+        val isMasterPlaylist: Boolean
+            get() = isHls && Regex("(master|index|playlist)[^/]*\\.m3u8$", RegexOption.IGNORE_CASE)
+                .containsMatchIn(url.substringBefore('?'))
+
+        private val extension: String
+            get() = url.substringBefore('?').substringBefore('#').substringAfterLast('.', "").lowercase()
+
+        /** A photo or picture, sent from the page's menu or open in the tab, instead of a video. */
+        val isImage: Boolean
+            get() = mime.startsWith("image/") || extension in IMAGE_EXTENSIONS
+
         /** Type for the TV: the server sometimes answers with a generic one (application/octet-stream). */
         val tvMime: String
             get() = when {
                 isHls -> "application/vnd.apple.mpegurl"
-                mime.startsWith("video/") -> mime
-                else -> when (url.substringBefore('?').substringAfterLast('.', "").lowercase()) {
+                mime.startsWith("video/") || mime.startsWith("image/") -> mime
+                else -> when (extension) {
+                    "jpg", "jpeg" -> "image/jpeg"
+                    "png" -> "image/png"
+                    "gif" -> "image/gif"
+                    "bmp" -> "image/bmp"
+                    "webp" -> "image/webp"
                     "webm" -> "video/webm"
                     "mov" -> "video/quicktime"
                     "mkv" -> "video/x-matroska"
@@ -42,6 +60,7 @@ object SendaMediaCatalog {
             }
     }
 
+    private val IMAGE_EXTENSIONS = setOf("jpg", "jpeg", "png", "gif", "bmp", "webp")
     private const val MAX_PAGES = 30
     private const val MAX_PER_PAGE = 12
     // Previews of a video in another ad or preview: the shortest one is not what the user is watching
@@ -80,9 +99,20 @@ object SendaMediaCatalog {
             return Media(pageUrl, "", -1L, null, System.currentTimeMillis())
         }
         val list = byPage[pageKey(pageUrl)] ?: return null
-        list.lastOrNull { it.isHls }?.let { return it }
+        // The player reloads a live broadcast's playlist for one quality every few seconds, so it is always the newest:
+        // the entry (a new session of its own for the TV) or else the master one (every quality, the TV picks the
+        // best) is preferred when the page loaded it
+        val playlists = list.filter { it.isHls }
+        (playlists.lastOrNull { it.isEntry } ?: playlists.lastOrNull { it.isMasterPlaylist } ?: playlists.lastOrNull())
+            ?.let { return it }
         return list.filter { it.length < 0 || it.length >= MIN_FILE_BYTES }
             .maxWithOrNull(compareBy<Media> { it.length }.thenBy { it.foundAt })
+    }
+
+    /** The image open in the tab by itself (the address is the image file), to send it to the TV. */
+    fun imageFor(pageUrl: String): Media? {
+        if (!pageUrl.startsWith("https://") && !pageUrl.startsWith("http://")) return null
+        return Media(pageUrl, "", -1L, null, System.currentTimeMillis()).takeIf { it.isImage }
     }
 
     @Synchronized
@@ -103,7 +133,8 @@ object SendaMediaCatalog {
                             mime = json.optString("mime"),
                             length = json.optLong("length", -1L),
                             referer = json.optString("referer").takeIf { it.isNotBlank() && it != "null" },
-                            foundAt = System.currentTimeMillis()
+                            foundAt = System.currentTimeMillis(),
+                            isEntry = json.optBoolean("entry", false)
                         )
                     )
                 }

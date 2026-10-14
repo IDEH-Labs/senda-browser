@@ -591,6 +591,15 @@ private fun ContextMenuSheet(
                     item(strings.ctx_open_image, Icons.Default.Image) { tab.openInNewTab(media) }
                     item(strings.ctx_download_image, Icons.Default.Download) { download(media) }
                     item(strings.ctx_copy_image_link, Icons.Default.ContentCopy) { copy(media) }
+                    if (media.startsWith("https://") || media.startsWith("http://")) {
+                        // The original image straight to the TV, at its resolution
+                        item(strings.ctx_send_to_tv, Icons.Default.Tv) {
+                            org.senda.browser.core.cast.SendaDlnaCast.request = org.senda.browser.core.cast.SendaDlnaCast.Request(
+                                org.senda.browser.core.cast.SendaMediaCatalog.Media(media, "image/*", -1L, tab.url, System.currentTimeMillis()),
+                                element.altText?.takeIf { it.isNotBlank() } ?: element.title?.takeIf { it.isNotBlank() } ?: tab.title
+                            )
+                        }
+                    }
                 } else if (!media.startsWith("blob:")) {
                     // Streaming videos (blob:/MSE) are not a downloadable file
                     item(strings.ctx_download_media, Icons.Default.Download) { download(media) }

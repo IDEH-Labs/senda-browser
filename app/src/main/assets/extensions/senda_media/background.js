@@ -29,9 +29,11 @@ browser.webRequest.onSendHeaders.addListener((details) => {
 
 browser.webRequest.onHeadersReceived.addListener((details) => {
     const referer = requestHeaders.get(details.requestId) || null;
-    requestHeaders.delete(details.requestId);
+    // A redirect keeps the same request: its Referer is still needed for the destination
+    const redirect = details.statusCode >= 300 && details.statusCode < 400;
+    if (!redirect) requestHeaders.delete(details.requestId);
     if (!port || details.tabId < 0) return;
-    if (details.statusCode < 200 || details.statusCode >= 300) return;
+    if ((details.statusCode < 200 || details.statusCode >= 300) && !redirect) return;
     let path;
     try {
         path = new URL(details.url).pathname;
@@ -39,7 +41,13 @@ browser.webRequest.onHeadersReceived.addListener((details) => {
         return;
     }
     if (SEGMENT_PATH.test(path)) return;
-    const type = (header(details.responseHeaders, 'content-type') || '').split(';')[0].trim();
+    // A playlist address that redirects is the broadcast's entry: each request to it opens a new session
+    // (Caracol, through Mediastream and Google ad insertion). The session the page's player got is its own and
+    // fails on another player, so the entry is what the TV needs
+    const entry = redirect && /\.m3u8$/i.test(path);
+    if (redirect && !entry) return;
+    const type = entry ? 'application/vnd.apple.mpegurl'
+        : (header(details.responseHeaders, 'content-type') || '').split(';')[0].trim();
     if (!VIDEO_TYPES.test(type) && !VIDEO_PATH.test(path)) return;
     // Page where the video is shown: the top-level one, even if the player is in an iframe from another site
     const ancestors = details.frameAncestors || [];
@@ -59,7 +67,8 @@ browser.webRequest.onHeadersReceived.addListener((details) => {
             url: details.url,
             mime: type,
             length: isNaN(length) ? -1 : length,
-            referer: referer
+            referer: referer,
+            entry: entry
         });
     } catch (e) {
         console.warn('Senda Media: postMessage error', e);

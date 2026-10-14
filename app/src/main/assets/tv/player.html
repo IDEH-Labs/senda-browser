@@ -1,0 +1,41 @@
+<!doctype html>
+<!-- Served by Senda's relay to an LG webOS TV's browser (SendaWebOs.kt): it plays a live broadcast that the phone
+     relays, full screen. The video address comes after # so it is never sent in a request. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Senda</title>
+<style>
+html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+video { width: 100%; height: 100%; object-fit: contain; }
+</style>
+</head>
+<body>
+<video id="video" autoplay playsinline></video>
+<script src="hls.min.js"></script>
+<script>
+(function () {
+    var video = document.getElementById('video');
+    var source = decodeURIComponent(location.hash.slice(1));
+    if (!/^http:\/\//.test(source)) return;
+    if (window.Hls && Hls.isSupported()) {
+        var hls = new Hls({ liveSyncDurationCount: 3 });
+        hls.on(Hls.Events.ERROR, function (event, data) {
+            if (!data.fatal) return;
+            // A dropped connection or a broken chunk: start again from the live edge instead of freezing
+            if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
+            else setTimeout(function () { hls.startLoad(); }, 2000);
+        });
+        hls.loadSource(source);
+        hls.attachMedia(video);
+    } else {
+        video.src = source;
+    }
+    var play = video.play();
+    // Without sound if the TV does not allow it at first, rather than not at all
+    if (play && play.catch) play.catch(function () { video.muted = true; video.play(); });
+})();
+</script>
+</body>
+</html>

@@ -1,5 +1,6 @@
 package org.senda.browser.core.cast
 
+import android.content.res.AssetManager
 import android.util.Base64
 import android.util.Log
 import java.io.BufferedInputStream
@@ -16,24 +17,32 @@ import java.security.SecureRandom
 import java.util.concurrent.Executors
 
 /**
- * Local relay for the video shown on the TV ([org.senda.browser.ui.components.TvPresentationHost]). Android's
- * player does not use Senda's proxy and does not know the Referer many sites require: the relay requests the
- * video the way the page did (through the same proxy or Tor) and passes it on without re-encoding.
+ * Local relay for what is shown on the TV: the phone's player in TV mode ([org.senda.browser.ui.components.TvPresentationHost])
+ * or the TV's own player when sending in original quality ([SendaDlnaCast]). Neither uses Senda's proxy nor knows
+ * the Referer many sites require: the relay requests the file the way the page did (through the same proxy or
+ * Tor) and passes it on without re-encoding.
  *
- * It only serves the given address (127.0.0.1) and paths with a random secret, and it closes when done.
+ * It only serves the given address (127.0.0.1 or the TV's IP) and paths with a random secret, and it closes when done.
  * HLS playlists are rewritten so their chunks also go through here. It does not fetch addresses on the user's
  * network (router, NAS…) unless the page or the video itself is there: otherwise a page's playlist could make
  * Senda send requests to them.
+ *
+ * For an LG webOS TV it also serves Senda's own player page ([TV_PAGES], from the assets), which the TV's browser
+ * opens to play a live broadcast ([SendaWebOs]).
  */
 class SendaCastRelay private constructor(
     private val server: ServerSocket,
     private val tvAddress: InetAddress,
     private val referer: String?,
-    private val proxy: Proxy
+    private val proxy: Proxy,
+    private val assets: AssetManager?
 ) {
     private val secret = ByteArray(16).also { SecureRandom().nextBytes(it) }.joinToString("") { "%02x".format(it) }
     private val pool = Executors.newCachedThreadPool { r -> Thread(r, "senda-cast-relay").apply { isDaemon = true } }
     @Volatile private var closed = false
+    /** True once the TV has received part of the video itself (not just a playlist): it is loading it. */
+    @Volatile var mediaServed = false
+        private set
     private val resolveLocally = proxy == Proxy.NO_PROXY
     /** The page's and the video's own hosts are always allowed (a home media server under its own name). */
     private val trustedHosts: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet<String>().apply {
@@ -54,6 +63,10 @@ class SendaCastRelay private constructor(
         if (isLocalUrl(original)) allowLocal = true
         return relayUrl(original)
     }
+
+    /** Senda's player page for the TV's browser, playing [original]. The address goes after # so it is never sent. */
+    fun playerUrlFor(original: String): String =
+        "${baseUrl}tv/player.html#" + java.net.URLEncoder.encode(urlFor(original), "UTF-8")
 
     private fun hostOf(url: String): String? = runCatching { URL(url).host.lowercase() }.getOrNull()?.ifBlank { null }
 
@@ -121,6 +134,11 @@ class SendaCastRelay private constructor(
                     writeStatus(out, 404, "Not Found", emptyMap())
                     return
                 }
+                val tvPage = path.removePrefix(prefix).substringBefore('?')
+                if (tvPage in TV_PAGES) {
+                    serveAsset(tvPage, method, out)
+                    return
+                }
                 val encoded = path.removePrefix(prefix).substringBefore('/')
                 val original = try {
                     String(Base64.decode(encoded, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING), Charsets.UTF_8)
@@ -140,18 +158,45 @@ class SendaCastRelay private constructor(
         }
     }
 
-    private fun relay(original: String, method: String, range: String?, out: OutputStream) {
+    private fun serveAsset(path: String, method: String, out: OutputStream) {
+        val body = assets?.open(path)?.use { it.readBytes() }
+        if (body == null) {
+            writeStatus(out, 404, "Not Found", emptyMap())
+            return
+        }
+        writeStatus(out, 200, "OK", mapOf(
+            "Content-Type" to TV_PAGES.getValue(path),
+            "Content-Length" to body.size.toString(),
+            "Cache-Control" to "no-store"
+        ))
+        if (method == "GET") out.write(body)
+        out.flush()
+    }
+
+    /** Content type of [original], asked like the TV will (same checks, proxy and Referer). Off the main thread. */
+    fun typeOf(original: String): String? = try {
+        (open(URL(original), "HEAD", null) as? Opened.Ok)?.let { ok ->
+            try { ok.conn.contentType?.substringBefore(';')?.trim()?.lowercase() } finally { ok.conn.disconnect() }
+        }
+    } catch (e: Exception) {
+        Log.d(TAG, "Relé: tipo no disponible: ${e.message}")
+        null
+    }
+
+    private sealed class Opened {
+        class Ok(val conn: HttpURLConnection, val target: URL) : Opened()
+        object Forbidden : Opened()
+        object TooManyRedirects : Opened()
+    }
+
+    private fun open(start: URL, method: String, range: String?): Opened {
         // Redirects are followed here, one by one, so that each destination is checked as well
-        var target = URL(original)
-        var conn: HttpURLConnection
+        var target = start
         var hops = 0
         while (true) {
-            if (!mayFetch(target)) {
-                Log.w(TAG, "Relé: dirección local rechazada")
-                writeStatus(out, 403, "Forbidden", emptyMap())
-                return
-            }
-            conn = target.openConnection(proxy) as HttpURLConnection
+            if (!mayFetch(target)) return Opened.Forbidden
+            val conn = target.openConnection(proxy) as HttpURLConnection
+            conn.requestMethod = method
             conn.connectTimeout = 10_000
             conn.readTimeout = 30_000
             conn.instanceFollowRedirects = false
@@ -159,13 +204,30 @@ class SendaCastRelay private constructor(
             referer?.let { conn.setRequestProperty("Referer", it) }
             if (range != null) conn.setRequestProperty("Range", range)
             val location = if (conn.responseCode in 300..399) conn.getHeaderField("Location") else null
-            if (location == null) break
+            if (location == null) return Opened.Ok(conn, target)
             conn.disconnect()
-            if (++hops > 5) {
+            if (++hops > 5) return Opened.TooManyRedirects
+            target = URL(target, location)
+        }
+    }
+
+    private fun relay(original: String, method: String, range: String?, out: OutputStream) {
+        val conn: HttpURLConnection
+        val target: URL
+        when (val opened = open(URL(original), "GET", range)) {
+            is Opened.Ok -> {
+                conn = opened.conn
+                target = opened.target
+            }
+            Opened.Forbidden -> {
+                Log.w(TAG, "Relé: dirección local rechazada")
+                writeStatus(out, 403, "Forbidden", emptyMap())
+                return
+            }
+            Opened.TooManyRedirects -> {
                 writeStatus(out, 502, "Too Many Redirects", emptyMap())
                 return
             }
-            target = URL(target, location)
         }
         try {
             val code = conn.responseCode
@@ -196,7 +258,10 @@ class SendaCastRelay private constructor(
             conn.getHeaderField("Content-Length")?.let { responseHeaders["Content-Length"] = it }
             conn.getHeaderField("Content-Range")?.let { responseHeaders["Content-Range"] = it }
             writeStatus(out, code, if (code == 206) "Partial Content" else "OK", responseHeaders)
-            if (method == "GET") copy(conn.inputStream, out)
+            if (method == "GET") {
+                mediaServed = true
+                copy(conn.inputStream, out)
+            }
             out.flush()
         } finally {
             conn.disconnect()
@@ -253,6 +318,11 @@ class SendaCastRelay private constructor(
 
     companion object {
         private const val TAG = "SendaCastRelay"
+        /** The only files of the app the relay serves: Senda's player page and hls.js (bundled-assets.gradle). */
+        private val TV_PAGES = mapOf(
+            "tv/player.html" to "text/html; charset=utf-8",
+            "tv/hls.min.js" to "application/javascript"
+        )
 
         /** The same path as browsing (see senda_proxy/background.js): with Tor the video also goes through Tor. */
         fun proxyFrom(prefs: org.senda.browser.core.PreferencesManager): Proxy = when (prefs.proxyMode) {
@@ -266,7 +336,7 @@ class SendaCastRelay private constructor(
          * Opens the relay on the network interface that reaches [tvAddress] (the home Wi‑Fi), on a free port.
          * With a TV it must be called off the main thread; with [tvAddress] 127.0.0.1 (the phone's player) it need not.
          */
-        fun open(tvAddress: InetAddress, referer: String?, proxy: Proxy): SendaCastRelay {
+        fun open(tvAddress: InetAddress, referer: String?, proxy: Proxy, assets: AssetManager? = null): SendaCastRelay {
             // For the phone's own player 127.0.0.1 is enough (and so there is no networking on the main thread)
             val local = if (tvAddress.isLoopbackAddress) tvAddress else java.net.DatagramSocket().use { probe ->
                 // Without sending anything: it only asks the system which own IP it would use to talk to the TV
@@ -276,7 +346,7 @@ class SendaCastRelay private constructor(
             val server = ServerSocket()
             server.reuseAddress = true
             server.bind(InetSocketAddress(local, 0))
-            return SendaCastRelay(server, tvAddress, referer, proxy).also { it.start() }
+            return SendaCastRelay(server, tvAddress, referer, proxy, assets).also { it.start() }
         }
     }
 }

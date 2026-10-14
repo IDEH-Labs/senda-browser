@@ -165,12 +165,9 @@ fun BrowserScreen(
         onCloseTab(child)
     }
 
-    // A single feature: without a TV, the button opens Android's panel to pick it (only the system can connect);
-    // with a TV, its controls. Videos move to the TV on their own
-    val openCast: () -> Unit = {
-        if (org.senda.browser.core.cast.SendaTvMode.tvConnected) {
-            showCastDialog = true
-        } else if (prefs.tvModeEnabled) {
+    // Mirroring (Miracast): only Android's panel can connect the TV. Videos move to the TV on their own
+    val startMirroring: () -> Unit = {
+        if (prefs.tvModeEnabled) {
             fun startMirroring() {
                 org.senda.browser.core.cast.SendaTvMode.evaluate()
                 // Keep Android from freezing Senda while the TV is being picked: TV mode is applied on connecting
@@ -187,6 +184,12 @@ fun BrowserScreen(
         } else {
             org.senda.browser.ui.components.CastHelper.openSystemCast(context)
         }
+    }
+    // The cast button: mirroring or sending in original quality (or, with the TV connected, its controls)
+    val openCast: () -> Unit = { showCastDialog = true }
+    // An image sent from the page's menu opens the same dialog with it
+    LaunchedEffect(org.senda.browser.core.cast.SendaDlnaCast.request) {
+        if (org.senda.browser.core.cast.SendaDlnaCast.request != null) showCastDialog = true
     }
 
     val toolbarPos = prefs.toolbarPosition
@@ -437,9 +440,15 @@ fun BrowserScreen(
             org.senda.browser.ui.components.TvPresentationHost(tvPlayback)
         }
 
-        // Casting with the TV already connected: the TV's video and "Disconnect TV"
         if (showCastDialog) {
-            CastDialog(onDismiss = { showCastDialog = false })
+            CastDialog(
+                activeTab = activeTab,
+                onMirror = startMirroring,
+                onDismiss = {
+                    showCastDialog = false
+                    org.senda.browser.core.cast.SendaDlnaCast.request = null
+                }
+            )
         }
 
         // Bookmarks manager dialog

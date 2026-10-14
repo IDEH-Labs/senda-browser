@@ -18,6 +18,12 @@ def librejsVersion = '7.21.1'
 def librejsSha256 = '60c5b1663ab2507dc12112e44076bb99c8feed0777b4d40ee74b9aef1b0c7256'
 def librejsUrl = "https://ftp.gnu.org/gnu/librejs/librejs-${librejsVersion}.xpi"
 
+// hls.js: the player of the page Senda serves to an LG webOS TV's browser for a live broadcast (SendaWebOs.kt).
+// The official npm package; only dist/hls.min.js and its license are used, unmodified
+def hlsjsVersion = '1.7.3'
+def hlsjsSha256 = 'a7290f1645f7c605baec75638acda6c6f7b08dde8a615c841a19d0e38df88729'
+def hlsjsUrl = "https://registry.npmjs.org/hls.js/-/hls.js-${hlsjsVersion}.tgz"
+
 // Mozilla Public Suffix List, kept as text (the official file, MPL 2.0) and turned into the
 // per-TLD archive PublicSuffixList.kt reads
 def pslSource = rootProject.file('third_party/publicsuffix/public_suffix_list.dat')
@@ -25,6 +31,7 @@ def pslSource = rootProject.file('third_party/publicsuffix/public_suffix_list.da
 def ublockDir = layout.buildDirectory.dir('generated/senda-assets/ublock')
 def pslDir = layout.buildDirectory.dir('generated/senda-assets/psl')
 def librejsDir = layout.buildDirectory.dir('generated/senda-assets/librejs')
+def hlsjsDir = layout.buildDirectory.dir('generated/senda-assets/hlsjs')
 
 static String sha256Of(File file) {
     def digest = MessageDigest.getInstance('SHA-256')
@@ -83,6 +90,36 @@ def fetchLibreJS = tasks.register('fetchLibreJS') {
     }
 }
 
+def fetchHlsJs = tasks.register('fetchHlsJs') {
+    description = 'Downloads the official hls.js npm package, verifies its SHA-256 and extracts the player'
+    inputs.property('url', hlsjsUrl)
+    inputs.property('sha256', hlsjsSha256)
+    outputs.dir(hlsjsDir)
+    doLast {
+        File tgz = new File(temporaryDir, "hls.js-${hlsjsVersion}.tgz")
+        if (!(tgz.isFile() && sha256Of(tgz) == hlsjsSha256)) {
+            File partial = new File(tgz.path + '.part')
+            new URL(hlsjsUrl).withInputStream { input -> partial.withOutputStream { it << input } }
+            String actual = sha256Of(partial)
+            if (actual != hlsjsSha256) {
+                partial.delete()
+                throw new GradleException("hls.js ${hlsjsVersion}: SHA-256 is ${actual}, expected ${hlsjsSha256}")
+            }
+            if (!partial.renameTo(tgz)) throw new GradleException("Could not move ${partial} to ${tgz}")
+        }
+        File target = hlsjsDir.get().dir('tv').asFile
+        project.delete(target)
+        project.copy {
+            from(project.tarTree(project.resources.gzip(tgz))) {
+                include 'package/dist/hls.min.js', 'package/LICENSE'
+                eachFile { it.path = it.name == 'LICENSE' ? 'hls.js-LICENSE.txt' : it.name }
+                includeEmptyDirs = false
+            }
+            into target
+        }
+    }
+}
+
 def generatePublicSuffixList = tasks.register('generatePublicSuffixList') {
     description = 'Builds the per-TLD Public Suffix List archive from the official text list'
     inputs.file(pslSource)
@@ -122,6 +159,6 @@ def generatePublicSuffixList = tasks.register('generatePublicSuffixList') {
     }
 }
 
-android.sourceSets.main.assets.srcDirs += [ublockDir.get().asFile, pslDir.get().asFile, librejsDir.get().asFile]
+android.sourceSets.main.assets.srcDirs += [ublockDir.get().asFile, pslDir.get().asFile, librejsDir.get().asFile, hlsjsDir.get().asFile]
 
-tasks.named('preBuild') { dependsOn fetchUBlockOrigin, fetchLibreJS, generatePublicSuffixList }
+tasks.named('preBuild') { dependsOn fetchUBlockOrigin, fetchLibreJS, fetchHlsJs, generatePublicSuffixList }
