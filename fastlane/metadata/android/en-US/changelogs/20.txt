@@ -1,0 +1,1 @@
+Tor censorship circumvention: support for built-in Snowflake and custom bridges (obfs4, WebTunnel) with real-time syntax validation and fail-closed leak protection. Security: strict WebRTC proxy isolation preventing local IP leakage, SIGNAL NEWNYM identity renewal for new circuits, and quick Security Level access from the main menu.
