@@ -94,6 +94,9 @@ class TorTest : E2eTest() {
         // Every test starts with no Tor data, so Tor first downloads the network's directory: measured from 22 s to
         // more than 90 s over mobile data on a moto g34 (2026-10-14)
         const val TOR_FIRST_START_MS = 180_000L
+        // A static page with no cookies and no other requests, only for these tests (Codeberg IDEH-Labs/pages, branch
+        // pages). Not on GitLab Pages: it cut about 2 of 3 Tor exit nodes, Codeberg Pages passed 12 of 12 (2026-10-14)
+        const val FINGERPRINT_PAGE = "https://ideh-labs.codeberg.page/e2e/fingerprint.html"
 
         // IPv4 only: both sites have only IPv4 addresses, and an IPv6 pattern would also match times such as 12:34:56
         val IP = Regex("""\b(?:\d{1,3}\.){3}\d{1,3}\b""")
@@ -127,5 +130,35 @@ class TorTest : E2eTest() {
             squatter.close()
             accepting.join(2000)
         }
+    }
+
+    /** What [FINGERPRINT_PAGE] reads about the browser ("tz-offset=… | tz=… | cores=…"), once its script ran. */
+    private fun fingerprint(what: String): String {
+        E2e.openLink(FINGERPRINT_PAGE)
+        var seen = ""
+        val end = System.currentTimeMillis() + TOR_FIRST_START_MS
+        while (seen.isEmpty() && System.currentTimeMillis() < end) {
+            seen = Regex("""tz-offset=[^\n]*""").find(E2e.screenTexts())?.value.orEmpty()
+            if (seen.isEmpty()) Thread.sleep(500)
+        }
+        assertTrue("The fingerprint page did not show its values ($what). Screen: ${E2e.screenTexts()}", seen.isNotEmpty())
+        return seen
+    }
+
+    /**
+     * B8 — protection against fingerprinting with Tor, as in Tor Browser (privacy.resistFingerprinting, 2026-10-14):
+     * a site sees the time zone as UTC, not the phone's. Switching to a direct connection restarts Senda without it.
+     * The phone must not be on UTC itself (the test phone is on UTC-5).
+     */
+    @Test
+    fun b8_torResistsFingerprinting() {
+        val tor = fingerprint("Tor")
+        assertTrue("With Tor a site reads the phone's time zone: $tor", tor.startsWith("tz-offset=0 "))
+        val before = E2e.pid()
+        E2e.chooseDirect()
+        E2e.waitFor("Senda to restart in direct mode") { E2e.pid().let { it != null && it != before } }
+        E2e.waitForApp()
+        val direct = fingerprint("direct")
+        assertTrue("Without Tor the protection stayed on: $direct", !direct.startsWith("tz-offset=0 "))
     }
 }

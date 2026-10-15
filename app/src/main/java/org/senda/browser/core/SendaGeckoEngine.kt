@@ -353,7 +353,36 @@ object SendaGeckoEngine {
      * extension asks for a direct connection (ProxyChannelFilter: "direct" returns the default proxy). Any other
      * proxy from the extension does replace it.
      */
-    fun needsRestartFor(mode: String) = mode == "OFF" && startupProxyMode in setOf("TOR_ORBOT", "CUSTOM_SOCKS5", "CUSTOM_HTTP")
+    fun needsRestartFor(mode: String) = mode == "OFF" && startupProxyMode in setOf("TOR_ORBOT", "CUSTOM_SOCKS5", "CUSTOM_HTTP") ||
+        // Tor's protection against fingerprinting is set when Gecko starts ([torFingerprintingPrefs])
+        (mode == "TOR_ORBOT") != (startupProxyMode == "TOR_ORBOT")
+
+    /**
+     * With Tor, protection against fingerprinting as in Tor Browser: the prefs of its "Fingerprinting" block that apply
+     * to Android (tor-browser 15.0, browser/app/profile/001-base-profile.js). privacy.resistFingerprinting makes
+     * Senda's Tor tabs report the same values to every site (screen, time zone, timers, canvas…), so one site cannot
+     * recognize them on another by those. Letterboxing is left out: its code (RFPHelper.sys.mjs) is never loaded by
+     * GeckoView. Senda still does not look like Tor Browser to sites (another engine version, other extensions).
+     * Only read when Gecko starts, so switching to or from Tor restarts Senda ([needsRestartFor]).
+     */
+    private fun torFingerprintingPrefs(prefs: PreferencesManager?): String {
+        if (prefs?.proxyMode != "TOR_ORBOT") return ""
+        return "  privacy.resistFingerprinting: true\n" +
+            "  privacy.resistFingerprinting.exemptedDomains: \"\"\n" +
+            // Without it the canvas is read completely white (Tor Browser locks it to true)
+            "  privacy.resistFingerprinting.randomDataOnCanvasExtract: true\n" +
+            "  privacy.resistFingerprinting.skipEarlyBlankFirstPaint: true\n" +
+            "  privacy.resistFingerprinting.block_mozAddonManager: true\n" +
+            "  webgl.disable-fail-if-major-performance-caveat: true\n" +
+            "  webgl.enable-webgl2: false\n" +
+            "  gfx.offscreencanvas.enabled: false\n" +
+            "  media.benchmark.vp9.threshold: 0\n" +
+            "  media.hevc.enabled: false\n" +
+            "  dom.webmidi.enabled: false\n" +
+            "  media.devices.enumerate.legacy.enabled: false\n" +
+            "  dom.netinfo.enabled: false\n" +
+            "  network.http.referer.XOriginTrimmingPolicy: 2\n"
+    }
 
     private fun socksPrefs(host: String, port: Int, remoteDns: Boolean) =
         "  network.proxy.type: 1\n  network.proxy.socks: \"$host\"\n  network.proxy.socks_port: $port\n" +
@@ -427,7 +456,8 @@ object SendaGeckoEngine {
                 "  app.normandy.enabled: false\n" +
                 googleSafeBrowsingOffPrefs() +
                 av1Prefs() +
-                startupProxyPrefs(prefs)
+                startupProxyPrefs(prefs) +
+                torFingerprintingPrefs(prefs)
         )
         return file.absolutePath
     }

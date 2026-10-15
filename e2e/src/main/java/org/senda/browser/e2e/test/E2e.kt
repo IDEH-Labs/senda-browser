@@ -130,9 +130,12 @@ object E2e {
 
     /** Taps a text that may be further down a list, scrolling to it first. */
     fun tapTextInList(text: String) {
-        repeat(25) {
+        repeat(25) { attempt ->
             find(By.pkg(APP).text(text), 700)?.let { it.click(); return }
-            val list = find(By.pkg(APP).scrollable(true), 1000) ?: fail("No list to scroll looking for \"$text\"")
+            // The first time, the menu or list may still be opening: on a busy phone (Tor starting, a restart) it took
+            // longer than a second, and the test failed although the menu then opened (also seen with beta.13)
+            val list = find(By.pkg(APP).scrollable(true), if (attempt == 0) TIMEOUT else 1000)
+                ?: fail("No list to scroll looking for \"$text\". Screen: ${screenTexts()}")
             (list as UiObject2).scroll(Direction.DOWN, 0.5f)
         }
         fail("\"$text\" not found after scrolling. Screen: ${screenTexts()}")
