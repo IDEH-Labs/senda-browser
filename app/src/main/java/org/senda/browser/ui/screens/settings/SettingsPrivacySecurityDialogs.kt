@@ -28,6 +28,7 @@ import org.senda.browser.core.SendaTorManager
 import org.senda.browser.MainActivity
 import org.senda.browser.core.TorState
 import org.senda.browser.core.SendaStringPack
+import org.senda.browser.core.TorBridgeRules
 
 @Composable
 fun SettingsAutofillDialog(
@@ -90,6 +91,10 @@ fun SettingsTorDialog(
     var hostInput by remember { mutableStateOf(prefs.proxyHost) }
     var portInput by remember { mutableStateOf(prefs.proxyPort.toString()) }
     var dnsRemote by remember { mutableStateOf(prefs.proxyDnsRemote) }
+    val customBridgeInvalid = bridgeMode == "CUSTOM" && (
+        TorBridgeRules.buildBridgeLines(customBridgesInput).isEmpty() ||
+            TorBridgeRules.unsupportedTransport(customBridgesInput) != null
+        )
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -133,6 +138,8 @@ fun SettingsTorDialog(
                                     strings.dlg_tor_status_connected
                                 else if (SendaTorManager.state == TorState.STARTING)
                                     strings.dlg_tor_status_connecting
+                                else if (SendaTorManager.state == TorState.ERROR)
+                                    strings.dlg_tor_status_error
                                 else
                                     strings.dlg_tor_integrated_sub,
                                 fontSize = 11.sp,
@@ -167,7 +174,7 @@ fun SettingsTorDialog(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))
                                 .clickable { bridgeMode = "NONE" },
-                            color = if (bridgeMode == "NONE") MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f) else Color.Transparent,
+                            color = if (bridgeMode == "NONE") MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f) else Color.Transparent,
                             border = BorderStroke(1.dp, if (bridgeMode == "NONE") MaterialTheme.colorScheme.primary.copy(alpha = 0.7f) else MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -190,7 +197,7 @@ fun SettingsTorDialog(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))
                                 .clickable { bridgeMode = "SNOWFLAKE" },
-                            color = if (bridgeMode == "SNOWFLAKE") MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f) else Color.Transparent,
+                            color = if (bridgeMode == "SNOWFLAKE") MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f) else Color.Transparent,
                             border = BorderStroke(1.dp, if (bridgeMode == "SNOWFLAKE") MaterialTheme.colorScheme.primary.copy(alpha = 0.7f) else MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -213,7 +220,7 @@ fun SettingsTorDialog(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))
                                 .clickable { bridgeMode = "CUSTOM" },
-                            color = if (bridgeMode == "CUSTOM") MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f) else Color.Transparent,
+                            color = if (bridgeMode == "CUSTOM") MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f) else Color.Transparent,
                             border = BorderStroke(1.dp, if (bridgeMode == "CUSTOM") MaterialTheme.colorScheme.primary.copy(alpha = 0.7f) else MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -235,6 +242,10 @@ fun SettingsTorDialog(
                                 onValueChange = { customBridgesInput = it },
                                 label = { Text(strings.dlg_tor_bridge_custom, fontSize = 11.sp) },
                                 placeholder = { Text(strings.dlg_tor_bridge_custom_hint, fontSize = 11.sp) },
+                                isError = customBridgeInvalid,
+                                supportingText = if (customBridgeInvalid) {
+                                    { Text(strings.dlg_tor_bridge_invalid) }
+                                } else null,
                                 minLines = 2,
                                 maxLines = 4,
                                 modifier = Modifier.fillMaxWidth()
@@ -370,7 +381,7 @@ fun SettingsTorDialog(
             }
         },
         confirmButton = {
-            TextButton(
+            Button(
                 onClick = {
                     val parsedPort = portInput.toIntOrNull() ?: 9050
                     val bridgeChanged = prefs.torBridgeMode != bridgeMode || prefs.torCustomBridges != customBridgesInput
@@ -397,7 +408,8 @@ fun SettingsTorDialog(
                         while (activity is android.content.ContextWrapper && activity !is MainActivity) activity = activity.baseContext
                         (activity as? MainActivity)?.restartSenda()
                     }
-                }
+                },
+                enabled = !customBridgeInvalid
             ) {
                 Text(strings.general_save)
             }

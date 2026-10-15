@@ -392,6 +392,7 @@ interface SendaStringPack {
     val dlg_tor_bridge_custom: String
     val dlg_tor_bridge_custom_sub: String
     val dlg_tor_bridge_custom_hint: String
+    val dlg_tor_bridge_invalid: String
     val dlg_proxy_socks5: String
     val dlg_proxy_socks5_sub: String
     val dlg_proxy_http: String
@@ -593,6 +594,7 @@ interface SendaStringPack {
     val ublock_dlg_dashboard_desc: String
     val dlg_tor_status_connected: String
     val dlg_tor_status_connecting: String
+    val dlg_tor_status_error: String
     val rm_visual_theme: String
     val rm_theme_sepia: String
     val rm_theme_oled: String
@@ -1156,6 +1158,7 @@ object SendaStringsDe : SendaStringPack {
     override val dlg_tor_bridge_custom = "Eigene Brücke"
     override val dlg_tor_bridge_custom_sub = "Nutze obfs4 oder andere Brücken von bridges.torproject.org"
     override val dlg_tor_bridge_custom_hint = "Füge hier eine oder mehrere Brücken-Zeilen ein…"
+    override val dlg_tor_bridge_invalid = "Füge eine gültige obfs4-, WebTunnel-, Snowflake- oder Vanilla-Brücke hinzu."
     override val dlg_proxy_socks5 = "Eigener SOCKS5-Proxy"
     override val dlg_proxy_socks5_sub = "Lokaler oder entfernter Proxy/VPN-Server"
     override val dlg_proxy_http = "HTTP / HTTPS-Proxy"
@@ -1357,6 +1360,7 @@ object SendaStringsDe : SendaStringPack {
     override val ublock_dlg_dashboard_desc = "Dynamische Regeln, Ausnahmeliste, Backups und erweiterte Einstellungen"
     override val dlg_tor_status_connected = "🟢 Verbunden · Keine DNS-Lecks · .onion-Seiten"
     override val dlg_tor_status_connecting = "🟡 Tor-Schaltkreis wird aufgebaut…"
+    override val dlg_tor_status_error = "🔴 Tor oder die gewählte Brücke konnte nicht verbunden werden"
     override val rm_visual_theme = "Visuelles Design"
     override val rm_theme_sepia = "Sepia"
     override val rm_theme_oled = "OLED"
@@ -1909,6 +1913,7 @@ object SendaStringsEn : SendaStringPack {
     override val dlg_tor_bridge_custom = "Custom bridge"
     override val dlg_tor_bridge_custom_sub = "Use obfs4 or other bridges provided by bridges.torproject.org"
     override val dlg_tor_bridge_custom_hint = "Paste one or more bridge lines here…"
+    override val dlg_tor_bridge_invalid = "Add a valid obfs4, WebTunnel, Snowflake, or vanilla bridge."
     override val dlg_proxy_socks5 = "Custom SOCKS5 Proxy"
     override val dlg_proxy_socks5_sub = "Local or remote proxy/VPN server"
     override val dlg_proxy_http = "HTTP / HTTPS Proxy"
@@ -2110,6 +2115,7 @@ object SendaStringsEn : SendaStringPack {
     override val ublock_dlg_dashboard_desc = "Dynamic rules, allowlist, backups, and advanced settings"
     override val dlg_tor_status_connected = "🟢 Connected · Zero DNS leaks · .onion sites"
     override val dlg_tor_status_connecting = "🟡 Connecting Tor circuit…"
+    override val dlg_tor_status_error = "🔴 Tor or the selected bridge could not connect"
     override val rm_visual_theme = "Visual Theme"
     override val rm_theme_sepia = "Sepia"
     override val rm_theme_oled = "OLED"
@@ -2662,6 +2668,7 @@ object SendaStringsEs : SendaStringPack {
     override val dlg_tor_bridge_custom = "Puente personalizado"
     override val dlg_tor_bridge_custom_sub = "Usa puentes obfs4 u otros provistos por bridges.torproject.org"
     override val dlg_tor_bridge_custom_hint = "Pega una o más líneas de puente aquí…"
+    override val dlg_tor_bridge_invalid = "Añade un puente obfs4, WebTunnel, Snowflake o normal válido."
     override val dlg_proxy_socks5 = "Proxy SOCKS5 Propio"
     override val dlg_proxy_socks5_sub = "Servidor proxy o VPN local/remoto"
     override val dlg_proxy_http = "Proxy HTTP / HTTPS"
@@ -2863,6 +2870,7 @@ object SendaStringsEs : SendaStringPack {
     override val ublock_dlg_dashboard_desc = "Reglas dinámicas, lista blanca, copias de seguridad y ajustes avanzados"
     override val dlg_tor_status_connected = "🟢 Conectado · Cero fugas DNS · Sitios .onion"
     override val dlg_tor_status_connecting = "🟡 Conectando circuito Tor…"
+    override val dlg_tor_status_error = "🔴 Tor o el puente seleccionado no pudo conectarse"
     override val rm_visual_theme = "Tema visual"
     override val rm_theme_sepia = "Sepia"
     override val rm_theme_oled = "OLED"
@@ -3425,6 +3433,7 @@ object SendaStringsFr : SendaStringPack {
     override val dlg_tor_bridge_custom = "Pont personnalisé"
     override val dlg_tor_bridge_custom_sub = "Utilisez obfs4 ou d'autres ponts fournis par bridges.torproject.org"
     override val dlg_tor_bridge_custom_hint = "Collez une ou plusieurs lignes de pont ici…"
+    override val dlg_tor_bridge_invalid = "Ajoutez un pont obfs4, WebTunnel, Snowflake ou ordinaire valide."
     override val dlg_proxy_socks5 = "Proxy SOCKS5 personnalisé"
     override val dlg_proxy_socks5_sub = "Serveur proxy ou VPN local/distant"
     override val dlg_proxy_http = "Proxy HTTP / HTTPS"
@@ -3626,6 +3635,7 @@ object SendaStringsFr : SendaStringPack {
     override val ublock_dlg_dashboard_desc = "Règles dynamiques, liste blanche, sauvegardes et paramètres avancés"
     override val dlg_tor_status_connected = "🟢 Connecté · Zéro fuite DNS · Sites .onion"
     override val dlg_tor_status_connecting = "🟡 Connexion au circuit Tor…"
+    override val dlg_tor_status_error = "🔴 Tor ou le pont sélectionné n’a pas pu se connecter"
     override val rm_visual_theme = "Thème visuel"
     override val rm_theme_sepia = "Sépia"
     override val rm_theme_oled = "OLED"
@@ -4178,6 +4188,7 @@ object SendaStringsPt : SendaStringPack {
     override val dlg_tor_bridge_custom = "Ponte personalizada"
     override val dlg_tor_bridge_custom_sub = "Use pontes obfs4 ou outras de bridges.torproject.org"
     override val dlg_tor_bridge_custom_hint = "Cole uma ou mais linhas de ponte aqui…"
+    override val dlg_tor_bridge_invalid = "Adicione uma ponte obfs4, WebTunnel, Snowflake ou comum válida."
     override val dlg_proxy_socks5 = "Proxy SOCKS5 Próprio"
     override val dlg_proxy_socks5_sub = "Servidor proxy ou VPN local/remoto"
     override val dlg_proxy_http = "Proxy HTTP / HTTPS"
@@ -4379,6 +4390,7 @@ object SendaStringsPt : SendaStringPack {
     override val ublock_dlg_dashboard_desc = "Regras dinâmicas, lista de permissões, backups e configurações avançadas"
     override val dlg_tor_status_connected = "🟢 Conectado · Zero vazamentos de DNS · Sites .onion"
     override val dlg_tor_status_connecting = "🟡 Conectando circuito Tor…"
+    override val dlg_tor_status_error = "🔴 Tor ou a ponte selecionada não pôde se conectar"
     override val rm_visual_theme = "Tema visual"
     override val rm_theme_sepia = "Sépia"
     override val rm_theme_oled = "OLED"
@@ -4931,6 +4943,7 @@ object SendaStringsIt : SendaStringPack {
     override val dlg_tor_bridge_custom = "Ponte personalizzato"
     override val dlg_tor_bridge_custom_sub = "Usa ponti obfs4 o altri forniti da bridges.torproject.org"
     override val dlg_tor_bridge_custom_hint = "Incolla una o più righe di ponte qui…"
+    override val dlg_tor_bridge_invalid = "Aggiungi un bridge obfs4, WebTunnel, Snowflake o normale valido."
     override val dlg_proxy_socks5 = "Proxy SOCKS5 Personalizzato"
     override val dlg_proxy_socks5_sub = "Server proxy o VPN locale/remoto"
     override val dlg_proxy_http = "Proxy HTTP / HTTPS"
@@ -5132,6 +5145,7 @@ object SendaStringsIt : SendaStringPack {
     override val ublock_dlg_dashboard_desc = "Regole dinamiche, lista consentiti, backup e impostazioni avanzate"
     override val dlg_tor_status_connected = "🟢 Connesso · Zero perdite DNS · Siti .onion"
     override val dlg_tor_status_connecting = "🟡 Connessione al circuito Tor…"
+    override val dlg_tor_status_error = "🔴 Tor o il bridge selezionato non è riuscito a connettersi"
     override val rm_visual_theme = "Tema visivo"
     override val rm_theme_sepia = "Seppia"
     override val rm_theme_oled = "OLED"
@@ -5684,6 +5698,7 @@ object SendaStringsJa : SendaStringPack {
     override val dlg_tor_bridge_custom = "カスタムブリッジ"
     override val dlg_tor_bridge_custom_sub = "bridges.torproject.org から提供された obfs4 等のブリッジを使用します"
     override val dlg_tor_bridge_custom_hint = "ここにブリッジの行を貼り付けてください…"
+    override val dlg_tor_bridge_invalid = "有効な obfs4、WebTunnel、Snowflake、または通常のブリッジを追加してください。"
     override val dlg_proxy_socks5 = "カスタム SOCKS5 プロキシ"
     override val dlg_proxy_socks5_sub = "ローカルまたはリモートのプロキシ/VPN サーバー"
     override val dlg_proxy_http = "HTTP / HTTPS プロキシ"
@@ -5885,6 +5900,7 @@ object SendaStringsJa : SendaStringPack {
     override val ublock_dlg_dashboard_desc = "動的ルール、ホワイトリスト、バックアップ、高度な設定"
     override val dlg_tor_status_connected = "🟢 接続完了 · DNS 漏洩ゼロ · .onion 対応"
     override val dlg_tor_status_connecting = "🟡 Tor サーキットに接続中…"
+    override val dlg_tor_status_error = "🔴 Tor または選択したブリッジに接続できませんでした"
     override val rm_visual_theme = "ビジュアルテーマ"
     override val rm_theme_sepia = "セピア (紙調)"
     override val rm_theme_oled = "OLED 漆黒"
@@ -6437,6 +6453,7 @@ object SendaStringsZh : SendaStringPack {
     override val dlg_tor_bridge_custom = "自定义网桥"
     override val dlg_tor_bridge_custom_sub = "使用 bridges.torproject.org 提供的 obfs4 等网桥"
     override val dlg_tor_bridge_custom_hint = "在此粘贴一行或多行网桥配置…"
+    override val dlg_tor_bridge_invalid = "请添加有效的 obfs4、WebTunnel、Snowflake 或普通网桥。"
     override val dlg_proxy_socks5 = "自定义 SOCKS5 代理"
     override val dlg_proxy_socks5_sub = "本地或远程网络代理/VPN 隧道服务"
     override val dlg_proxy_http = "HTTP / HTTPS 代理"
@@ -6638,6 +6655,7 @@ object SendaStringsZh : SendaStringPack {
     override val ublock_dlg_dashboard_desc = "动态规则、白名单、备份导入导出与专家级高级设置"
     override val dlg_tor_status_connected = "🟢 已连接 · 零 DNS 泄漏 · 支持访问 .onion 暗网域名"
     override val dlg_tor_status_connecting = "🟡 正在建立 Tor 洋葱加密链路…"
+    override val dlg_tor_status_error = "🔴 Tor 或所选网桥无法连接"
     override val rm_visual_theme = "阅读器主题"
     override val rm_theme_sepia = "羊皮纸复古"
     override val rm_theme_oled = "OLED 纯黑"

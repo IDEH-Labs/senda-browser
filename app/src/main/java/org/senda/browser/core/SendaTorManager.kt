@@ -255,16 +255,35 @@ object SendaTorManager {
     }
 
     fun stopPluggableTransports() {
+        stopTransport(IPtProxy.Snowflake)
+        stopTransport(IPtProxy.Obfs4)
+        stopTransport(IPtProxy.Webtunnel)
+    }
+
+    private fun stopTransport(transport: String) {
         try {
-            ptController?.stop(IPtProxy.Snowflake)
+            ptController?.stop(transport)
         } catch (e: Exception) {
-            Log.w(TAG, "Error deteniendo Snowflake: ${e.message}")
+            Log.w(TAG, "Error deteniendo $transport: ${e.message}")
         }
-        try {
-            ptController?.stop(IPtProxy.Obfs4)
-        } catch (e: Exception) {
-            Log.w(TAG, "Error deteniendo Obfs4: ${e.message}")
+    }
+
+    /** Starts a bundled transport and verifies its local SOCKS listener. */
+    private fun transportPort(controller: Controller, transport: String): Long {
+        var port = controller.port(transport)
+        if (port <= 0L) {
+            controller.start(transport, null)
+            port = controller.port(transport)
         }
+        check(port > 0L) { "$transport no abrió un puerto local" }
+        return port
+    }
+
+    /** Stops transports that are no longer used, after the requested ones are ready. */
+    private fun stopUnusedTransports(required: Set<String>) {
+        listOf(IPtProxy.Snowflake, IPtProxy.Obfs4, IPtProxy.Webtunnel)
+            .filterNot(required::contains)
+            .forEach(::stopTransport)
     }
 
     fun restart(context: Context) {
@@ -316,47 +335,46 @@ object SendaTorManager {
 
             var snowflakePort = 0L
             var obfs4Port = 0L
+            var webtunnelPort = 0L
+            val required = linkedSetOf<String>()
+
+            if (bridgeMode == "CUSTOM") {
+                check(TorBridgeRules.buildBridgeLines(customBridges).isNotEmpty()) {
+                    "No hay puentes configurados"
+                }
+                val unsupportedTransport = TorBridgeRules.unsupportedTransport(customBridges)
+                check(unsupportedTransport == null) {
+                    "Transporte de puente no compatible: $unsupportedTransport"
+                }
+            }
 
             if (bridgeMode == "SNOWFLAKE" || (bridgeMode == "CUSTOM" && TorBridgeRules.needsSnowflake(customBridges))) {
-                val controller = getPtController(context)
-                snowflakePort = controller.port(IPtProxy.Snowflake)
-                if (snowflakePort <= 0L) {
-                    try {
-                        controller.start(IPtProxy.Snowflake, null)
-                        snowflakePort = controller.port(IPtProxy.Snowflake)
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error al iniciar Snowflake: ${e.message}", e)
-                    }
-                }
-            } else {
-                try { ptController?.stop(IPtProxy.Snowflake) } catch (_: Exception) {}
+                required += IPtProxy.Snowflake
+                snowflakePort = transportPort(getPtController(context), IPtProxy.Snowflake)
             }
-
             if (bridgeMode == "CUSTOM" && TorBridgeRules.needsObfs4(customBridges)) {
-                val controller = getPtController(context)
-                obfs4Port = controller.port(IPtProxy.Obfs4)
-                if (obfs4Port <= 0L) {
-                    try {
-                        controller.start(IPtProxy.Obfs4, null)
-                        obfs4Port = controller.port(IPtProxy.Obfs4)
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error al iniciar Obfs4: ${e.message}", e)
-                    }
-                }
-            } else {
-                try { ptController?.stop(IPtProxy.Obfs4) } catch (_: Exception) {}
+                required += IPtProxy.Obfs4
+                obfs4Port = transportPort(getPtController(context), IPtProxy.Obfs4)
             }
-
-            if (bridgeMode == "NONE") {
-                stopPluggableTransports()
+            if (bridgeMode == "CUSTOM" && TorBridgeRules.needsWebtunnel(customBridges)) {
+                required += IPtProxy.Webtunnel
+                webtunnelPort = transportPort(getPtController(context), IPtProxy.Webtunnel)
             }
 
             val bridgeConfig = TorBridgeRules.buildTorrcBridgeConfig(
                 bridgeMode = bridgeMode,
                 customBridges = customBridges,
                 snowflakePort = snowflakePort,
-                obfs4Port = obfs4Port
+                obfs4Port = obfs4Port,
+                webtunnelPort = webtunnelPort
             )
+            // A selected bridge must always produce UseBridges 1.  Otherwise
+            // Tor would be started as a public/direct client after a transport
+            // failure, which defeats the selected censorship-circumvention mode.
+            check(bridgeMode == "NONE" || bridgeConfig.isNotBlank()) {
+                "No se pudo preparar la configuración del puente"
+            }
+            stopUnusedTransports(required)
 
             val content = if (bridgeConfig.isNotBlank()) "$baseConfig\n$bridgeConfig" else baseConfig
 

@@ -59,6 +59,17 @@ class TorBridgeRulesTest {
     }
 
     @Test
+    fun customBridges_detectsWebtunnelAndRejectsUnknownTransports() {
+        val webtunnel = "webtunnel 198.51.100.3:443 url=https://bridge.example.com/ ver=0.0.1"
+        assertTrue(TorBridgeRules.needsWebtunnel(webtunnel))
+        assertEquals(null, TorBridgeRules.unsupportedTransport(webtunnel))
+
+        val vanilla = "198.51.100.4:9001 0123456789ABCDEF0123456789ABCDEF01234567"
+        assertEquals(null, TorBridgeRules.unsupportedTransport(vanilla))
+        assertEquals("meek", TorBridgeRules.unsupportedTransport("meek 198.51.100.5:443"))
+    }
+
+    @Test
     fun customBridges_buildsFullConfigWithPlugins() {
         val input = "obfs4 198.51.100.1:443 cert=abc"
         val config = TorBridgeRules.buildTorrcBridgeConfig("CUSTOM", input, obfs4Port = 44444L)
@@ -66,5 +77,14 @@ class TorBridgeRulesTest {
         assertTrue(config.contains("UseBridges 1"))
         assertTrue(config.contains("ClientTransportPlugin obfs4 socks5 127.0.0.1:44444"))
         assertTrue(config.contains("Bridge obfs4 198.51.100.1:443 cert=abc"))
+    }
+
+    @Test
+    fun customBridges_buildsWebtunnelPlugin() {
+        val input = "webtunnel 198.51.100.3:443 url=https://bridge.example.com/ ver=0.0.1"
+        val config = TorBridgeRules.buildTorrcBridgeConfig("CUSTOM", input, webtunnelPort = 45555L)
+
+        assertTrue(config.contains("UseBridges 1"))
+        assertTrue(config.contains("ClientTransportPlugin webtunnel socks5 127.0.0.1:45555"))
     }
 }
