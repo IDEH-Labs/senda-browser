@@ -36,7 +36,7 @@ object EthicalNewsRepository {
             listOf(
                 async { fetchRssSafely("https://www.muylinux.com/feed/", "MuyLinux", 4) },
                 async { fetchRssSafely("https://www.eff.org/rss/updates.xml", "EFF", 4) },
-                async { fetchRssSafely("https://www.fsf.org/static/fsforg/rss/news.xml", "FSF", 3) }
+                async { fetchRssSafely("https://static.fsf.org/fsforg/rss/news.xml", "FSF", 3) }
             ).awaitAll().flatten()
         }
         if (results.isNotEmpty()) {
@@ -63,8 +63,11 @@ object EthicalNewsRepository {
 
         try {
             connection = org.senda.browser.core.SendaNet.open(feedUrl)
-            connection.connectTimeout = 4000
-            connection.readTimeout = 4000
+            // Through Tor or a proxy a request takes longer: measured on 2026-10-14 over Tor, EFF answered in 2.4-4.7 s and
+            // FSF in 1.5-6.2 s, so 4 s per phase cut feeds that were working. Direct, 4 s as before
+            val wait = if (org.senda.browser.core.SendaNet.proxyFor(connection.url.host) == java.net.Proxy.NO_PROXY) 4000 else 15000
+            connection.connectTimeout = wait
+            connection.readTimeout = wait
             connection.instanceFollowRedirects = true
 
             if (connection.responseCode in 200..299) {
