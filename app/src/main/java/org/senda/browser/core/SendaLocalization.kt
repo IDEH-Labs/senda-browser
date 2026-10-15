@@ -887,6 +887,16 @@ interface SendaStringPack {
     val audit_entropy_fail: String
     val audit_verdict_ok: String
     val audit_verdict_fail: String
+
+    val st_sec_level_title: String get() = "Security Level"
+    val st_sec_level_standard: String get() = "Standard"
+    val st_sec_level_safer: String get() = "Safer"
+    val st_sec_level_safest: String get() = "Safest"
+    val st_sec_level_desc: String get() = "Tor Browser security levels. Disabling features reduces attack surface against browser exploits."
+    val st_sec_level_restart_title: String get() = "Restart required"
+    val st_sec_level_restart_msg: String get() = "Senda needs to restart to apply security level changes to the engine."
+    val st_sec_level_restart_btn: String get() = "Restart now"
+    val st_sec_level_later_btn: String get() = "Later"
 }
 
 object SendaStringsDe : SendaStringPack {
@@ -3122,6 +3132,16 @@ object SendaStringsEs : SendaStringPack {
     override val audit_entropy_fail = "Entropía insuficiente (%s bits) o faltan tipos de caracteres."
     override val audit_verdict_ok = "Autoprueba superada: %1\$d de %1\$d pruebas (no es una certificación externa)"
     override val audit_verdict_fail = "Autoprueba con observaciones: %d pruebas no superadas"
+
+    override val st_sec_level_title = "Nivel de seguridad"
+    override val st_sec_level_standard = "Estándar"
+    override val st_sec_level_safer = "Más seguro"
+    override val st_sec_level_safest = "El más seguro"
+    override val st_sec_level_desc = "Niveles de seguridad de Tor Browser. Reducen la superficie de ataque desactivando funciones web vulnerables."
+    override val st_sec_level_restart_title = "Reinicio necesario"
+    override val st_sec_level_restart_msg = "Senda debe reiniciarse para aplicar los cambios del nivel de seguridad en el motor."
+    override val st_sec_level_restart_btn = "Reiniciar ahora"
+    override val st_sec_level_later_btn = "Más tarde"
 }
 
 object SendaStringsFr : SendaStringPack {

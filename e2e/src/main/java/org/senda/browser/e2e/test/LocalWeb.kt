@@ -44,6 +44,20 @@ object LocalWeb {
                 "videoCapabilities:[{contentType:'video/mp4; codecs=\"avc1.42E01E\"'}]}])" +
                 ".then(function(){show(\"DRM-AVAILABLE\");},function(e){show(\"DRM-BLOCKED \"+e.message);});}</script>"
         ),
+        // What a page can use at each security level (SecurityLevelTest). Deterministic checks only: no CPU timing.
+        // MathML: with it, a fraction is about twice as tall as a plain line of the same size; without it, as tall
+        "/levels.html" to page(
+            "levels",
+            """<p id="r">LV-WAIT</p><p id="t" style="font-size:30px;margin:0;display:inline-block">1</p>""" +
+                """<math id="m" style="font-size:30px"><mfrac><mn>1</mn><mn>2</mn></mfrac></math>""" +
+                """<svg id="s" width="60" height="60" xmlns="http://www.w3.org/2000/svg"><rect width="50" height="50"/></svg>""" +
+                """<script>var c=document.createElement("canvas"),g=null;try{g=c.getContext("webgl");}catch(e){}""" +
+                """var line=document.getElementById("t").getBoundingClientRect().height;""" +
+                """var math=document.getElementById("m").getBoundingClientRect().height;""" +
+                """var svg=document.getElementById("s").getBoundingClientRect().width;""" +
+                """document.getElementById("r").textContent="LV-DONE webgl="+(g?"yes":"no")+" wasm="+""" +
+                """(typeof WebAssembly==="object"?"yes":"no")+" math="+(math>25?"yes":"no")+" svg="+(svg>0?"yes":"no");</script>"""
+        ),
         "/a.html" to page("e2e-a", "<p>Page A</p>"),
         "/b.html" to page("e2e-b", "<p>Page B</p>"),
         "/c.html" to page("e2e-c", "<p>Page C</p>"),

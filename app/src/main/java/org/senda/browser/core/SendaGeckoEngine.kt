@@ -384,6 +384,37 @@ object SendaGeckoEngine {
             "  network.http.referer.XOriginTrimmingPolicy: 2\n"
     }
 
+    /**
+     * Security level as in Tor Browser (SecurityLevel.sys.mjs, tor-browser-153.5.0esr-16.0-1: kSecuritySettings and
+     * its NoScript policy). Each pref was measured on the phone on 2026-10-14 to change what a page sees:
+     * JIT off makes a CPU loop about 11 times slower (125 to 1383 ms), mathml.disabled stops MathML drawing,
+     * svg.disabled leaves an SVG at size 0, webgl.disabled and wasm=false remove WebGL and WebAssembly.
+     * Not set here: audio and video (Tor Browser blocks them with NoScript, which Senda does not have), and
+     * JavaScript, which is the "JavaScript" setting. Only read when Gecko starts, so changing the level restarts
+     * Senda ([needsRestartForLevel]). STANDARD sets nothing.
+     */
+    private fun securityLevelPrefs(prefs: PreferencesManager?): String {
+        val level = prefs?.securityLevel ?: return ""
+        startupSecurityLevel = level
+        if (level == "STANDARD") return ""
+        return "  javascript.options.ion: false\n" +
+            "  javascript.options.baselinejit: false\n" +
+            "  javascript.options.native_regexp: false\n" +
+            "  javascript.options.wasm: false\n" +
+            "  mathml.disabled: true\n" +
+            "  gfx.font_rendering.graphite.enabled: false\n" +
+            "  gfx.font_rendering.opentype_svg.enabled: false\n" +
+            "  webgl.disabled: true\n" +
+            // Only SAFEST: SAFER keeps SVG, as in Tor Browser
+            (if (level == "SAFEST") "  svg.disabled: true\n" else "")
+    }
+
+    /** Security level set in Gecko's prefs when this process started ([securityLevelPrefs]). */
+    private var startupSecurityLevel = "STANDARD"
+
+    /** Whether choosing [level] needs Senda to start again: its Gecko prefs are only read at startup. */
+    fun needsRestartForLevel(level: String) = level != startupSecurityLevel
+
     private fun socksPrefs(host: String, port: Int, remoteDns: Boolean) =
         "  network.proxy.type: 1\n  network.proxy.socks: \"$host\"\n  network.proxy.socks_port: $port\n" +
             "  network.proxy.socks_version: 5\n  network.proxy.socks_remote_dns: $remoteDns\n"
@@ -457,7 +488,8 @@ object SendaGeckoEngine {
                 googleSafeBrowsingOffPrefs() +
                 av1Prefs() +
                 startupProxyPrefs(prefs) +
-                torFingerprintingPrefs(prefs)
+                torFingerprintingPrefs(prefs) +
+                securityLevelPrefs(prefs)
         )
         return file.absolutePath
     }

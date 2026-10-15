@@ -211,6 +211,18 @@ fun buildSettingsList(
             onClick = { onOpenDialog("private_browsing") }
         ),
         SettingItemData(
+            id = "security_level",
+            title = strings.st_sec_level_title,
+            subtitle = when (prefs.securityLevel) {
+                "SAFER" -> strings.st_sec_level_safer
+                "SAFEST" -> strings.st_sec_level_safest
+                else -> strings.st_sec_level_standard
+            },
+            category = strings.cat_privacy,
+            icon = Icons.Default.Shield,
+            onClick = { onOpenDialog("security_level") }
+        ),
+        SettingItemData(
             id = "https_only",
             title = strings.st_https_title,
             subtitle = httpsSummary,

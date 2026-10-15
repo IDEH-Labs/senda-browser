@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -397,6 +398,160 @@ fun SettingsHttpsOnlyDialog(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(text = label, style = MaterialTheme.typography.bodyMedium)
                     }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(strings.general_done)
+            }
+        }
+    )
+}
+
+@Composable
+fun SettingsSecurityLevelDialog(
+    context: Context,
+    prefs: PreferencesManager,
+    strings: SendaStringPack,
+    onSettingsChanged: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    var selectedLevel by remember { mutableStateOf(prefs.securityLevel) }
+    var showRestartPrompt by remember { mutableStateOf(false) }
+    var pendingLevel by remember { mutableStateOf<String?>(null) }
+
+    fun doRestart() {
+        var activity = context
+        while (activity is android.content.ContextWrapper && activity !is MainActivity) activity = activity.baseContext
+        (activity as? MainActivity)?.restartSenda()
+    }
+
+    fun applyLevel(level: String, restartNow: Boolean) {
+        selectedLevel = level
+        prefs.securityLevel = level
+        onSettingsChanged()
+        if (restartNow) {
+            doRestart()
+        }
+    }
+
+    if (showRestartPrompt && pendingLevel != null) {
+        val target = pendingLevel!!
+        AlertDialog(
+            onDismissRequest = {
+                applyLevel(target, restartNow = false)
+                showRestartPrompt = false
+                pendingLevel = null
+                onDismiss()
+            },
+            title = { Text(strings.st_sec_level_restart_title) },
+            text = { Text(strings.st_sec_level_restart_msg) },
+            confirmButton = {
+                TextButton(onClick = {
+                    applyLevel(target, restartNow = true)
+                    showRestartPrompt = false
+                    pendingLevel = null
+                    onDismiss()
+                }) {
+                    Text(strings.st_sec_level_restart_btn)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    applyLevel(target, restartNow = false)
+                    showRestartPrompt = false
+                    pendingLevel = null
+                    onDismiss()
+                }) {
+                    Text(strings.st_sec_level_later_btn)
+                }
+            }
+        )
+        return
+    }
+
+    fun selectLevel(level: String) {
+        if (SendaGeckoEngine.needsRestartForLevel(level)) {
+            pendingLevel = level
+            showRestartPrompt = true
+        } else {
+            applyLevel(level, restartNow = false)
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.Shield,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(strings.st_sec_level_title, style = MaterialTheme.typography.titleMedium)
+            }
+        },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+                Text(
+                    text = strings.st_sec_level_desc,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(14.dp))
+
+                val levels = listOf(
+                    Triple(
+                        "STANDARD",
+                        strings.st_sec_level_standard,
+                        if (strings.st_sec_level_standard == "Estándar")
+                            "Todas las funciones web habituales están activadas."
+                        else "All browser and website features are enabled."
+                    ),
+                    Triple(
+                        "SAFER",
+                        strings.st_sec_level_safer,
+                        if (strings.st_sec_level_standard == "Estándar")
+                            "Desactiva JIT (compilación en tiempo real; JS ~11x más lento), WebGL, WebAssembly, MathML y fuentes SVG. Mantiene SVG estándar.\nNota ética: audio y vídeo no se bloquean automáticamente aún."
+                        else "Disables JIT (CPU loops ~11x slower), WebGL, WebAssembly, MathML and SVG fonts. Standard SVG stays.\nHonest note: audio and video are not automatically blocked yet."
+                    ),
+                    Triple(
+                        "SAFEST",
+                        strings.st_sec_level_safest,
+                        if (strings.st_sec_level_standard == "Estándar")
+                            "Todo lo del nivel 'Más seguro', más SVG completamente desactivado. Se recomienda usar con JavaScript Desactivado.\nNota ética: audio y vídeo no se bloquean automáticamente aún."
+                        else "Everything in Safer, plus SVG is completely disabled. Recommended with JavaScript Off.\nHonest note: audio and video are not automatically blocked yet."
+                    )
+                )
+
+                levels.forEach { (lvl, title, detail) ->
+                    val isSelected = selectedLevel == lvl
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable { selectLevel(lvl) },
+                        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        border = BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                RadioButton(selected = isSelected, onClick = { selectLevel(lvl) })
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(text = title, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            }
+                            Text(
+                                text = detail,
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(start = 32.dp, top = 4.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
             }
         },

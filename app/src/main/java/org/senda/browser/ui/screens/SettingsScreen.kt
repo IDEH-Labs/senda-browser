@@ -455,6 +455,17 @@ fun SettingsScreen(
         )
     }
 
+    // DIALOG: SECURITY LEVEL (TOR BROWSER LEVELS: STANDARD / SAFER / SAFEST)
+    if (activeDialog == "security_level") {
+        SettingsSecurityLevelDialog(
+            context = context,
+            prefs = prefs,
+            strings = strings,
+            onSettingsChanged = onSettingsChanged,
+            onDismiss = { activeDialog = null }
+        )
+    }
+
     // DIALOG: HTTPS-ONLY MODE
     if (activeDialog == "https_only") {
         SettingsHttpsOnlyDialog(

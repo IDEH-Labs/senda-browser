@@ -41,6 +41,7 @@ class PreferencesManager(context: Context) {
 
     private companion object {
         val JAVASCRIPT_MODES = setOf("NORMAL", "FREE", "OFF")
+        val SECURITY_LEVELS = setOf("STANDARD", "SAFER", "SAFEST")
 
         val historyExecutor: java.util.concurrent.ExecutorService =
             java.util.concurrent.Executors.newSingleThreadExecutor { r -> Thread(r, "senda-history") }
@@ -407,6 +408,14 @@ class PreferencesManager(context: Context) {
         get() = prefs.getString("https_only_mode", "ALL_TABS") ?: "ALL_TABS"
         set(value) = prefs.edit().putString("https_only_mode", value).apply()
 
+    /**
+     * Security level as in Tor Browser: STANDARD, SAFER or SAFEST. The person chooses it; Senda never raises it by itself.
+     * The engine part is read when Gecko starts ([SendaGeckoEngine.securityLevelPrefs]).
+     */
+    var securityLevel: String
+        get() = prefs.getString("security_level", "STANDARD").takeIf { it in SECURITY_LEVELS } ?: "STANDARD"
+        set(value) = prefs.edit().putString("security_level", value.takeIf { it in SECURITY_LEVELS } ?: "STANDARD").apply()
+
     var dnsOverHttpsMode: String
         get() = prefs.getString("dns_over_https_mode", "MAX_PROTECTION") ?: "MAX_PROTECTION"
         set(value) = prefs.edit().putString("dns_over_https_mode", value).apply()
@@ -742,7 +751,7 @@ class PreferencesManager(context: Context) {
         "dns_over_https_mode", "doh_provider", "enable_anti_snooping", "font_hinting", "font_scale_percent",
         "force_enable_zoom", "https_only_mode", "javascript_mode", "offer_translations", "open_links_in_apps", "open_links_in_background",
         "reader_font_family", "reader_font_size_percent", "reader_theme", "require_biometrics",
-        "search_engine_name", "search_engine_url", "search_suggestions_enabled", "selected_wallpaper_id",
+        "search_engine_name", "search_engine_url", "search_suggestions_enabled", "security_level", "selected_wallpaper_id",
         "show_back_button", "show_bookmarks_bar", "show_bookmarks_button", "show_cast_button", "show_devtools_button",
         "show_forward_button", "show_home_button", "show_menu_button", "show_new_tab_button", "show_reader_button",
         "show_reload_button", "show_security_indicator", "show_share_button", "show_tabs_button",
