@@ -14,6 +14,8 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import kotlinx.coroutines.*
 import org.torproject.jni.TorService
 import java.io.File
+import `IPtProxy`.Controller
+import `IPtProxy`.`IPtProxy`
 
 enum class TorState {
     STOPPED,
@@ -241,6 +243,47 @@ object SendaTorManager {
         if (!app.bindService(Intent(app, TorService::class.java), connection, 0)) Log.e(TAG, "No se pudo consultar el TorService")
     }
 
+    private var ptController: Controller? = null
+
+    @Synchronized
+    private fun getPtController(context: Context): Controller {
+        ptController?.let { return it }
+        val stateDir = File(context.applicationContext.filesDir, "pt_state").apply { mkdirs() }.absolutePath
+        val c = Controller(stateDir, false, false, null, null)
+        ptController = c
+        return c
+    }
+
+    fun stopPluggableTransports() {
+        try {
+            ptController?.stop(IPtProxy.Snowflake)
+        } catch (e: Exception) {
+            Log.w(TAG, "Error deteniendo Snowflake: ${e.message}")
+        }
+        try {
+            ptController?.stop(IPtProxy.Obfs4)
+        } catch (e: Exception) {
+            Log.w(TAG, "Error deteniendo Obfs4: ${e.message}")
+        }
+    }
+
+    fun restart(context: Context) {
+        init(context)
+        wanted = true
+        val app = context.applicationContext
+        if (state == TorState.CONNECTED || state == TorState.STARTING) {
+            changeState(TorState.STOPPING)
+            try {
+                app.startService(Intent(app, TorService::class.java).apply { action = TorService.ACTION_STOP })
+            } catch (e: Exception) {
+                Log.w(TAG, "Error deteniendo TorService para reinicio: ${e.message}")
+                start(context)
+            }
+        } else {
+            start(context)
+        }
+    }
+
     private fun ensureTorrc(context: Context) {
         try {
             val torrc = TorService.getTorrc(context)
@@ -257,16 +300,8 @@ object SendaTorManager {
             folder.mkdirs()
             android.system.Os.chmod(folder.path, "700".toInt(8))
 
-            // Two SOCKS listeners, with the flags Tor Browser for Android uses: the socket for pages, and a TCP port Tor
-            // picks on each start for Senda's own Java connections, asked of its own TorService ([askSocksPort]). No
-            // fixed port: an app holding 9050 received Senda's requests (measured 2026-10-13). No ControlPort:
-            // tor-android starts Tor with CookieAuthentication 0 and talks to it through its private ControlSocket, so
-            // a TCP control port let any app on the phone control Tor and read its circuits and streams without a
-            // password (measured 2026-10-13). No HTTPTunnelPort: tor-android's torrc-defaults opens 8118, a second
-            // proxy Senda does not use. These SocksPort lines replace the one in tor-android's torrc-defaults.
-            // DataDirectory and CacheDirectory are set by tor-android (TorService.java, 0.4.9.13)
             val flags = "IPv6Traffic PreferIPv6 KeepAliveIsolateSOCKSAuth"
-            val content = """
+            val baseConfig = """
                 SocksPort unix:"${socket.absolutePath}" $flags
                 SocksPort auto $flags
                 HTTPTunnelPort 0
@@ -274,6 +309,56 @@ object SendaTorManager {
                 SafeLogging 1
                 DNSPort 0
             """.trimIndent()
+
+            val prefs = PreferencesManager(context)
+            val bridgeMode = prefs.torBridgeMode
+            val customBridges = prefs.torCustomBridges
+
+            var snowflakePort = 0L
+            var obfs4Port = 0L
+
+            if (bridgeMode == "SNOWFLAKE" || (bridgeMode == "CUSTOM" && TorBridgeRules.needsSnowflake(customBridges))) {
+                val controller = getPtController(context)
+                snowflakePort = controller.port(IPtProxy.Snowflake)
+                if (snowflakePort <= 0L) {
+                    try {
+                        controller.start(IPtProxy.Snowflake, null)
+                        snowflakePort = controller.port(IPtProxy.Snowflake)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error al iniciar Snowflake: ${e.message}", e)
+                    }
+                }
+            } else {
+                try { ptController?.stop(IPtProxy.Snowflake) } catch (_: Exception) {}
+            }
+
+            if (bridgeMode == "CUSTOM" && TorBridgeRules.needsObfs4(customBridges)) {
+                val controller = getPtController(context)
+                obfs4Port = controller.port(IPtProxy.Obfs4)
+                if (obfs4Port <= 0L) {
+                    try {
+                        controller.start(IPtProxy.Obfs4, null)
+                        obfs4Port = controller.port(IPtProxy.Obfs4)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error al iniciar Obfs4: ${e.message}", e)
+                    }
+                }
+            } else {
+                try { ptController?.stop(IPtProxy.Obfs4) } catch (_: Exception) {}
+            }
+
+            if (bridgeMode == "NONE") {
+                stopPluggableTransports()
+            }
+
+            val bridgeConfig = TorBridgeRules.buildTorrcBridgeConfig(
+                bridgeMode = bridgeMode,
+                customBridges = customBridges,
+                snowflakePort = snowflakePort,
+                obfs4Port = obfs4Port
+            )
+
+            val content = if (bridgeConfig.isNotBlank()) "$baseConfig\n$bridgeConfig" else baseConfig
 
             // torrc is Senda's own (there is no way to edit it): rewritten whenever Senda's configuration changes,
             // or installations from an older version would keep the old one forever

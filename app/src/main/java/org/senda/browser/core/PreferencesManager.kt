@@ -446,6 +446,15 @@ class PreferencesManager(context: Context) {
         get() = prefs.getBoolean("proxy_dns_remote", true)
         set(value) = prefs.edit().putBoolean("proxy_dns_remote", value).apply()
 
+    var torBridgeMode: String
+        // NONE, SNOWFLAKE, CUSTOM
+        get() = prefs.getString("tor_bridge_mode", "NONE") ?: "NONE"
+        set(value) = prefs.edit().putString("tor_bridge_mode", value).apply()
+
+    var torCustomBridges: String
+        get() = prefs.getString("tor_custom_bridges", "") ?: ""
+        set(value) = prefs.edit().putString("tor_custom_bridges", value).apply()
+
     // --- READER MODE (SETTINGS) ---
     var readerTheme: String
         get() = prefs.getString("reader_theme", "SEPIA") ?: "SEPIA" // LIGHT, SEPIA, OLED_BLACK

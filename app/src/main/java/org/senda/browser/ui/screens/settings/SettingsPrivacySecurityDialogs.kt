@@ -85,6 +85,8 @@ fun SettingsTorDialog(
     onDismiss: () -> Unit
 ) {
     var selectedMode by remember { mutableStateOf(prefs.proxyMode) }
+    var bridgeMode by remember { mutableStateOf(prefs.torBridgeMode) }
+    var customBridgesInput by remember { mutableStateOf(prefs.torCustomBridges) }
     var hostInput by remember { mutableStateOf(prefs.proxyHost) }
     var portInput by remember { mutableStateOf(prefs.proxyPort.toString()) }
     var dnsRemote by remember { mutableStateOf(prefs.proxyDnsRemote) }
@@ -141,6 +143,103 @@ fun SettingsTorDialog(
                             selected = selectedMode == "TOR_ORBOT",
                             onClick = { selectedMode = "TOR_ORBOT" }
                         )
+                    }
+                }
+
+                if (selectedMode == "TOR_ORBOT") {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 8.dp)
+                    ) {
+                        Text(
+                            text = strings.dlg_tor_bridges_title,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        // Bridge Option 1: Direct
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { bridgeMode = "NONE" },
+                            color = if (bridgeMode == "NONE") MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f) else Color.Transparent,
+                            border = BorderStroke(1.dp, if (bridgeMode == "NONE") MaterialTheme.colorScheme.primary.copy(alpha = 0.7f) else MaterialTheme.colorScheme.outlineVariant)
+                        ) {
+                            Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(strings.dlg_tor_bridge_direct, fontWeight = FontWeight.Medium, fontSize = 12.sp)
+                                    Text(strings.dlg_tor_bridge_direct_sub, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                RadioButton(
+                                    selected = bridgeMode == "NONE",
+                                    onClick = { bridgeMode = "NONE" }
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        // Bridge Option 2: Snowflake
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { bridgeMode = "SNOWFLAKE" },
+                            color = if (bridgeMode == "SNOWFLAKE") MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f) else Color.Transparent,
+                            border = BorderStroke(1.dp, if (bridgeMode == "SNOWFLAKE") MaterialTheme.colorScheme.primary.copy(alpha = 0.7f) else MaterialTheme.colorScheme.outlineVariant)
+                        ) {
+                            Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("❄️ ${strings.dlg_tor_bridge_snowflake}", fontWeight = FontWeight.Medium, fontSize = 12.sp)
+                                    Text(strings.dlg_tor_bridge_snowflake_sub, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                RadioButton(
+                                    selected = bridgeMode == "SNOWFLAKE",
+                                    onClick = { bridgeMode = "SNOWFLAKE" }
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        // Bridge Option 3: Custom
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { bridgeMode = "CUSTOM" },
+                            color = if (bridgeMode == "CUSTOM") MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f) else Color.Transparent,
+                            border = BorderStroke(1.dp, if (bridgeMode == "CUSTOM") MaterialTheme.colorScheme.primary.copy(alpha = 0.7f) else MaterialTheme.colorScheme.outlineVariant)
+                        ) {
+                            Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("🌉 ${strings.dlg_tor_bridge_custom}", fontWeight = FontWeight.Medium, fontSize = 12.sp)
+                                    Text(strings.dlg_tor_bridge_custom_sub, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                RadioButton(
+                                    selected = bridgeMode == "CUSTOM",
+                                    onClick = { bridgeMode = "CUSTOM" }
+                                )
+                            }
+                        }
+
+                        if (bridgeMode == "CUSTOM") {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            OutlinedTextField(
+                                value = customBridgesInput,
+                                onValueChange = { customBridgesInput = it },
+                                label = { Text(strings.dlg_tor_bridge_custom, fontSize = 11.sp) },
+                                placeholder = { Text(strings.dlg_tor_bridge_custom_hint, fontSize = 11.sp) },
+                                minLines = 2,
+                                maxLines = 4,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                     }
                 }
 
@@ -274,13 +373,23 @@ fun SettingsTorDialog(
             TextButton(
                 onClick = {
                     val parsedPort = portInput.toIntOrNull() ?: 9050
+                    val bridgeChanged = prefs.torBridgeMode != bridgeMode || prefs.torCustomBridges != customBridgesInput
+                    val modeChanged = prefs.proxyMode != selectedMode
                     prefs.proxyMode = selectedMode
-                    if (selectedMode != "TOR_ORBOT") {
+                    if (selectedMode == "TOR_ORBOT") {
+                        prefs.torBridgeMode = bridgeMode
+                        prefs.torCustomBridges = customBridgesInput
+                        if (bridgeChanged && !modeChanged) {
+                            SendaTorManager.restart(context)
+                        } else {
+                            SendaTorManager.applyMode(context, prefs)
+                        }
+                    } else {
                         prefs.proxyHost = hostInput
                         prefs.proxyPort = parsedPort
                         prefs.proxyDnsRemote = dnsRemote
+                        SendaTorManager.applyMode(context, prefs)
                     }
-                    SendaTorManager.applyMode(context, prefs)
                     onSettingsChanged()
                     onDismiss()
                     if (SendaGeckoEngine.needsRestartFor(selectedMode)) {
