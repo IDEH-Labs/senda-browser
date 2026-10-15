@@ -200,6 +200,7 @@ fun SendaToolbar(
         TranslateDialog(tab = activeTab, onDismiss = { showTranslateDialog = false })
     }
     var showProxyDialog by remember { mutableStateOf(false) }
+    var showSecurityLevelDialog by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     // Page of the main menu: "main", or "bookmarks" for its bookmarks submenu
     var menuPage by remember { mutableStateOf("main") }
@@ -1541,6 +1542,33 @@ fun SendaToolbar(
                                     }
                                 )
 
+                                // Security Level (Tor Browser Standard / Safer / Safest)
+                                DropdownMenuItem(
+                                    text = {
+                                        Column {
+                                            Text(strings.st_sec_level_title, fontWeight = FontWeight.SemiBold)
+                                            val secSub = when (activeTab?.prefs?.securityLevel) {
+                                                "SAFEST" -> strings.st_sec_level_safest
+                                                "SAFER" -> strings.st_sec_level_safer
+                                                else -> strings.st_sec_level_standard
+                                            }
+                                            Text(secSub, fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
+                                        }
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.Shield,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    },
+                                    onClick = {
+                                        showMenu = false
+                                        showSecurityLevelDialog = true
+                                    }
+                                )
+
                                 // Cast (available here only if the user hid the navigation bar button, avoiding unnecessary duplicates)
                                 if (!showCastButton && !org.senda.browser.core.cast.SendaTvMode.tvConnected) {
                                     DropdownMenuItem(
@@ -1703,6 +1731,19 @@ fun SendaToolbar(
                 strings = strings,
                 onSettingsChanged = {},
                 onDismiss = { showProxyDialog = false }
+            )
+        }
+    }
+
+    // DIALOG: SECURITY LEVEL (Tor Browser Standard / Safer / Safest)
+    if (showSecurityLevelDialog) {
+        activeTab?.prefs?.let { p ->
+            org.senda.browser.ui.screens.settings.SettingsSecurityLevelDialog(
+                context = context,
+                prefs = p,
+                strings = strings,
+                onSettingsChanged = {},
+                onDismiss = { showSecurityLevelDialog = false }
             )
         }
     }

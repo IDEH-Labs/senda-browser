@@ -243,6 +243,40 @@ object SendaTorManager {
         if (!app.bindService(Intent(app, TorService::class.java), connection, 0)) Log.e(TAG, "No se pudo consultar el TorService")
     }
 
+    /**
+     * Sends SIGNAL NEWNYM to Tor to discard old circuits and build new ones with fresh identity.
+     */
+    fun newIdentity(context: Context, onComplete: ((Boolean) -> Unit)? = null) {
+        val app = context.applicationContext
+        val connection = object : android.content.ServiceConnection {
+            override fun onServiceConnected(name: android.content.ComponentName?, binder: android.os.IBinder?) {
+                val service = (binder as? TorService.LocalBinder)?.service
+                val self = this
+                scope.launch {
+                    val ok = withContext(Dispatchers.IO) {
+                        try {
+                            service?.torControlConnection?.signal("NEWNYM")
+                            Log.i(TAG, "Señal NEWNYM enviada con éxito a Tor")
+                            true
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Error enviando NEWNYM a Tor: ${e.message}")
+                            false
+                        }
+                    }
+                    try { app.unbindService(self) } catch (_: Exception) {}
+                    withContext(Dispatchers.Main) { onComplete?.invoke(ok) }
+                }
+            }
+
+            override fun onServiceDisconnected(name: android.content.ComponentName?) {}
+        }
+        // Flags 0: only bind to the TorService already running, never start a new one here
+        if (!app.bindService(Intent(app, TorService::class.java), connection, 0)) {
+            Log.e(TAG, "No se pudo conectar a TorService para renovar circuito")
+            onComplete?.invoke(false)
+        }
+    }
+
     private var ptController: Controller? = null
 
     @Synchronized

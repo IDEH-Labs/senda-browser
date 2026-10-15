@@ -10,6 +10,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.VpnKey
@@ -160,6 +161,39 @@ fun SettingsTorDialog(
                             .fillMaxWidth()
                             .padding(start = 8.dp)
                     ) {
+                        if (SendaTorManager.state == TorState.CONNECTED) {
+                            var renewingCircuit by remember { mutableStateOf(false) }
+                            FilledTonalButton(
+                                onClick = {
+                                    renewingCircuit = true
+                                    SendaTorManager.newIdentity(context) { success ->
+                                        renewingCircuit = false
+                                        android.widget.Toast.makeText(
+                                            context,
+                                            if (success) strings.dlg_tor_new_circuit_success else strings.dlg_tor_new_circuit_failed,
+                                            android.widget.Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                },
+                                enabled = !renewingCircuit,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 10.dp),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = if (renewingCircuit) strings.dlg_tor_new_circuit_loading else strings.dlg_tor_new_circuit_btn,
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+
                         Text(
                             text = strings.dlg_tor_bridges_title,
                             style = MaterialTheme.typography.labelMedium,

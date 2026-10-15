@@ -595,6 +595,10 @@ interface SendaStringPack {
     val dlg_tor_status_connected: String
     val dlg_tor_status_connecting: String
     val dlg_tor_status_error: String
+    val dlg_tor_new_circuit_btn: String
+    val dlg_tor_new_circuit_loading: String
+    val dlg_tor_new_circuit_success: String
+    val dlg_tor_new_circuit_failed: String
     val rm_visual_theme: String
     val rm_theme_sepia: String
     val rm_theme_oled: String
@@ -1361,6 +1365,10 @@ object SendaStringsDe : SendaStringPack {
     override val dlg_tor_status_connected = "🟢 Verbunden · Keine DNS-Lecks · .onion-Seiten"
     override val dlg_tor_status_connecting = "🟡 Tor-Schaltkreis wird aufgebaut…"
     override val dlg_tor_status_error = "🔴 Tor oder die gewählte Brücke konnte nicht verbunden werden"
+    override val dlg_tor_new_circuit_btn = "Neuer Tor-Kanal (Neue Identität)"
+    override val dlg_tor_new_circuit_loading = "Kanal wird erneuert…"
+    override val dlg_tor_new_circuit_success = "Neuer Tor-Kanal erfolgreich aufgebaut"
+    override val dlg_tor_new_circuit_failed = "Tor-Kanal konnte nicht erneuert werden"
     override val rm_visual_theme = "Visuelles Design"
     override val rm_theme_sepia = "Sepia"
     override val rm_theme_oled = "OLED"
@@ -2116,6 +2124,10 @@ object SendaStringsEn : SendaStringPack {
     override val dlg_tor_status_connected = "🟢 Connected · Zero DNS leaks · .onion sites"
     override val dlg_tor_status_connecting = "🟡 Connecting Tor circuit…"
     override val dlg_tor_status_error = "🔴 Tor or the selected bridge could not connect"
+    override val dlg_tor_new_circuit_btn = "New Tor circuit (New Identity)"
+    override val dlg_tor_new_circuit_loading = "Renewing circuit…"
+    override val dlg_tor_new_circuit_success = "New Tor circuit established"
+    override val dlg_tor_new_circuit_failed = "Could not renew Tor circuit"
     override val rm_visual_theme = "Visual Theme"
     override val rm_theme_sepia = "Sepia"
     override val rm_theme_oled = "OLED"
@@ -2871,6 +2883,10 @@ object SendaStringsEs : SendaStringPack {
     override val dlg_tor_status_connected = "🟢 Conectado · Cero fugas DNS · Sitios .onion"
     override val dlg_tor_status_connecting = "🟡 Conectando circuito Tor…"
     override val dlg_tor_status_error = "🔴 Tor o el puente seleccionado no pudo conectarse"
+    override val dlg_tor_new_circuit_btn = "Nuevo circuito Tor (Nueva identidad)"
+    override val dlg_tor_new_circuit_loading = "Renovando circuito…"
+    override val dlg_tor_new_circuit_success = "Nuevo circuito Tor establecido"
+    override val dlg_tor_new_circuit_failed = "No se pudo renovar el circuito Tor"
     override val rm_visual_theme = "Tema visual"
     override val rm_theme_sepia = "Sepia"
     override val rm_theme_oled = "OLED"
@@ -3636,6 +3652,10 @@ object SendaStringsFr : SendaStringPack {
     override val dlg_tor_status_connected = "🟢 Connecté · Zéro fuite DNS · Sites .onion"
     override val dlg_tor_status_connecting = "🟡 Connexion au circuit Tor…"
     override val dlg_tor_status_error = "🔴 Tor ou le pont sélectionné n’a pas pu se connecter"
+    override val dlg_tor_new_circuit_btn = "Nouveau circuit Tor (Nouvelle identité)"
+    override val dlg_tor_new_circuit_loading = "Renouvellement du circuit…"
+    override val dlg_tor_new_circuit_success = "Nouveau circuit Tor établi"
+    override val dlg_tor_new_circuit_failed = "Impossible de renouveler le circuit Tor"
     override val rm_visual_theme = "Thème visuel"
     override val rm_theme_sepia = "Sépia"
     override val rm_theme_oled = "OLED"
@@ -4391,6 +4411,10 @@ object SendaStringsPt : SendaStringPack {
     override val dlg_tor_status_connected = "🟢 Conectado · Zero vazamentos de DNS · Sites .onion"
     override val dlg_tor_status_connecting = "🟡 Conectando circuito Tor…"
     override val dlg_tor_status_error = "🔴 Tor ou a ponte selecionada não pôde se conectar"
+    override val dlg_tor_new_circuit_btn = "Novo circuito Tor (Nova identidade)"
+    override val dlg_tor_new_circuit_loading = "Renovando circuito…"
+    override val dlg_tor_new_circuit_success = "Novo circuito Tor estabelecido"
+    override val dlg_tor_new_circuit_failed = "Não foi possível renovar o circuito Tor"
     override val rm_visual_theme = "Tema visual"
     override val rm_theme_sepia = "Sépia"
     override val rm_theme_oled = "OLED"
@@ -5146,6 +5170,10 @@ object SendaStringsIt : SendaStringPack {
     override val dlg_tor_status_connected = "🟢 Connesso · Zero perdite DNS · Siti .onion"
     override val dlg_tor_status_connecting = "🟡 Connessione al circuito Tor…"
     override val dlg_tor_status_error = "🔴 Tor o il bridge selezionato non è riuscito a connettersi"
+    override val dlg_tor_new_circuit_btn = "Nuovo circuito Tor (Nuova identità)"
+    override val dlg_tor_new_circuit_loading = "Rinnovo del circuito…"
+    override val dlg_tor_new_circuit_success = "Nuovo circuito Tor stabilito"
+    override val dlg_tor_new_circuit_failed = "Impossibile rinnovare il circuito Tor"
     override val rm_visual_theme = "Tema visivo"
     override val rm_theme_sepia = "Seppia"
     override val rm_theme_oled = "OLED"
@@ -5901,6 +5929,10 @@ object SendaStringsJa : SendaStringPack {
     override val dlg_tor_status_connected = "🟢 接続完了 · DNS 漏洩ゼロ · .onion 対応"
     override val dlg_tor_status_connecting = "🟡 Tor サーキットに接続中…"
     override val dlg_tor_status_error = "🔴 Tor または選択したブリッジに接続できませんでした"
+    override val dlg_tor_new_circuit_btn = "新しい Tor サーキット (新しいアイデンティティ)"
+    override val dlg_tor_new_circuit_loading = "サーキットを更新中…"
+    override val dlg_tor_new_circuit_success = "新しい Tor サーキットが確立されました"
+    override val dlg_tor_new_circuit_failed = "Tor サーキットを更新できませんでした"
     override val rm_visual_theme = "ビジュアルテーマ"
     override val rm_theme_sepia = "セピア (紙調)"
     override val rm_theme_oled = "OLED 漆黒"
@@ -6656,6 +6688,10 @@ object SendaStringsZh : SendaStringPack {
     override val dlg_tor_status_connected = "🟢 已连接 · 零 DNS 泄漏 · 支持访问 .onion 暗网域名"
     override val dlg_tor_status_connecting = "🟡 正在建立 Tor 洋葱加密链路…"
     override val dlg_tor_status_error = "🔴 Tor 或所选网桥无法连接"
+    override val dlg_tor_new_circuit_btn = "新建 Tor 链路 (新身份)"
+    override val dlg_tor_new_circuit_loading = "正在刷新链路…"
+    override val dlg_tor_new_circuit_success = "已建立新的 Tor 链路"
+    override val dlg_tor_new_circuit_failed = "无法刷新 Tor 链路"
     override val rm_visual_theme = "阅读器主题"
     override val rm_theme_sepia = "羊皮纸复古"
     override val rm_theme_oled = "OLED 纯黑"

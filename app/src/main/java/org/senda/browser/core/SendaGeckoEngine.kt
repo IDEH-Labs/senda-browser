@@ -381,7 +381,11 @@ object SendaGeckoEngine {
             "  dom.webmidi.enabled: false\n" +
             "  media.devices.enumerate.legacy.enabled: false\n" +
             "  dom.netinfo.enabled: false\n" +
-            "  network.http.referer.XOriginTrimmingPolicy: 2\n"
+            "  network.http.referer.XOriginTrimmingPolicy: 2\n" +
+            // WebRTC leak prevention as in Tor Browser (001-base-profile.js): never create host ICE candidates
+            // containing local device interfaces, and strictly route WebRTC only via the Tor proxy
+            "  media.peerconnection.ice.no_host: true\n" +
+            "  media.peerconnection.ice.proxy_only: true\n"
     }
 
     /**
