@@ -22,6 +22,7 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- Only for the TV mode notification, with its "Stop casting" button; requested when mirroring the screen -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- If the phone restarts or Senda is updated while casting, return the screen to normal -->

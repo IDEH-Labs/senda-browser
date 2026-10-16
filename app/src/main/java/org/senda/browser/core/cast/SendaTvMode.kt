@@ -15,10 +15,12 @@ import android.content.pm.ServiceInfo
 import android.graphics.PixelFormat
 import android.graphics.Point
 import android.hardware.display.DisplayManager
+import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.PowerManager
 import android.provider.Settings
 import android.util.Log
 import android.view.Display
@@ -55,6 +57,9 @@ object SendaTvMode {
     private const val KEY_ORIGINAL_W = "original_w"
     private const val KEY_ORIGINAL_H = "original_h"
     private const val KEY_ORIGINAL_DENSITY = "original_density"
+    private const val KEY_REFRESH_LOCKED = "refresh_locked"
+    private const val KEY_ORIGINAL_PEAK_REFRESH_RATE = "original_peak_refresh_rate"
+    private const val KEY_ORIGINAL_MIN_REFRESH_RATE = "original_min_refresh_rate"
     // Android user Senda runs as (with USER_CURRENT, -2, Android requires INTERACT_ACROSS_USERS)
     private val userId: Int
         get() = android.os.Process.myUid() / 100_000
@@ -87,9 +92,12 @@ object SendaTvMode {
             return
         }
         appContext = context.applicationContext
-        // If the process died with the TV aspect ratio in place, return the screen to normal
-        if (mirroringDisplay() == null) restoreDisplaySize()
-        setRestoreReceiver(appContext.getSharedPreferences(STATE_PREFS, Context.MODE_PRIVATE).getBoolean(KEY_FORCED, false))
+        // If the process died with the TV aspect ratio or refresh rate locked, return the screen to normal
+        if (mirroringDisplay() == null) {
+            restoreDisplaySize()
+            restoreRefreshRate()
+        }
+        updateRestoreReceiverState()
         appContext.getSystemService(DisplayManager::class.java)?.registerDisplayListener(displayListener, mainHandler)
         evaluate()
     }
@@ -170,8 +178,8 @@ object SendaTvMode {
         }
         active = true
         Log.i(TAG, "TV conectada (${tv.name} ${tv.mode.physicalWidth}x${tv.mode.physicalHeight}): activando modo TV")
-        // The phone is never rotated: the invisible window only sets 60 Hz (the TV shows no more and mirrors with
-        // less delay)
+        // Bloquea el sistema a 60 Hz estricto (vía WRITE_SECURE_SETTINGS y ventana overlay como respaldo)
+        lockRefreshRate()
         updateOverlay(landscape = false)
         applyForRotation()
         try {
@@ -202,6 +210,7 @@ object SendaTvMode {
         Log.i(TAG, "TV desconectada: restaurando pantalla")
         removeOverlay()
         restoreDisplaySize()
+        restoreRefreshRate()
         appContext.stopService(Intent(appContext, SendaTvModeService::class.java))
     }
 
@@ -260,6 +269,73 @@ object SendaTvMode {
             .minByOrNull { it.refreshRate }?.modeId ?: 0
     }
 
+    // --- 60 Hz across the system ---
+
+    private fun lockRefreshRate() {
+        if (!canAdaptAspect(appContext)) return
+        val state = appContext.getSharedPreferences(STATE_PREFS, Context.MODE_PRIVATE)
+        if (state.getBoolean(KEY_REFRESH_LOCKED, false)) return
+
+        val resolver = appContext.contentResolver
+        val originalPeak = try {
+            Settings.Global.getFloat(resolver, "peak_refresh_rate")
+        } catch (_: Exception) {
+            -1f
+        }
+        val originalMin = try {
+            Settings.Global.getFloat(resolver, "min_refresh_rate")
+        } catch (_: Exception) {
+            -1f
+        }
+
+        state.edit()
+            .putBoolean(KEY_REFRESH_LOCKED, true)
+            .putFloat(KEY_ORIGINAL_PEAK_REFRESH_RATE, originalPeak)
+            .putFloat(KEY_ORIGINAL_MIN_REFRESH_RATE, originalMin)
+            .commit()
+        updateRestoreReceiverState()
+
+        try {
+            Settings.Global.putFloat(resolver, "peak_refresh_rate", 60f)
+            Settings.Global.putFloat(resolver, "min_refresh_rate", 60f)
+            Log.i(TAG, "Tasa de refresco del sistema bloqueada a 60 Hz para Miracast (era pico=$originalPeak, min=$originalMin)")
+        } catch (e: Exception) {
+            Log.w(TAG, "No se pudo fijar tasa de refresco a 60 Hz: ${e.message}")
+        }
+    }
+
+    private fun restoreRefreshRate() {
+        val state = appContext.getSharedPreferences(STATE_PREFS, Context.MODE_PRIVATE)
+        if (!state.getBoolean(KEY_REFRESH_LOCKED, false)) return
+
+        val originalPeak = state.getFloat(KEY_ORIGINAL_PEAK_REFRESH_RATE, -1f)
+        val originalMin = state.getFloat(KEY_ORIGINAL_MIN_REFRESH_RATE, -1f)
+        val resolver = appContext.contentResolver
+
+        try {
+            if (originalPeak > 0f) {
+                Settings.Global.putFloat(resolver, "peak_refresh_rate", originalPeak)
+            } else {
+                Settings.Global.putFloat(resolver, "peak_refresh_rate", 120f)
+            }
+            if (originalMin > 0f) {
+                Settings.Global.putFloat(resolver, "min_refresh_rate", originalMin)
+            } else {
+                Settings.Global.putFloat(resolver, "min_refresh_rate", 60f)
+            }
+            Log.i(TAG, "Tasa de refresco restaurada a su valor original")
+        } catch (e: Exception) {
+            Log.w(TAG, "No se pudo restaurar la tasa de refresco: ${e.message}")
+        } finally {
+            state.edit()
+                .putBoolean(KEY_REFRESH_LOCKED, false)
+                .remove(KEY_ORIGINAL_PEAK_REFRESH_RATE)
+                .remove(KEY_ORIGINAL_MIN_REFRESH_RATE)
+                .commit()
+            updateRestoreReceiverState()
+        }
+    }
+
     // --- TV aspect ratio ---
 
     private fun forceTvAspect(tv: Display) {
@@ -300,7 +376,7 @@ object SendaTvMode {
                     .putInt(KEY_ORIGINAL_W, if (base == initial) 0 else base.x)
                     .putInt(KEY_ORIGINAL_H, if (base == initial) 0 else base.y)
                     .commit()
-                setRestoreReceiver(true)
+                updateRestoreReceiverState()
             }
             iface.getMethod("setForcedDisplaySize", Int::class.java, Int::class.java, Int::class.java)
                 .invoke(wms, Display.DEFAULT_DISPLAY, w, h)
@@ -336,16 +412,22 @@ object SendaTvMode {
                 }
             }
             state.edit().putBoolean(KEY_FORCED, false).remove(KEY_ORIGINAL_DENSITY).commit()
-            setRestoreReceiver(false)
+            updateRestoreReceiverState()
             Log.i(TAG, "Pantalla del móvil restaurada")
         } catch (e: Exception) {
             Log.w(TAG, "No se pudo restaurar la pantalla: ${e.cause?.message ?: e.message}")
         }
     }
 
+    private fun updateRestoreReceiverState() {
+        val state = appContext.getSharedPreferences(STATE_PREFS, Context.MODE_PRIVATE)
+        val needsRestore = state.getBoolean(KEY_FORCED, false) || state.getBoolean(KEY_REFRESH_LOCKED, false)
+        setRestoreReceiver(needsRestore)
+    }
+
     /**
-     * The restore receiver is only on while the screen has the TV size: otherwise every reboot and every update
-     * started Senda in the background (the engine, and Tor if it was on) for nothing.
+     * The restore receiver is only on while the screen has the TV size or locked refresh rate: otherwise every reboot
+     * and every update started Senda in the background (the engine, and Tor if it was on) for nothing.
      */
     private fun setRestoreReceiver(enabled: Boolean) {
         appContext.packageManager.setComponentEnabledSetting(
@@ -365,7 +447,51 @@ object SendaTvMode {
  */
 class SendaTvModeService : Service() {
 
+    private var wifiLock: WifiManager.WifiLock? = null
+    private var wakeLock: PowerManager.WakeLock? = null
+
     override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onCreate() {
+        super.onCreate()
+        try {
+            val wm = getSystemService(WifiManager::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                wifiLock = wm?.createWifiLock(WifiManager.WIFI_MODE_FULL_LOW_LATENCY, "Senda:TvModeWifiLock")
+            } else {
+                @Suppress("DEPRECATION")
+                wifiLock = wm?.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "Senda:TvModeWifiLock")
+            }
+            wifiLock?.apply {
+                setReferenceCounted(false)
+                acquire()
+            }
+            Log.i("SendaTvModeService", "WifiLock de baja latencia adquirido para duplicación Miracast")
+        } catch (e: Exception) {
+            Log.w("SendaTvModeService", "No se pudo activar WifiLock de baja latencia: ${e.message}")
+        }
+        try {
+            val pm = getSystemService(PowerManager::class.java)
+            wakeLock = pm?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Senda:TvModeWakeLock")?.apply {
+                setReferenceCounted(false)
+                acquire(12 * 60 * 60 * 1000L)
+            }
+        } catch (e: Exception) {
+            Log.w("SendaTvModeService", "No se pudo activar WakeLock: ${e.message}")
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        try {
+            if (wifiLock?.isHeld == true) wifiLock?.release()
+        } catch (_: Exception) {}
+        wifiLock = null
+        try {
+            if (wakeLock?.isHeld == true) wakeLock?.release()
+        } catch (_: Exception) {}
+        wakeLock = null
+    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
