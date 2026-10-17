@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -39,6 +40,7 @@ import org.senda.browser.ui.components.BookmarksBar
 import org.senda.browser.ui.components.SendaPromptHost
 import org.senda.browser.ui.components.SendaToolbar
 import org.senda.browser.ui.components.TabsOverview
+import org.senda.browser.ui.components.updateScreenPosition
 import org.senda.browser.ui.model.BrowserTab
 import org.senda.browser.ui.model.SendaPrompt
 
@@ -341,7 +343,9 @@ fun BrowserScreen(
                                 update = { view ->
                                     view.setSession(activeTab.session)
                                 },
-                                modifier = Modifier.fillMaxSize()
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .onGloballyPositioned { geckoView?.updateScreenPosition() }
                             )
                         }
                     }
