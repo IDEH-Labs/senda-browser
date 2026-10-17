@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -30,6 +31,7 @@ import org.senda.browser.MainActivity
 import org.senda.browser.core.TorState
 import org.senda.browser.core.SendaStringPack
 import org.senda.browser.core.TorBridgeRules
+import org.senda.browser.core.security.SendaVaultAuth
 
 @Composable
 fun SettingsAutofillDialog(
@@ -1004,6 +1006,7 @@ fun SettingsSecurityVaultDialog(
     onSettingsChanged: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
     var requireBio by remember { mutableStateOf(prefs.requireBiometrics) }
     var enableAntiSnooping by remember { mutableStateOf(prefs.enableAntiSnooping) }
 
@@ -1025,12 +1028,18 @@ fun SettingsSecurityVaultDialog(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+                    // Turning the lock on or off asks for the fingerprint or PIN first, as Signal does with its screen lock:
+                    // otherwise anyone holding the phone with Senda open could switch it off
                     Switch(
                         checked = requireBio,
-                        onCheckedChange = {
-                            requireBio = it
-                            prefs.requireBiometrics = it
-                            onSettingsChanged()
+                        onCheckedChange = { checked ->
+                            SendaVaultAuth.request(context, strings.dlg_bio_lock) { ok ->
+                                if (ok) {
+                                    requireBio = checked
+                                    prefs.requireBiometrics = checked
+                                    onSettingsChanged()
+                                }
+                            }
                         }
                     )
                 }
