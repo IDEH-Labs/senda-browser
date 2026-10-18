@@ -159,8 +159,13 @@ object SendaTorManager {
     }
 
     private fun launchService(context: Context): Boolean {
+        // The chosen bridges could not be prepared: Tor must not start with the previous torrc, which may have none
+        // and would connect to the Tor network directly, what bridges are meant to hide
+        if (!ensureTorrc(context)) {
+            changeState(TorState.ERROR)
+            return false
+        }
         try {
-            ensureTorrc(context)
             context.startService(Intent(context, TorService::class.java).apply { action = TorService.ACTION_START })
             return true
         } catch (e: IllegalStateException) {
@@ -337,7 +342,8 @@ object SendaTorManager {
         }
     }
 
-    private fun ensureTorrc(context: Context) {
+    /** Writes Senda's torrc; false when it could not, and then Tor must not start. */
+    private fun ensureTorrc(context: Context): Boolean {
         try {
             val torrc = TorService.getTorrc(context)
             torrc.parentFile?.mkdirs()
@@ -422,8 +428,10 @@ object SendaTorManager {
                     throw java.io.IOException("Could not replace ${torrc.path}")
                 }
             }
+            return true
         } catch (e: Exception) {
             Log.w(TAG, "No se pudo preparar torrc personalizado: ${e.message}")
+            return false
         }
     }
 }
