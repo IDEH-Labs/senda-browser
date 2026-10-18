@@ -470,9 +470,11 @@ class BrowserTab(
                 if (error.code == org.mozilla.geckoview.WebRequestError.ERROR_CONTENT_CRASHED) return null
                 pendingErrorUrl = failed
                 isLoading = false
-                failedBeforeTor = error.category == org.mozilla.geckoview.WebRequestError.ERROR_CATEGORY_PROXY &&
+                // With Tor chosen and not connected yet no page can go out, whatever the error: Gecko reports Tor's
+                // socket not being there yet as a network error, not only as a proxy one (seen on 2026-10-18)
+                failedBeforeTor = prefs?.proxyMode == "TOR_ORBOT" &&
                     org.senda.browser.core.SendaTorManager.state != org.senda.browser.core.TorState.CONNECTED
-                return GeckoResult.fromValue(buildErrorPage(failed, error))
+                return GeckoResult.fromValue(buildErrorPage(failed, error, failedBeforeTor))
             }
 
             // tel:, mailto:, geo:, intent:, whatsapp:… are not pages: they are handed to the matching app
@@ -1093,10 +1095,11 @@ class BrowserTab(
     var showingError by mutableStateOf(false)
         private set
 
-    private fun buildErrorPage(failedUrl: String, error: org.mozilla.geckoview.WebRequestError): String {
+    private fun buildErrorPage(failedUrl: String, error: org.mozilla.geckoview.WebRequestError, beforeTor: Boolean): String {
         val context = SendaGeckoEngine.appContext
         val strings = org.senda.browser.core.SendaStrings.get(prefs?.appLanguage ?: "SYSTEM", context)
         val message = when {
+            beforeTor -> strings.err_proxy
             error.code == WebErr.ERROR_UNKNOWN_HOST -> strings.err_host
             error.category == WebErr.ERROR_CATEGORY_PROXY -> strings.err_proxy
             error.code == WebErr.ERROR_HTTPS_ONLY -> strings.err_https_only
