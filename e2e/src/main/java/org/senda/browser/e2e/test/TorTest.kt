@@ -4,6 +4,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
@@ -29,8 +30,11 @@ class TorTest : E2eTest() {
 
     private fun usesTor(what: String) {
         E2e.openLink("https://check.torproject.org/")
-        assertTrue("check.torproject.org did not say it uses Tor ($what). Screen: ${E2e.screenTexts()}",
-            E2e.has(By.textContains("Congratulations"), TOR_FIRST_START_MS))
+        if (E2e.has(By.textContains("Congratulations"), TOR_FIRST_START_MS)) return
+        val page = E2e.screenTexts()
+        // Tor's state as Senda shows it: Senda's own error, or a Tor network still connecting
+        val tor = runCatching { E2e.openProxyDialog(); E2e.screenTexts() }.getOrElse { "not opened: ${it.message}" }
+        fail("check.torproject.org did not say it uses Tor ($what). Screen: $page. Tor dialog: $tor")
     }
 
     /** B5 — guards de65914. Cold start with Tor; after 90 s in the background, Tor works again on return. */
@@ -160,5 +164,23 @@ class TorTest : E2eTest() {
         E2e.waitForApp()
         val direct = fingerprint("direct")
         assertTrue("Without Tor the protection stayed on: $direct", !direct.startsWith("tz-offset=0 "))
+    }
+
+    /**
+     * B9 — guards the 2026-10-17 fix. After Tor was used without bridges (its torrc has none), bridges Senda cannot
+     * prepare (a transport it does not have) must stop Tor. Before, the error was swallowed and Tor started with the old
+     * torrc: it connected to the Tor network directly, which is what bridges hide, and the page loaded through it.
+     */
+    @Test
+    fun b9_bridgesThatFailNeverStartTorWithoutThem() {
+        usesTor("without bridges, to leave a torrc without them")
+        E2e.setPrefs(testProxyPrefs() + startPrefs() + mapOf(
+            "tor_bridge_mode" to "CUSTOM",
+            "tor_custom_bridges" to "meek_lite 192.0.2.18:80 BE776A53492E1E044A26F17306E1BC46A55A1625"
+        ))
+        E2e.openLink("https://check.torproject.org/?b9")
+        // Tor's data is already on the phone: with the old torrc it connected again within seconds
+        assertTrue("Tor started without the chosen bridges. Screen: ${E2e.screenTexts()}",
+            !E2e.has(By.textContains("Congratulations"), 60_000))
     }
 }

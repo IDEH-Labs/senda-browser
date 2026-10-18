@@ -75,6 +75,7 @@ Priority 1 are regressions of bugs fixed in October 2026; they must pass before 
 | B5 (`network`) | Tor: started cold, check.torproject.org reports Tor; after Senda spends 90 s in the background, Tor works again on return | `de65914` |
 | B6 (`network`) | Tor: a circuit per site. check.torproject.org and ipv4.myip.wtf (both IPv4 only: Tor exits may use IPv6, as in Tor Browser) show different exits; check.torproject.org again shows its first exit. It measures once check.torproject.org gives the same exit twice in a row: Tor replaces its first circuits for a while after it starts, even for one SOCKS username. Two circuits can end at the same exit (about 1-2 % of runs): retried once by hand | `ab8d5d1` |
 | B7 (`network`) | Another app listens on 9050 before Senda starts Tor: the page loads through Tor and that app receives no connection (pages go through Tor's socket file in a folder only Senda can open, as in Tor Browser for Android) | port fix, 2026-10-13 |
+| B9 (`network`) | After Tor was used without bridges, bridges Senda cannot prepare never let Tor start without them: check.torproject.org never says "Congratulations" (failed with the previous code 4 of 4 times, 2026-10-18). When a Tor test fails, it records the Tor state shown in the Tor dialog | `f436d6d` |
 
 ### C. JavaScript setting and GNU LibreJS (priority 1)
 

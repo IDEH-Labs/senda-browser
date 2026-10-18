@@ -64,6 +64,12 @@ object E2e {
         if (prefs.isNotEmpty()) writePrefs(prefs)
     }
 
+    /** Stops the e2e app and replaces its settings with [prefs], keeping the rest of its data (as a person changing settings). */
+    fun setPrefs(prefs: Map<String, Any>) {
+        stop()
+        writePrefs(prefs)
+    }
+
     private fun writePrefs(prefs: Map<String, Any>) {
         val entries = prefs.entries.joinToString("\n") { (key, value) ->
             when (value) {
