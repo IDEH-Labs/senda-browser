@@ -1,13 +1,13 @@
 Senda is a free web browser for Android built on Mozilla's GeckoView engine, independent of Chromium. The interface is available in 8 languages: Spanish, English, German, French, Portuguese, Italian, Japanese and Chinese.
 
-<b>Beta version.</b> It has been tested on a single phone model and has not had an external security audit. It is not yet recommended for sensitive data. Bug reports are welcome.
+<b>Honest note.</b> Senda has been tested on one phone model and has not had an external security audit yet. For strong anonymity, use Tor Browser. Bug reports are welcome.
 
 <b>Privacy and security</b>
 <ul>
 <li>Strict tracking protection, isolated third-party cookies, tracking-parameter stripping and Global Privacy Control.</li>
 <li>Built-in uBlock Origin.</li>
 <li>JavaScript setting: all, none, or only free JavaScript with GNU LibreJS.</li>
-<li>No DRM: streaming sites that require it (Netflix, Disney+…) do not play video; their apps do.</li>
+<li>No DRM: streaming sites that require it do not play video; their own apps do.</li>
 <li>HTTPS-only mode and DNS over HTTPS, both on by default.</li>
 <li>Built-in Tor network (optional), or your own SOCKS5/HTTP proxy.</li>
 <li>Password vault encrypted with AES-256-GCM, with the key kept in the phone's secure hardware and unlocked with fingerprint or PIN. Import and export passwords (CSV from Chrome, Brave, Edge, Firefox, Bitwarden or KeePassXC).</li>

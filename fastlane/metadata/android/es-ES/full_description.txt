@@ -1,0 +1,39 @@
+Senda es un navegador web libre para Android basado en el motor GeckoView de Mozilla, independiente de Chromium. La interfaz está disponible en 8 idiomas: español, inglés, alemán, francés, portugués, italiano, japonés y chino.
+
+<b>Nota honesta.</b> Senda se ha probado en un solo modelo de teléfono y todavía no ha tenido una auditoría de seguridad externa. Para un anonimato fuerte, usa Tor Browser. Los reportes de errores son bienvenidos.
+
+<b>Privacidad y seguridad</b>
+<ul>
+<li>Protección estricta contra el rastreo, cookies de terceros aisladas, eliminación de parámetros de rastreo y Global Privacy Control.</li>
+<li>uBlock Origin integrado.</li>
+<li>Ajuste de JavaScript: todo, nada, o solo JavaScript libre con GNU LibreJS.</li>
+<li>Sin DRM: los sitios de streaming que lo exigen no reproducen vídeo; sus propias apps sí.</li>
+<li>Modo solo HTTPS y DNS sobre HTTPS, ambos activados por defecto.</li>
+<li>Red Tor integrada (opcional), o tu propio proxy SOCKS5/HTTP.</li>
+<li>Bóveda de contraseñas cifrada con AES-256-GCM, con la clave guardada en el hardware seguro del teléfono y desbloqueo con huella o PIN. Importa y exporta contraseñas (CSV de Chrome, Brave, Edge, Firefox, Bitwarden o KeePassXC).</li>
+<li>Copia cifrada de marcadores, ajustes, historial y contraseñas con una frase que solo tú conoces, en el formato abierto age: guárdala donde quieras y ábrela con age en cualquier sistema.</li>
+<li>Bloqueo de la app y protección contra capturas de pantalla, opcionales. Sin telemetría.</li>
+</ul>
+
+<b>Navegación</b>
+<ul>
+<li>Pestañas normales y privadas separadas, marcadores, historial y descargas.</li>
+<li>Modo lectura y traducción de páginas en el propio teléfono (el texto nunca sale del teléfono).</li>
+<li>Imprimir o guardar como PDF, buscar en la página, versión de escritorio, accesos directos en la pantalla de inicio.</li>
+<li>Página de inicio con accesos directos y 64 fondos con licencia libre que llenan cualquier pantalla; cinco vienen incluidos y el resto se descarga solo cuando los eliges.</li>
+</ul>
+
+<b>Otros</b>
+<ul>
+<li>Transmisión a la TV mediante la duplicación de pantalla de Android (Miracast). Los vídeos se pausan al salir de Senda, salvo si se están reproduciendo en la TV.</li>
+</ul>
+
+<b>Conexiones que Senda hace por su cuenta</b>
+<ul>
+<li>DNS sobre HTTPS a través de Quad9 por defecto (se puede cambiar en Ajustes).</li>
+<li>Las listas de protección contra el rastreo de Mozilla.</li>
+<li>Las actualizaciones de las listas de filtros de uBlock Origin.</li>
+<li>Las noticias de la página de inicio desde los canales RSS de MuyLinux, EFF y FSF, solo en los diseños que muestran noticias.</li>
+<li>Los modelos de traducción de Mozilla, la primera vez que se traduce un idioma.</li>
+<li>Los fondos que no vienen incluidos, solo cuando eliges uno, desde la release del proyecto en Codeberg (GitHub y GitLab como respaldo), con su SHA-256 comprobado.</li>
+</ul>
