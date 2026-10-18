@@ -68,7 +68,8 @@ browser.webRequest.onHeadersReceived.addListener((details) => {
             mime: type,
             length: isNaN(length) ? -1 : length,
             referer: referer,
-            entry: entry
+            entry: entry,
+            private: details.incognito === true
         });
     } catch (e) {
         console.warn('Senda Media: postMessage error', e);

@@ -45,4 +45,9 @@ object Es {
     const val menuTorProxy = "Red Tor y Proxy"
     const val ublockShield = "Escudo y Protección Móvil"
     const val ublockDashboard = "Panel de Control Completo"
+    const val cast = "Transmitir a la TV"
+    const val castNoVideo = "Esta página aún no tiene un video para enviar. Pon el video en marcha un momento y vuelve a tocar Transmitir. Para una imagen, mantenla pulsada."
+    const val close = "Cerrar"
+    const val tabsMoreOptions = "Más opciones"
+    const val closeAllPrivate = "Cerrar todas las privadas"
 }

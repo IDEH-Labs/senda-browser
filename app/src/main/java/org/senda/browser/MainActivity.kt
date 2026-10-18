@@ -420,6 +420,7 @@ class MainActivity : FragmentActivity() {
                                         val index = tabs.indexOf(tabToClose)
                                         tabToClose.close()
                                         tabs.remove(tabToClose)
+                                        if (tabToClose.isPrivate && tabs.none { it.isPrivate }) org.senda.browser.core.cast.SendaMediaCatalog.clearPrivate()
                                         if (tabs.isEmpty()) {
                                             val fresh = BrowserTab(
                                                 initialUrl = "about:blank",
@@ -439,6 +440,7 @@ class MainActivity : FragmentActivity() {
                                     onCloseAllTabs = {
                                         tabs.forEach { it.close() }
                                         tabs.clear()
+                                        org.senda.browser.core.cast.SendaMediaCatalog.clearPrivate()
                                         val fresh = BrowserTab(
                                             initialUrl = "about:blank",
                                             isPrivate = prefs.alwaysPrivateMode,

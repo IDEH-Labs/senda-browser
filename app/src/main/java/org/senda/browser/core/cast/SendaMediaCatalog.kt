@@ -24,7 +24,9 @@ object SendaMediaCatalog {
         val referer: String?,
         val foundAt: Long,
         /** A live broadcast's entry playlist, which redirects to a new session on every request. */
-        val isEntry: Boolean = false
+        val isEntry: Boolean = false,
+        /** Found in a private tab: forgotten when the last private tab closes ([clearPrivate]). */
+        val isPrivate: Boolean = false
     ) {
         val isHls: Boolean
             get() = mime.contains("mpegurl", ignoreCase = true) ||
@@ -116,7 +118,18 @@ object SendaMediaCatalog {
     }
 
     @Synchronized
-    fun clear() = byPage.clear()
+    fun clear() {
+        byPage.clear()
+        version++
+    }
+
+    /** Forgets what private tabs found, as Gecko does with their data when the last one closes. */
+    @Synchronized
+    fun clearPrivate() {
+        byPage.values.forEach { list -> list.removeAll { it.isPrivate } }
+        byPage.values.removeAll { it.isEmpty() }
+        version++
+    }
 
     val messageDelegate = object : WebExtension.MessageDelegate {
         override fun onConnect(port: WebExtension.Port) {
@@ -134,7 +147,8 @@ object SendaMediaCatalog {
                             length = json.optLong("length", -1L),
                             referer = json.optString("referer").takeIf { it.isNotBlank() && it != "null" },
                             foundAt = System.currentTimeMillis(),
-                            isEntry = json.optBoolean("entry", false)
+                            isEntry = json.optBoolean("entry", false),
+                            isPrivate = json.optBoolean("private", false)
                         )
                     )
                 }

@@ -798,6 +798,8 @@ fun ClearBrowsingDataDialog(
                 onClick = {
                     if (clearHistory) {
                         prefs.clearHistoryRange(selectedRange)
+                        // The videos detected on the pages visited (memory only) go with the history
+                        org.senda.browser.core.cast.SendaMediaCatalog.clear()
                     }
                     if (clearCookies || clearCache) {
                         SendaGeckoEngine.clearBrowsingData(clearCookies = clearCookies, clearCache = clearCache)

@@ -144,6 +144,15 @@ engine and code, no personal data). Only host names and ports are recorded.
 |---|---|
 | J1 | 5,000 random events with a fixed seed (`monkey -p org.senda.browser.e2e`), with the app set to a stopped local proxy so nothing reaches the internet: no crash, no freeze |
 
+### L. Videos detected for the TV (priority 1)
+
+No TV is needed: "Cast to the TV" says whether the page has a video to send. Opening it looks for TVs on the Wi-Fi
+(an SSDP search that stays on the local network).
+
+| Id | What it checks | Guards |
+|---|---|---|
+| L1 | A private tab's video is forgotten when the last private tab closes, while a normal tab's video is still offered (fails without the fix, checked on 2026-10-17) | 2026-10-17 fix |
+
 ### K. With the user present (manual)
 
 The password vault must not open without a fingerprint or PIN, so it is not automated around that: the person running

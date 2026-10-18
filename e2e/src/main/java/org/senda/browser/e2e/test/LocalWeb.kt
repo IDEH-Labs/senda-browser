@@ -77,6 +77,18 @@ object LocalWeb {
 
     @Volatile var slowDelayMs = 10_000L
 
+    /** Whether /vpriv.html still has its video: once off, the same page is served without it (MediaTest L1). */
+    @Volatile var privateVideo = true
+
+    /** Requests for each test video, by path. */
+    val videoRequests = java.util.concurrent.ConcurrentHashMap<String, AtomicInteger>()
+
+    /** Big enough for Senda to count it as the page's video (512 KB minimum); its content is never played. */
+    private const val VIDEO_BYTES = 600 * 1024
+
+    private fun videoPage(title: String, video: String?) =
+        page(title, video?.let { "<video src=\"$it\" autoplay muted preload=\"auto\"></video>" } ?: "<p>No video</p>")
+
     private var server: ServerSocket? = null
     private var proxy: ServerSocket? = null
 
@@ -99,6 +111,7 @@ object LocalWeb {
         else InetAddress.getByName("127.0.0.1")
         host = address.hostAddress!!
         directRequests.set(0); proxiedRequests.set(0); refusedHosts.clear()
+        privateVideo = true; videoRequests.clear()
         server = ServerSocket(0, 50, address).also { s -> acceptLoop(s) { handlePage(it, viaProxy = false) } }
         proxy = ServerSocket(0, 50, InetAddress.getByName("127.0.0.1")).also { s -> acceptLoop(s) { handleProxy(it) } }
     }
@@ -176,6 +189,17 @@ object LocalWeb {
             path == "/slow.html" -> {
                 Thread.sleep(slowDelayMs)
                 respond(out, "text/html", page("e2e-slow", "<p>Slow page</p>"))
+            }
+            path == "/vpriv.html" -> respond(out, "text/html", videoPage("e2e-vpriv", if (privateVideo) "v1.mp4" else null))
+            path == "/vnormal.html" -> respond(out, "text/html", videoPage("e2e-vnormal", "v2.mp4"))
+            path == "/v1.mp4" || path == "/v2.mp4" -> {
+                videoRequests.getOrPut(path) { AtomicInteger() }.incrementAndGet()
+                out.write(
+                    ("HTTP/1.1 200 OK\r\nContent-Type: video/mp4\r\nContent-Length: $VIDEO_BYTES\r\n" +
+                        "Cache-Control: no-store\r\nConnection: close\r\n\r\n").toByteArray()
+                )
+                // The player gives up on these zeros and closes the connection: the headers are what Senda looks at
+                runCatching { out.write(ByteArray(VIDEO_BYTES)); out.flush() }
             }
             pages.containsKey(path) -> respond(out, "text/html", pages.getValue(path))
             else -> respond(out, "text/plain", "not found", status = "404 Not Found")
