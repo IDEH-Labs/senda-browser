@@ -38,6 +38,8 @@ class SendaApplication : Application() {
                 val sw = java.io.StringWriter()
                 val pw = java.io.PrintWriter(sw)
                 throwable.printStackTrace(pw)
+                // Only the latest crashes: past 256 KB the log starts over instead of growing forever
+                if (crashFile.length() > 256 * 1024) crashFile.delete()
                 crashFile.appendText("Time: ${java.util.Date()}\nThread: ${thread.name}\n$sw\n---\n")
             } catch (_: Exception) {}
             defaultHandler?.uncaughtException(thread, throwable)
