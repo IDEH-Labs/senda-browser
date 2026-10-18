@@ -40,6 +40,7 @@ Only the latest release receives fixes.
 
 ## Verifying releases
 
-Release APKs are signed with the certificate whose SHA-256 is
-`431d64a9a39e299956aef5880b88c4830fc81add2acdd9571c76d5323c775309`, and release tags are GPG-signed. See the
+Release APKs from 0.2.0 on are signed by IDEH (`CN=Senda, OU=IDEH Labs, O=IDEH`) with the certificate whose
+SHA-256 is `22803c92259bdf9d09eb595b735cfd1f0e0eda7d4b54d411a17972161157b06e`, and release tags are GPG-signed. Up to 0.2.0-beta.16 they were signed with
+an earlier certificate, `431d64a9a39e299956aef5880b88c4830fc81add2acdd9571c76d5323c775309`. See the
 release notes of each version for its APK checksum.

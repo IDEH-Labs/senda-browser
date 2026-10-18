@@ -90,8 +90,9 @@ Senda includes no telemetry or usage reports. Firefox's captive portal detection
   [GitLab](https://gitlab.com/ideh-labs/senda-browser/-/releases)), each with its SHA-256.
 - **F-Droid client**: add the IDEH Labs repository `https://senda-fdroid-7a0636.gitlab.io/fdroid/repo` and check that its
   fingerprint is `2A4DF40FECF9E96C3986E500F42C2EC99065BAA5AA7CA90B50F887D7A886FCF2`. It serves the same APKs as the releases.
-- Every APK is signed by IDEH Labs with certificate SHA-256
-  `431d64a9a39e299956aef5880b88c4830fc81add2acdd9571c76d5323c775309`.
+- Every APK from 0.2.0 on is signed by IDEH (IDEH Labs) with certificate SHA-256
+  `22803c92259bdf9d09eb595b735cfd1f0e0eda7d4b54d411a17972161157b06e`. Betas up to 0.2.0-beta.16 used an earlier
+  certificate (`431d64a9…5309`): uninstall them before installing 0.2.0.
 
 Senda is not in the official F-Droid repository yet: F-Droid builds everything from source, and Senda still uses
 Mozilla's prebuilt GeckoView.

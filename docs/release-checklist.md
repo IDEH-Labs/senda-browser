@@ -29,7 +29,7 @@ security release without help.
 
 - `bash ~/.local/bin/senda-compilar-firmado` (asks for the GPG passphrase; it packages from scratch, so no old
   library is left inside the APK).
-- Check the APK: certificate SHA-256 `431d64a9…5309`, size below 100 MiB, and that the sum of its entries is close to
+- Check the APK: certificate SHA-256 `22803c92…b06e` (`CN=Senda, OU=IDEH Labs, O=IDEH`), size below 100 MiB, and that the sum of its entries is close to
   the file size.
 - Bump `versionCode` and `versionName`, add `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt`.
 
