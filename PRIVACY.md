@@ -1,6 +1,6 @@
 # Senda privacy policy
 
-_Last updated: October 10, 2026. Applies to Senda for Android, published by IDEH Labs._
+_Last updated: October 18, 2026. Applies to Senda for Android, published by IDEH Labs._
 
 Senda is a web browser. It has **no accounts, no servers of its own, no analytics, no telemetry and no
 advertising**. Its developers receive nothing about you or about how you use it.
@@ -69,6 +69,6 @@ about this before creating them.
 
 ## Contact
 
-Questions or reports: <https://github.com/IDEH-Labs/senda-browser/issues> or
+Privacy questions: <support@ideh.top>. Questions or reports: <https://github.com/IDEH-Labs/senda-browser/issues> or
 <https://gitlab.com/ideh-labs/senda-browser/-/issues>. Please never include passwords or personal data in a report.
 Security vulnerabilities: please report them privately, as described in [SECURITY.md](SECURITY.md).
