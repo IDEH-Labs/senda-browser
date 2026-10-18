@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <application>
+        <!-- simpleperf, Perfetto and am profile can measure it without making it debuggable -->
+        <profileable android:shell="true" />
+        <!-- No icon in the launcher, as in the e2e app: a person must not mistake it for their Senda -->
+        <activity
+            android:name="org.senda.browser.MainActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            tools:replace="android:excludeFromRecents">
+            <intent-filter tools:node="remove">
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

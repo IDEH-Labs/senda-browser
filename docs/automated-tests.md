@@ -31,6 +31,11 @@ and without contacting anything the person running it did not agree to.
 - **`e2e` build type** in `app/build.gradle`: `debuggable`, `applicationIdSuffix '.e2e'`, debug signing, app name
   "Senda e2e". Minified like release (`minifyEnabled true`, same ProGuard rules) so code shrinking problems show up,
   as they could in a release.
+- **`lab` build type**, for performance measurements only: built exactly like the release and **not** debuggable
+  (Android: debuggable apps "aren't useful for measuring timing accurately"), `applicationIdSuffix '.lab'`, debug
+  signing, app name "Senda lab", no launcher icon, `<profileable android:shell="true"/>` so simpleperf, Perfetto and
+  `am profile` can measure it. The e2e suite cannot drive it (it needs `run-as`): correctness is checked on `e2e`,
+  timing on `lab`, both from the same code.
 - **`:e2e` test module** (`com.android.test` plugin, `targetProjectPath ':app'`, `targetVariant 'e2e'`), running in
   its own process (`android.experimental.self-instrumenting`, to be checked against the AGP version in use before
   relying on it). A separate process is required: several tests force-stop and restart the app, which would kill

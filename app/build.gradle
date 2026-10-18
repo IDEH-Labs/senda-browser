@@ -82,6 +82,14 @@ android {
             debuggable true
             matchingFallbacks = ['release']
         }
+        // Performance measurements: a separate app built exactly like the release (not debuggable: Android documents
+        // that debuggable apps are "not useful for measuring timing accurately"), profileable from the shell
+        lab {
+            initWith release
+            applicationIdSuffix '.lab'
+            signingConfig signingConfigs.debug
+            matchingFallbacks = ['release']
+        }
     }
 
     compileOptions {
