@@ -1,0 +1,32 @@
+Senda is a free and private web browser built on Mozilla's GeckoView engine, independent of Chromium. No accounts, no ads, no analytics, no telemetry: everything you keep stays on your phone.
+
+★ WHAT MAKES SENDA DIFFERENT
+• Built-in Tor network: hide your IP address from websites, with Snowflake and custom bridges (obfs4, WebTunnel) against censorship. If the chosen bridges cannot be used, Tor does not start without them.
+• uBlock Origin built in, plus strict tracking protection, isolated third-party cookies, tracking-parameter stripping and Global Privacy Control.
+• Free JavaScript only, if you choose: GNU LibreJS blocks nonfree scripts. Or turn JavaScript on or off for every site.
+• Password vault encrypted with AES-256-GCM. Its key lives in the phone's secure hardware (Android Keystore, TEE) and only works after your fingerprint or PIN. Import and export CSV from Chrome, Brave, Edge, Firefox, Bitwarden or KeePassXC, and generate strong passwords.
+• Encrypted backup of bookmarks, settings, history and passwords with a passphrase only you know, in the open age format: keep it wherever you want and open it with age on any system.
+• TV mode: mirror the screen to your TV (Miracast) and Senda adapts the phone to it while mirroring: 60 Hz, and the TV's 16:9 format when the phone is turned. Nothing is sent to any server.
+
+★ PRIVACY AND SECURITY
+• HTTPS-only mode and DNS over HTTPS (Quad9 by default), both on from the start.
+• Security levels Standard, Safer and Safest, as in Tor Browser.
+• No DRM: streaming sites that require it do not play video; their own apps do.
+• Optional app lock with fingerprint or PIN, and screenshot protection.
+• Passkeys through the password manager you choose on your phone.
+
+★ BROWSING
+• Separate normal and private tabs; private tabs leave no history.
+• Reader mode with key sentences and text search.
+• Page translation on the phone itself: the text never leaves it.
+• Print or save as PDF, find in page, desktop site, home screen shortcuts.
+• Home page with shortcuts and 64 freely licensed wallpapers.
+• Interface in 8 languages: English, Spanish, German, French, Portuguese, Italian, Japanese and Chinese.
+
+★ CONNECTIONS SENDA MAKES ON ITS OWN
+DNS over HTTPS (Quad9 by default, can be changed), Mozilla's tracking protection lists, uBlock Origin filter updates, home page news feeds (only in layouts that show news), Mozilla's translation models (the first time a language is translated) and wallpapers you choose (from the project's release, with their SHA-256 checked).
+
+★ HONEST NOTE
+Senda has been tested on one phone model and has not had an external security audit yet. Senda is not Tor Browser: it does not make all its users look alike. For strong anonymity, use Tor Browser.
+
+Free software (GPL-3.0-or-later), developed by IDEH Labs. Source code: https://codeberg.org/IDEH-Labs/senda-browser
