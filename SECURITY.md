@@ -7,10 +7,9 @@ yet, and independent review is very welcome.
 
 Please report security problems **privately**, not in a public issue:
 
-- **GitHub**: [report a vulnerability](https://github.com/IDEH-Labs/senda-browser/security/advisories/new)
-  (private vulnerability reporting).
-- **GitLab**: open an issue at <https://gitlab.com/ideh-labs/senda-browser/-/issues/new> and tick
-  **"This issue is confidential"** before submitting.
+- **Codeberg / Direct Email**: send an encrypted email or report to **<security@ideh.top>** or **<support@ideh.top>**.
+- **GitHub**: [report a vulnerability](https://github.com/IDEH-Labs/senda-browser/security/advisories/new) (private vulnerability reporting).
+- **GitLab**: open an issue at <https://gitlab.com/ideh-labs/senda-browser/-/issues/new> and tick **"This issue is confidential"** before submitting.
 
 Include, if you can: the Senda version (Settings → About), the Android version and phone model, the steps to
 reproduce, and what an attacker could achieve. Never include your own passwords or personal data.
