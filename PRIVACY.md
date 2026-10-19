@@ -69,6 +69,6 @@ about this before creating them.
 
 ## Contact
 
-Privacy questions: <support@ideh.top>. Questions or reports: <https://github.com/IDEH-Labs/senda-browser/issues> or
+Privacy questions: <support@ideh.top>. Questions or reports: <https://codeberg.org/IDEH-Labs/senda-browser/issues>, <https://github.com/IDEH-Labs/senda-browser/issues> or
 <https://gitlab.com/ideh-labs/senda-browser/-/issues>. Please never include passwords or personal data in a report.
 Security vulnerabilities: please report them privately, as described in [SECURITY.md](SECURITY.md).

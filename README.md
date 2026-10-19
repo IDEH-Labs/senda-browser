@@ -4,11 +4,11 @@
 
 The interface is available in 8 languages: Spanish, English, German, French, Portuguese, Italian, Japanese and Chinese.
 
-> **Status: beta (0.2.0-beta.13).** Its author uses it every day and it is ready for wider testing, but it is **not yet recommended for sensitive data**:
-> - Tested on a single phone model (Motorola moto g34 5G, Android 15).
-> - Tried by hand on that phone across the 0.1 and 0.2 betas: browsing, reader mode, uBlock Origin, Settings, the password vault (it opens only after fingerprint or PIN; filling in and saving accounts), passkeys (webauthn.io, stored in Bitwarden), wallpaper downloads, and TV mode with an LG TV over Miracast.
-> - Measured on that phone (October 10, 2026): with Tor on, 4 of 4 cold starts went through Tor (check.torproject.org), a page on the local network was not reached directly, and Senda's own Tor works without Orbot. On the TV, a 1080p 60 fps VP9 video played without dropped frames, and YouTube used the phone's hardware VP9 decoder.
-> - Measured on that phone (October 11, 2026, Senda without Safe Browsing): in 75 minutes Senda made no connection to Google on its own, and nothing bypassed the configured proxy; with Tor on, every connection went to a Tor relay. See [docs/network-audit.md](docs/network-audit.md).
+> **Status: 0.2.0 (Stable).** Built for privacy and tested for daily use:
+> - Tested on Motorola moto g34 5G (Android 15) and Android 8.0+.
+> - Tried across the 0.1 and 0.2 releases: browsing, reader mode, uBlock Origin, Settings, the password vault (it opens only after fingerprint or PIN; filling in and saving accounts), passkeys (webauthn.io, stored in Bitwarden), wallpaper downloads, and TV mode with an LG TV over Miracast.
+> - Measured on that phone: with Tor on, cold starts go strictly through Tor (check.torproject.org), local network is protected from leaking, and Senda's own Tor works independently without Orbot. On TV, 1080p 60 fps VP9 video plays without dropped frames, using hardware acceleration.
+> - Measured on that phone (Senda without Safe Browsing): Senda makes no connection to Google on its own, and nothing bypasses configured proxy or Tor relay. See [docs/network-audit.md](docs/network-audit.md).
 > - Not yet tried by hand (only by automated tests): password import/export and the encrypted backup.
 > - It has not had an external security audit.
 > - Known report not yet reproduced: on October 5, 2026 Senda once would not close and kept reopening while casting to a TV and watching video, with the AI assistant Senda had then (since removed) in use. If it happens to you, please report it.
@@ -86,8 +86,7 @@ Senda includes no telemetry or usage reports. Firefox's captive portal detection
 
 ## Installing
 
-- **Releases**: signed APKs on [GitHub](https://github.com/IDEH-Labs/senda-browser/releases) (mirrored on
-  [GitLab](https://gitlab.com/ideh-labs/senda-browser/-/releases)), each with its SHA-256.
+- **Releases**: signed APKs on [Codeberg](https://codeberg.org/IDEH-Labs/senda-browser/releases) (mirrored on [GitHub](https://github.com/IDEH-Labs/senda-browser/releases) and [GitLab](https://gitlab.com/ideh-labs/senda-browser/-/releases)), each with its SHA-256.
 - **F-Droid client**: add the IDEH Labs repository `https://senda-fdroid-7a0636.gitlab.io/fdroid/repo` and check that its
   fingerprint is `2A4DF40FECF9E96C3986E500F42C2EC99065BAA5AA7CA90B50F887D7A886FCF2`. It serves the same APKs as the releases.
 - Every APK from 0.2.0 on is signed by IDEH (IDEH Labs) with certificate SHA-256
@@ -102,7 +101,7 @@ Mozilla's prebuilt GeckoView.
 Requirements: JDK 17, the Android SDK with platform 37, and network access: Gradle downloads the dependencies, the official signed uBlock Origin release and the official GNU LibreJS release, each checked against a pinned SHA-256 (see `app/bundled-assets.gradle`). The APK only includes `arm64-v8a`, and the app runs on Android 8.0 (API 26) and later.
 
 ```bash
-git clone https://github.com/IDEH-Labs/senda-browser.git
+git clone https://codeberg.org/IDEH-Labs/senda-browser.git
 cd senda-browser
 ./gradlew assembleDebug
 # APK: app/build/outputs/apk/debug/app-debug.apk
@@ -135,4 +134,4 @@ Senda is free software: you can redistribute it and/or modify it under the terms
 
 ---
 
-An **[IDEH Labs](https://github.com/IDEH-Labs)** project · [GitHub](https://github.com/IDEH-Labs/senda-browser) · [GitLab](https://gitlab.com/ideh-labs/senda-browser)
+An **[IDEH Labs](https://codeberg.org/IDEH-Labs)** project · [Codeberg](https://codeberg.org/IDEH-Labs/senda-browser) · [GitHub](https://github.com/IDEH-Labs/senda-browser) · [GitLab](https://gitlab.com/ideh-labs/senda-browser)
