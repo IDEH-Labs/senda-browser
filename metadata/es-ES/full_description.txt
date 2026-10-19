@@ -1,0 +1,10 @@
+Senda es un navegador web libre, soberano y privado para Android, construido sobre Mozilla GeckoView.
+
+Características:
+• Motor independiente: Basado en Mozilla GeckoView, libre del monocultivo de Chromium.
+• Bloqueo nativo de anuncios y rastreo: uBlock Origin integrado para máxima protección.
+• JavaScript libre: Modo GNU LibreJS opcional para bloquear scripts no libres en la web.
+• Red Tor integrada: Enrutamiento directo a través de Tor sin necesidad de apps externas.
+• Privado y seguro: Bóveda de contraseñas con biometría, modo solo-HTTPS y copias cifradas.
+• Traducción local: Traductor en el dispositivo que nunca envía el contenido a servidores externos.
+• Software Libre: Publicado bajo la licencia Mozilla Public License 2.0 (MPL-2.0).

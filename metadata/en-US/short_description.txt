@@ -1,0 +1,1 @@
+Free, sovereign and private web browser built on Mozilla GeckoView.

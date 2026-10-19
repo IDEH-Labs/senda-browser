@@ -1,0 +1,11 @@
+Senda is a free, sovereign and private web browser for Android, built on Mozilla GeckoView.
+
+Features:
+• Independent Engine: Built on Mozilla GeckoView, free from the Chromium monoculture.
+• Native Ad & Tracker Blocking: Integrated uBlock Origin for seamless protection.
+• Free Software JavaScript: Optional GNU LibreJS mode to block non-free web scripts.
+• Built-in Tor Support: Direct routing through the Tor network without third-party apps.
+• Private & Secure: Biometrically locked password vault, HTTPS-only mode, and encrypted backups.
+• Local Translation: On-device offline page translation that never leaks data.
+• Clean & Customizable: Distraction-free reader mode and high-resolution sovereign wallpapers.
+• Free & Open Source: Published under the Mozilla Public License 2.0 (MPL-2.0).
